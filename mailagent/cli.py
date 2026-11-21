@@ -20,6 +20,8 @@ def main(argv: list[str] | None = None) -> int:
     ov.add_argument("--uren", type=int, default=24)
     ov.add_argument("--bestand", help="schrijf het overzicht naar dit bestand")
     sub.add_parser("login", help="eenmalig inloggen bij Outlook (Microsoft 365)")
+    tb = sub.add_parser("test-bronnen", help="mail van het afgelopen etmaal tonen, zonder Claude en zonder iets op te slaan")
+    tb.add_argument("--uren", type=int, default=24)
     args = ap.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -43,6 +45,22 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Inloggen voor bron '{naam}':")
                 bron.login()
         return 0
+
+    if args.opdracht == "test-bronnen":
+        from datetime import datetime, timedelta
+        sinds = datetime.now().astimezone() - timedelta(hours=args.uren)
+        fout = False
+        for naam, bron in bronnen.items():
+            try:
+                mails = bron.haal_op(sinds, 10)
+            except Exception as ex:
+                print(f"{naam}: MISLUKT: {ex}")
+                fout = True
+                continue
+            print(f"{naam}: {len(mails)} mail(s) in de afgelopen {args.uren} uur (maximaal 10 getoond)")
+            for m in mails:
+                print(f"  {m.datum:%d-%m %H:%M}  {m.van[:40]:40}  {m.onderwerp[:60]}")
+        return 1 if fout else 0
 
     from .llm import ClaudeLLM
 

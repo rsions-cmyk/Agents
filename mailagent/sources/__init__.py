@@ -26,7 +26,7 @@ def maak_bronnen(cfg: Config) -> dict[str, Bron]:
             bronnen[naam] = MapBron(naam, cfg.pad.parent / b["pad"], cfg.data_dir)
         elif soort == "applemail":
             from .applemail import AppleMailBron
-            bronnen[naam] = AppleMailBron(naam, b["account"], b.get("mailbox", "INBOX"))
+            bronnen[naam] = AppleMailBron(naam, b["account"], b.get("mailbox", "Inbox"))
         elif soort == "outlook":
             from .outlook import OutlookBron
             bronnen[naam] = OutlookBron(naam, b["client_id"], b.get("tenant", "organizations"),

@@ -29,7 +29,7 @@ on run argv
         set berichten to (messages of mb whose date received > grens)
         set teller to 0
         repeat with m in berichten
-            if teller ≥ maximum then exit repeat
+            if teller >= maximum then exit repeat
             set teller to teller + 1
             set ontvangers to ""
             repeat with r in to recipients of m
@@ -72,7 +72,7 @@ def _osascript(script: str, *args: str) -> str:
 
 
 class AppleMailBron:
-    def __init__(self, naam: str, account: str, mailbox: str = "INBOX"):
+    def __init__(self, naam: str, account: str, mailbox: str = "Inbox"):
         self.naam, self.account, self.mailbox = naam, account, mailbox
 
     def haal_op(self, sinds, maximum: int) -> list[Email]:

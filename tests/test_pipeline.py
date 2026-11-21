@@ -49,11 +49,10 @@ def omgeving(tmp_path):
     shutil.copytree(ROOT / "tests" / "fixtures", tmp_path / "mail")
     cfg_tekst = (ROOT / "config.example.yaml").read_text()
     cfg_tekst = cfg_tekst.replace(
-        """  - type: outlook
+        """  - type: applemail
     naam: buas
-    client_id: "VUL-IN"          # Application (client) ID van je app-registratie
-    tenant: organizations
-    map: inbox""",
+    account: "Exchange"          # naam van het account zoals Apple Mail het toont
+    mailbox: "Inbox"""",
         """  - type: map
     naam: test
     pad: mail""")

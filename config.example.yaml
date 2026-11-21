@@ -10,16 +10,23 @@ data_dir: data
 #   applemail  Elk account dat in Apple Mail staat (bijvoorbeeld een ISTTE-adres).
 #   map        Leest .eml-bestanden uit een map. Handig om te testen.
 bronnen:
-  - type: outlook
+  # BUas-mail via het Exchange-account in Apple Mail. Controleer de namen met:
+  #   osascript -e 'tell application "Mail" to get name of every account'
+  #   osascript -e 'tell application "Mail" to get name of every mailbox of account "Exchange"'
+  - type: applemail
     naam: buas
-    client_id: "VUL-IN"          # Application (client) ID van je app-registratie
-    tenant: organizations
-    map: inbox
+    account: "Exchange"          # naam van het account zoals Apple Mail het toont
+    mailbox: "Inbox"
   # - type: applemail
   #   naam: istte
-  #   account: "ISTTE"           # naam van het account zoals Apple Mail het toont
-  #   mailbox: INBOX
-  # - type: map
+  #   account: "ISTTE"
+  #   mailbox: "Inbox"
+  # - type: outlook               # alleen als je een app-registratie in Entra hebt
+  #   naam: buas-graph
+  #   client_id: "VUL-IN"
+  #   tenant: organizations
+  #   map: inbox
+  # - type: map                   # .eml-bestanden uit een map, om te testen
   #   naam: test
   #   pad: tests/fixtures
 

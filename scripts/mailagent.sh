@@ -8,7 +8,7 @@ if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
   ANTHROPIC_API_KEY="$(security find-generic-password -s mailagent-anthropic -w 2>/dev/null || true)"
   export ANTHROPIC_API_KEY
 fi
-if [ -z "$ANTHROPIC_API_KEY" ] && [ "${1:-}" != "overzicht" ] && [ "${1:-}" != "login" ]; then
+if [ -z "$ANTHROPIC_API_KEY" ] && [ "${1:-}" != "overzicht" ] && [ "${1:-}" != "login" ] && [ "${1:-}" != "test-bronnen" ]; then
   echo "Geen API-sleutel. Zet hem in de sleutelhanger met:" >&2
   echo "  security add-generic-password -s mailagent-anthropic -a \"\$USER\" -w" >&2
   exit 2
