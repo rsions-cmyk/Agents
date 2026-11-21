@@ -56,11 +56,15 @@ def run(cfg: Config, store: Store, bronnen: dict, llm: LLM) -> dict[str, int]:
 
         nieuw = 0
         nieuwste = sinds
-        for mail in sorted(mails, key=lambda m: m.datum):
+        te_doen = [m for m in sorted(mails, key=lambda m: m.datum) if not store.is_bekend(m)]
+        log.info("%s: %d opgehaald, %d nieuw te verwerken", naam, len(mails), len(te_doen))
+        for mail in mails:
             nieuwste = max(nieuwste, mail.datum)
-            if store.is_bekend(mail):
-                continue
-            verwerk_mail(cfg, store, llm, mail)
+        for i, mail in enumerate(te_doen, 1):
+            log.info("%s %d/%d: %s", naam, i, len(te_doen), mail.onderwerp[:70])
+            item_id = verwerk_mail(cfg, store, llm, mail)
+            item = store.item(item_id)
+            log.info("   -> %s, %s (%s)", item["project"], item["actie"], item["status"])
             nieuw += 1
         store.zet_laatst_opgehaald(naam, nieuwste)
         store.log(None, f"run {naam}: {len(mails)} opgehaald, {nieuw} nieuw")
