@@ -52,7 +52,7 @@ def omgeving(tmp_path):
         """  - type: applemail
     naam: buas
     account: "Exchange"          # naam van het account zoals Apple Mail het toont
-    mailbox: "Inbox"""",
+    mailbox: "Inbox\"""",
         """  - type: map
     naam: test
     pad: mail""")
