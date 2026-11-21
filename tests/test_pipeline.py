@@ -56,6 +56,9 @@ def omgeving(tmp_path):
         """  - type: map
     naam: test
     pad: mail""")
+    begin = cfg_tekst.index("  # Google-account in Apple Mail")
+    eind = cfg_tekst.index("  # - type: outlook")
+    cfg_tekst = cfg_tekst[:begin] + cfg_tekst[eind:]
     cfg_tekst = cfg_tekst.replace('    # - "@mijnbank.nl"', '    - "@mijnbank.example"')
     cfg_tekst = cfg_tekst.replace("eerste_run_dagen_terug: 2", "eerste_run_dagen_terug: 100000")
     (tmp_path / "config.yaml").write_text(cfg_tekst)
