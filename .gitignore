@@ -5,3 +5,8 @@ config.yaml
 data/
 *.sqlite
 .token_cache.json
+.env
+.env.*
+*.key
+*.pem
+secrets*
