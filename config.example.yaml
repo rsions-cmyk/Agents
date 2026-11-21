@@ -1,0 +1,76 @@
+# Kopieer dit bestand naar config.yaml en pas het aan.
+# config.yaml staat in .gitignore, zodat je adressen en regels niet in git belanden.
+
+# Map voor de database, logbestanden en concepten (relatief aan dit bestand).
+data_dir: data
+
+# Welke mailbron(nen) gebruik je? Je kunt er meerdere tegelijk aanzetten.
+#   outlook    Microsoft 365 via Microsoft Graph (BUas-account). Maakt concepten
+#              als antwoord in je map Concepten. Vereist een app-registratie, zie README.
+#   applemail  Elk account dat in Apple Mail staat (bijvoorbeeld een ISTTE-adres).
+#   map        Leest .eml-bestanden uit een map. Handig om te testen.
+bronnen:
+  - type: outlook
+    naam: buas
+    client_id: "VUL-IN"          # Application (client) ID van je app-registratie
+    tenant: organizations
+    map: inbox
+  # - type: applemail
+  #   naam: istte
+  #   account: "ISTTE"           # naam van het account zoals Apple Mail het toont
+  #   mailbox: INBOX
+  # - type: map
+  #   naam: test
+  #   pad: tests/fixtures
+
+# Hoe ver terug de eerste keer (daarna haalt hij alleen nieuwe mail op).
+eerste_run_dagen_terug: 2
+max_mails_per_run: 60
+
+# Claude-instellingen. effort: low | medium | high
+claude:
+  model: claude-opus-5-5
+  sorteren_effort: low
+  uitwerken_effort: medium
+
+# Projecten. De naam moet overeenkomen met een bestand in projecten/<naam>.md.
+projecten:
+  - onderwijs
+  - onderzoek
+  - istte
+  - overig
+
+# Vaste regels, lokaal toegepast vóór Claude. De eerste regel die past, wint.
+# 'van' en 'onderwerp' zijn tekstfragmenten (hoofdletters maken niet uit).
+regels:
+  - van: "@istte.org"
+    project: istte
+  - onderwerp: "ISTTE"
+    project: istte
+  - van: "@students.buas.nl"
+    project: onderwijs
+  # - van: "nieuwsbrief@"
+  #   project: overig
+  #   actie: ter_info
+
+# Deze mails gaan nooit naar Claude. Ze komen alleen als 'handmatig' in je overzicht.
+nooit_naar_claude:
+  van:
+    # - "@mijnbank.nl"
+    # - "huisarts"
+  onderwerp:
+    # - "vertrouwelijk"
+    # - "medisch"
+
+# Tekst die vervangen wordt vóór iets naar Claude gaat (reguliere expressies).
+# Standaard: studentnummers van 6 of 7 cijfers en IBAN-nummers.
+anonimiseren:
+  - patroon: '\b\d{6,7}\b'
+    vervang: '[NUMMER]'
+  - patroon: '\b[A-Z]{2}\d{2}[A-Z0-9]{4}\d{7,16}\b'
+    vervang: '[IBAN]'
+
+# Lokale goedkeuringspagina
+web:
+  host: 127.0.0.1
+  poort: 8765
