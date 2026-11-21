@@ -17,10 +17,11 @@ bronnen:
     naam: buas
     account: "Exchange"          # naam van het account zoals Apple Mail het toont
     mailbox: "Inbox"
-  # - type: applemail
-  #   naam: istte
-  #   account: "ISTTE"
-  #   mailbox: "Inbox"
+  # Google-account in Apple Mail. Gmail noemt het postvak meestal "INBOX" (hoofdletters).
+  - type: applemail
+    naam: google
+    account: "Google"            # naam van het account zoals Apple Mail het toont
+    mailbox: "INBOX"
   # - type: outlook               # alleen als je een app-registratie in Entra hebt
   #   naam: buas-graph
   #   client_id: "VUL-IN"
