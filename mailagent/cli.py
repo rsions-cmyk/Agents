@@ -62,11 +62,11 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  {m.datum:%d-%m %H:%M}  {m.van[:40]:40}  {m.onderwerp[:60]}")
         return 1 if fout else 0
 
-    from .llm import ClaudeLLM
+    from .llm import maak_llm
 
     if args.opdracht == "run":
         from .pipeline import overzicht, run
-        res = run(cfg, store, bronnen, ClaudeLLM(cfg))
+        res = run(cfg, store, bronnen, maak_llm(cfg))
         for naam, n in res.items():
             print(f"{naam}: {'ophalen mislukt (zie log)' if n < 0 else f'{n} nieuwe mail(s) verwerkt'}")
         (cfg.data_dir / "overzicht.md").write_text(overzicht(cfg, store), encoding="utf-8")
@@ -74,7 +74,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.opdracht == "inbox":
         from .web import serveer
-        serveer(cfg, store, bronnen, lambda: ClaudeLLM(cfg))
+        serveer(cfg, store, bronnen, lambda: maak_llm(cfg))
         return 0
     return 0
 

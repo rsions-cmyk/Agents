@@ -150,3 +150,40 @@ def test_weigering_wordt_fout_item(omgeving):
     run(cfg, store, bronnen, ClaudeLLM(cfg, client=client))
     fout = store.items(status="fout")
     assert len(fout) == 4 and "weigerde" in fout[0]["opmerking"]
+
+
+def test_claude_code_aanroep(omgeving):
+    """Controleert de `claude -p`-aanroep met een nep-subprocess."""
+    from mailagent.llm import ClaudeCodeLLM, LLMFout
+
+    cfg, store, bronnen = omgeving
+    aanroepen = []
+
+    def nep_run(cmd, **kw):
+        aanroepen.append((cmd, kw))
+        schema = json.loads(cmd[cmd.index("--json-schema") + 1])
+        data = ({"project": "onderzoek", "actie": "antwoorden", "prioriteit": "hoog", "deadline": None,
+                 "samenvatting": "x", "reden": "y"} if "project" in schema["properties"] else
+                {"concept_antwoord": "Dear Tracy", "taken": [], "agenda_voorstel": None, "vragen_aan_jou": None})
+        return SimpleNamespace(returncode=0, stderr="",
+                               stdout=json.dumps({"result": "", "is_error": False, "structured_output": data}))
+
+    llm = ClaudeCodeLLM(cfg, uitvoerder=nep_run)
+    mail = bronnen["test"].haal_op(None, 10)[1]
+    s = llm.sorteer(mail, mail.tekst, None)
+    u = llm.werk_uit(mail, mail.tekst, s)
+    assert u.concept_antwoord == "Dear Tracy"
+
+    cmd, kw = aanroepen[0]
+    assert cmd[:2] == ["claude", "-p"]
+    assert cmd[cmd.index("--tools") + 1] == ""                       # geen tools
+    assert "mcp__*" in cmd and "--strict-mcp-config" in cmd           # geen MCP-servers
+    assert cmd[cmd.index("--effort") + 1] == "low"
+    assert mail.onderwerp in kw["input"] and mail.onderwerp not in " ".join(cmd)  # mail via stdin
+    assert "ANTHROPIC_API_KEY" not in kw["env"]                       # abonnement, geen API-sleutel
+
+    def kapot(cmd, **kw):
+        return SimpleNamespace(returncode=1, stderr="", stdout=json.dumps({"is_error": True, "result": "Not logged in"}))
+
+    with pytest.raises(LLMFout, match="Not logged in"):
+        ClaudeCodeLLM(cfg, uitvoerder=kapot).sorteer(mail, mail.tekst, None)

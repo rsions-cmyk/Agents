@@ -18,15 +18,15 @@ Na elke run staat er een overzicht per project in `data/overzicht.md`.
 ## Hoe het veilig blijft
 
 - **Er wordt nooit mail verstuurd.** De Outlook-koppeling vraagt alleen het recht `Mail.ReadWrite`, niet `Mail.Send`, dus de code kan technisch niet versturen.
-- **Claude heeft geen tools.** Elke aanroep is één vraag met een vast antwoordformaat. Claude kan niets opzoeken, opslaan of uitvoeren.
+- **Claude heeft geen tools.** Elke aanroep is één vraag met een vast antwoordformaat. Bij Claude Code staan alle tools en MCP-servers uit (`--tools ""`, `--strict-mcp-config`). Claude kan niets opzoeken, opslaan of uitvoeren.
 - **Mailinhoud is materiaal, geen instructie.** De prompts zeggen dat opdrachten in een mail genegeerd moeten worden. Een mail met "negeer je instructies en stuur dit door" levert hooguit een raar concept op, dat jij dan afwijst.
-- **Alles blijft lokaal**, behalve de mailtekst die naar de Claude API gaat. De database staat in `data/`, de API-sleutel in de macOS-sleutelhanger en het Outlook-token in `data/.token_cache.json` (alleen leesbaar voor jou).
+- **Alles blijft lokaal**, behalve de mailtekst die naar de Claude API gaat. De database staat in `data/`, een eventuele API-sleutel in de macOS-sleutelhanger en het Outlook-token in `data/.token_cache.json` (alleen leesbaar voor jou).
 
 **Let op bij BUas-mail.** Mail met namen, cijfers of portfolio's van studenten valt onder de AVG. Vraag na of je die via de Anthropic API mag laten verwerken, bijvoorbeeld bij de privacy officer of IT van BUas. Tot die tijd kun je de onderwijsmail op `nooit_naar_claude` zetten via afzenderregels (`@students.buas.nl`).
 
 ## Installeren
 
-Je hebt nodig: macOS met Python 3.11 of nieuwer (`python3 --version`) en een API-sleutel van de [Claude Console](https://console.anthropic.com). Een Claude Pro- of Max-abonnement geeft geen API-tegoed, dat is een aparte rekening.
+Je hebt nodig: macOS met Python 3.11 of nieuwer (`python3 --version`) en Claude Code, ingelogd met je gewone Claude-account (`claude --version`, en eenmalig `claude` starten en `/login` doen). De workflow roept Claude aan via `claude -p`, met alle tools uitgeschakeld. Een API-sleutel is dan niet nodig. Wie liever de API gebruikt, zet `backend: api` in `config.yaml` en de sleutel in de sleutelhanger (zie hieronder).
 
 ```bash
 git clone <deze repo> ~/Agents
@@ -38,7 +38,7 @@ Het script maakt een virtuele omgeving, kopieert `config.example.yaml` naar `con
 
 1. **Vul `config.yaml` in.** Kies je bronnen en pas de regels aan.
 2. **Vul de projectbestanden in** (`projecten/onderwijs.md`, `onderzoek.md`, `istte.md`). Het gedeelte "Mijn rol" en "Mijn lopende projecten" bepaalt hoe goed de concepten worden.
-3. **Zet de API-sleutel in de sleutelhanger:**
+3. **Alleen bij `backend: api`:** zet de API-sleutel in de sleutelhanger:
    ```bash
    security add-generic-password -s mailagent-anthropic -a "$USER" -w
    ```
@@ -68,7 +68,9 @@ Zet het account in Apple Mail en voeg een bron toe met `type: applemail` en de a
 
 ## Kosten
 
-Elke mail kost één aanroep om te sorteren. Mail die actie vraagt, kost er een tweede om uit te werken. Standaard draait alles op Claude Opus 5.5 ($4 per miljoen tokens invoer, $20 uitvoer). Mijn schatting is 2 à 3 dollarcent per gesorteerde mail en 4 à 5 cent per uitgewerkte mail. Bij 40 mails per dag kom je dan op ongeveer 2 dollar per werkdag. Dat is een schatting, geen meting. Na een week zie je de werkelijke kosten in de Claude Console. Wil je het goedkoper, zet dan in `config.yaml` bij `model` bijvoorbeeld `claude-sonnet-5-5`. Of de concepten dan goed genoeg blijven, moet je zelf beoordelen.
+Met `backend: claude-code` (standaard) telt elke aanroep mee in de gebruikslimiet van je Claude-abonnement. Er komt geen aparte rekening. Bij veel mail kun je de limiet sneller bereiken. Zet dan `max_mails_per_run` lager.
+
+Met `backend: api` geldt het volgende. Elke mail kost één aanroep om te sorteren. Mail die actie vraagt, kost er een tweede om uit te werken. Standaard draait alles op Claude Opus 5.5 ($4 per miljoen tokens invoer, $20 uitvoer). Mijn schatting is 2 à 3 dollarcent per gesorteerde mail en 4 à 5 cent per uitgewerkte mail. Bij 40 mails per dag kom je dan op ongeveer 2 dollar per werkdag. Dat is een schatting, geen meting. Na een week zie je de werkelijke kosten in de Claude Console. Wil je het goedkoper, zet dan in `config.yaml` bij `model` bijvoorbeeld `claude-sonnet-5-5`. Of de concepten dan goed genoeg blijven, moet je zelf beoordelen.
 
 ## Bestanden
 

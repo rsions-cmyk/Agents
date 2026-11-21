@@ -23,6 +23,9 @@ class Config:
     nooit_van: list[str] = field(default_factory=list)
     nooit_onderwerp: list[str] = field(default_factory=list)
     anonimiseren: list[tuple[re.Pattern, str]] = field(default_factory=list)
+    backend: str = "claude-code"
+    claude_pad: str = "claude"
+    claude_code_model: str = "opus"
     model: str = "claude-opus-5-5"
     sorteren_effort: str = "low"
     uitwerken_effort: str = "medium"
@@ -69,6 +72,9 @@ def laad(pad: str | Path = "config.yaml") -> Config:
         nooit_van=[s.lower() for s in (nooit.get("van") or []) if s],
         nooit_onderwerp=[s.lower() for s in (nooit.get("onderwerp") or []) if s],
         anonimiseren=[(re.compile(r["patroon"]), r.get("vervang", "[VERWIJDERD]")) for r in (ruw.get("anonimiseren") or [])],
+        backend=claude.get("backend", "claude-code"),
+        claude_pad=claude.get("pad", "claude"),
+        claude_code_model=claude.get("claude_code_model", "opus"),
         model=claude.get("model", "claude-opus-5-5"),
         sorteren_effort=claude.get("sorteren_effort", "low"),
         uitwerken_effort=claude.get("uitwerken_effort", "medium"),

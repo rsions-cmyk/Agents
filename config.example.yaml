@@ -36,8 +36,13 @@ eerste_run_dagen_terug: 2
 max_mails_per_run: 60
 
 # Claude-instellingen. effort: low | medium | high
+#   backend: claude-code  gebruikt Claude Code op je Mac met je gewone Claude-login (geen API-sleutel)
+#   backend: api          gebruikt de Claude API met een sleutel uit de macOS-sleutelhanger
 claude:
-  model: claude-opus-5-5
+  backend: claude-code
+  pad: claude                    # of het volledige pad, zie: which claude
+  claude_code_model: opus
+  model: claude-opus-5-5         # alleen voor backend: api
   sorteren_effort: low
   uitwerken_effort: medium
 

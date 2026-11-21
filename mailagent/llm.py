@@ -8,6 +8,8 @@ naar de goedkeuringswachtrij.
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 from typing import Protocol
 
 import anthropic
@@ -44,7 +46,7 @@ def mail_blok(mail: Email, tekst: str) -> str:
 class ClaudeLLM:
     def __init__(self, cfg: Config, client: anthropic.Anthropic | None = None):
         self.cfg = cfg
-        self.client = client or anthropic.Anthropic()
+        self._client = client
 
         projectblokken = "\n\n".join(
             f"<project naam=\"{p}\">\n{cfg.project_instructies[p]}\n</project>" for p in cfg.projecten
@@ -64,6 +66,12 @@ class ClaudeLLM:
             "Volg de prioriteitsregels uit de projectbeschrijvingen.\n\n"
             f"{VEILIGHEID}\n\n{projectblokken}"
         )
+
+    @property
+    def client(self) -> anthropic.Anthropic:
+        if self._client is None:
+            self._client = anthropic.Anthropic()
+        return self._client
 
     def _vraag(self, system: str, gebruiker: str, schema: dict, effort: str) -> dict:
         try:
@@ -121,3 +129,54 @@ class ClaudeLLM:
         )
         data = self._vraag(system, gebruiker, SCHEMA_UITWERKING, self.cfg.uitwerken_effort)
         return Uitwerking.model_validate(data)
+
+
+class ClaudeCodeLLM(ClaudeLLM):
+    """Zelfde prompts, maar via `claude -p` (Claude Code) met je Claude-abonnement. Geen API-sleutel nodig.
+
+    Alle tools staan uit (`--tools ""`, geen MCP-servers), dus Claude kan ook hier niets uitvoeren,
+    lezen of versturen. De mail gaat via stdin, de instructie als argument.
+    """
+
+    def __init__(self, cfg: Config, uitvoerder=subprocess.run):
+        super().__init__(cfg, client=None)
+        self.uitvoerder = uitvoerder
+
+    def _vraag(self, system: str, gebruiker: str, schema: dict, effort: str) -> dict:
+        cmd = [
+            self.cfg.claude_pad, "-p",
+            "Beoordeel de e-mail op stdin volgens je instructies en geef alleen het gevraagde JSON-object.",
+            "--output-format", "json",
+            "--json-schema", json.dumps(schema),
+            "--system-prompt", system,
+            "--model", self.cfg.claude_code_model,
+            "--effort", effort,
+            "--tools", "",
+            "--disallowedTools", "mcp__*",
+            "--strict-mcp-config",
+            "--no-session-persistence",
+        ]
+        env = {k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")}
+        try:
+            r = self.uitvoerder(cmd, input=gebruiker, capture_output=True, text=True, timeout=300,
+                                env=env, cwd=str(self.cfg.data_dir))
+        except FileNotFoundError as e:
+            raise LLMFout(f"Claude Code niet gevonden ({self.cfg.claude_pad}). Zet het pad bij claude.pad in config.yaml.") from e
+        except subprocess.TimeoutExpired as e:
+            raise LLMFout("Claude Code reageerde niet binnen 5 minuten") from e
+        try:
+            uit = json.loads(r.stdout)
+        except json.JSONDecodeError:
+            raise LLMFout(f"Claude Code gaf geen JSON terug (code {r.returncode}): {(r.stderr or r.stdout)[:300]}")
+        if r.returncode != 0 or uit.get("is_error"):
+            raise LLMFout(f"Claude Code-fout: {str(uit.get('result') or r.stderr)[:300]}")
+        data = uit.get("structured_output")
+        if not isinstance(data, dict):
+            raise LLMFout(f"geen gestructureerd antwoord: {str(uit.get('result'))[:300]}")
+        return data
+
+
+def maak_llm(cfg: Config) -> LLM:
+    if cfg.backend == "api":
+        return ClaudeLLM(cfg)
+    return ClaudeCodeLLM(cfg)
