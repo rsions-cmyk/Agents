@@ -193,6 +193,49 @@ details.origineel pre{white-space:pre-wrap;font:13px/1.5 -apple-system,sans-seri
 .stappen-klein{margin:4px 0 0;padding-left:18px;color:var(--zacht);font-size:13px}
 .regels summary{cursor:pointer;color:var(--zacht);font-size:13px;padding:4px}
 
+/* zijbalk-koppen */
+.nav-kop{font-size:11px;font-weight:650;text-transform:uppercase;letter-spacing:.06em;color:var(--zacht);padding:14px 10px 4px}
+.kop-tel{color:var(--zacht);font-weight:550}
+.leegpaneel{margin:auto;text-align:center;color:var(--zacht);padding:40px 24px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.leegpaneel .rond{width:56px;height:56px;border-radius:50%;background:var(--ok-zacht);color:var(--ok);display:grid;place-items:center}
+.leegpaneel .rond svg{width:26px;height:26px}
+.sneltoetsen{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--zacht);justify-content:center;max-width:360px}
+kbd{font:600 11px var(--romp,inherit);font-family:inherit;padding:1px 6px;border-radius:5px;border:1px solid var(--lijn);border-bottom-width:2px;background:var(--vlak);color:var(--tekst)}
+.knop kbd{margin-left:4px;font-size:10px;padding:0 4px;opacity:.75;background:transparent;color:inherit;border-color:currentColor}
+.projectkies{font:inherit;font-size:12px;font-weight:600;padding:2px 22px 2px 9px;border-radius:999px;border:0;color:#fff;cursor:pointer;appearance:none;-webkit-appearance:none;
+  background-image:linear-gradient(45deg,transparent 50%,#fff 50%),linear-gradient(135deg,#fff 50%,transparent 50%);background-size:4px 4px;background-position:calc(100% - 11px) 55%,calc(100% - 7px) 55%;background-repeat:no-repeat}
+
+/* drie kolommen op een breed scherm (voorstel A) */
+@media (min-width:1100px){
+  .app.drie{grid-template-columns:210px minmax(330px,420px) 1fr}
+  .app.drie main{height:100vh;overflow-y:auto;position:sticky;top:0;padding:20px 14px 120px;border-right:1px solid var(--lijn)}
+  .app.drie .paneel{position:sticky;top:0;transform:none;transition:none;width:auto;height:100vh;box-shadow:none;border-left:0;z-index:auto}
+  .app.drie ~ .dek{display:none}
+  .app.drie .rij{padding:10px 12px}
+  .app.drie .sluit-mail{display:none}
+}
+
+/* planning (voorstel B) */
+.planning-grid{display:grid;grid-template-columns:minmax(260px,360px) 1fr;gap:18px;align-items:start}
+.kaarten{display:flex;flex-direction:column;gap:8px}
+.kaart{background:var(--vlak);border:1px solid var(--lijn);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:5px;cursor:grab;user-select:none;-webkit-user-select:none}
+.kaart:hover{border-color:var(--zacht)}
+.kaart.gekozen{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-zacht)}
+.kaart .r{display:flex;gap:8px;align-items:center}
+.kaart .titel{font-weight:600;flex:1;min-width:0}
+.kaart .rondje{width:20px;height:20px;border-radius:50%;border:2px solid var(--lijn);display:grid;place-items:center;flex:none;color:transparent}
+.kaart .rondje:hover{border-color:var(--ok);color:var(--ok)}
+.kaart .rondje svg{width:12px;height:12px;stroke-width:3}
+.kaart.ingepland{cursor:default;background:var(--vlak2)}
+.spook{position:fixed;z-index:30;pointer-events:none;background:var(--accent);color:var(--vlak);padding:6px 10px;border-radius:9px;font-weight:600;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.25);transform:translate(-50%,-120%);white-space:nowrap}
+.dagkop{display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+.dagkop b{min-width:170px;text-align:center;font-size:15px}
+.plaatsbalk{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;margin-bottom:8px;border-radius:10px;background:var(--accent-zacht)}
+.plaatsbalk span{flex:1;min-width:0}
+#pl-tijdlijn{max-height:calc(100vh - 190px)}
+.tb.concept{background:transparent;color:var(--accent);border:2px dashed var(--accent);box-shadow:none}
+.tb.concept.botst{color:var(--hoog);border-color:var(--hoog)}
+
 /* telefoon en smal scherm */
 @media (max-width:760px){
   .app{grid-template-columns:1fr}
@@ -206,11 +249,13 @@ details.origineel pre{white-space:pre-wrap;font:13px/1.5 -apple-system,sans-seri
   .balk{width:calc(100vw - 32px);flex-wrap:wrap;justify-content:center}
   .rij{padding:12px}
   .gewoonte{display:none}
+  .planning-grid{grid-template-columns:1fr}
+  .nav-kop{display:none}
 }
 </style>
 </head>
 <body>
-<div class="app">
+<div class="app" id="app">
   <aside class="zij">
     <div class="logo"><span class="blok" data-ikoon="inbox"></span>Mail-inbox</div>
     <div id="nav" style="display:contents"></div>
@@ -221,15 +266,15 @@ details.origineel pre{white-space:pre-wrap;font:13px/1.5 -apple-system,sans-seri
   </aside>
   <main>
     <div class="kop">
-      <h1 id="titel">Alles</h1>
-      <div class="tabs" id="tabs"></div>
+      <h1 id="titel">Te doen</h1>
+      <span class="kop-tel" id="koptel"></span>
     </div>
     <div id="inhoud"></div>
   </main>
+  <aside class="paneel" id="paneel" aria-hidden="true"></aside>
 </div>
 
 <div class="dek" id="dek"></div>
-<aside class="paneel" id="paneel" aria-hidden="true"></aside>
 <div class="balk" id="balk"></div>
 <div class="toasts" id="toasts"></div>
 
@@ -279,8 +324,12 @@ function datum(iso){
 const avatar = (it, klein) => { const a = afzender(it.van);
   return `<div class="avatar${klein?" klein":""}" style="background:${kleur(it.project)}">${esc(initialen(a.naam))}</div>`; };
 
-let D = null, staat = {project:"alles", tab:"beoordelen", open:null, gekozen:new Set()};
-try { const o = JSON.parse(localStorage.getItem("mailagent-ui")||"{}"); Object.assign(staat, {project:o.project||"alles", tab:o.tab||"beoordelen"}); } catch(e){}
+let D = null, staat = {project:"alles", tab:"te_doen", open:null, gekozen:new Set(), geenAuto:false, planDag:null};
+try { const o = JSON.parse(localStorage.getItem("mailagent-ui")||"{}"); Object.assign(staat, {project:o.project||"alles", tab:o.tab||"te_doen"}); } catch(e){}
+if (!["te_doen","planning","opruimen"].includes(staat.tab)) staat.tab = "te_doen";
+const breed = () => window.matchMedia("(min-width:1100px)").matches;
+const drieKolommen = () => breed() && staat.tab !== "planning";
+const teDoen = () => filter([...D.zelf, ...D.wacht]);
 const bewaar = () => { try { localStorage.setItem("mailagent-ui", JSON.stringify({project:staat.project, tab:staat.tab})); } catch(e){} };
 // Items waarvoor een actie onderweg is: meteen van het scherm, terug als de actie mislukt.
 const verborgen = new Set(), takenVerborgen = new Set();
@@ -349,35 +398,68 @@ async function zetTerug(id){
 
 function teken(){
   if(!D) return;
-  // zijbalk
+  const app = document.getElementById("app");
+  app.classList.toggle("drie", drieKolommen());
+  // zijbalk: weergaven en projecten
   const alleWacht = [...D.zelf, ...D.wacht].filter(i => !verborgen.has(i.id));
   const tel = n => n === "alles" ? alleWacht.length : alleWacht.filter(i => i.project === n).length;
-  document.getElementById("nav").innerHTML = [{naam:"alles"}, ...D.projecten].map(p => ({...p, wacht: tel(p.naam)})).map(p => `
+  const inPlan = filter(D.taken, true).filter(t => !t.gepland).length;
+  const opruimN = filter(D.info).length + filter(D.overgeslagen).length;
+  const weergaven = [["te_doen","inbox","Te doen",teDoen().length],["planning","calendar","Planning",inPlan],["opruimen","sparkle","Opruimen",opruimN]];
+  document.getElementById("nav").innerHTML =
+    weergaven.map(([k,i,l,n]) => `<button class="nav${staat.tab===k?" actief":""}" data-tab="${k}">${ik(i)}${l}${n ? `<span class="tel">${n}</span>` : ""}</button>`).join("")
+    + `<div class="nav-kop">Projecten</div>`
+    + [{naam:"alles"}, ...D.projecten].map(p => `
     <button class="nav${p.naam===staat.project?" actief":""}" data-project="${esc(p.naam)}">
-      ${p.naam==="alles" ? ik("inbox") : `<span class="stip" style="background:${kleur(p.naam)}"></span>`}
-      ${esc(naamProject(p.naam))}${p.wacht ? `<span class="tel">${p.wacht}</span>` : ""}
+      ${p.naam==="alles" ? `<span class="stip" style="background:var(--lijn)"></span>` : `<span class="stip" style="background:${kleur(p.naam)}"></span>`}
+      ${esc(naamProject(p.naam))}${tel(p.naam) ? `<span class="tel">${tel(p.naam)}</span>` : ""}
     </button>`).join("");
   const knop = document.getElementById("ophalen");
   knop.classList.toggle("bezig", D.ophalen.bezig);
   knop.lastElementChild.textContent = D.ophalen.bezig ? "Bezig met ophalen…" : "Mail ophalen";
   document.getElementById("status").textContent = D.ophalen.bezig ? "Claude sorteert en schrijft concepten" : (D.ophalen.laatste || "");
-  document.getElementById("titel").textContent = naamProject(staat.project);
-
-  const wacht = filter([...D.zelf, ...D.wacht]), taken = filter(D.taken, true);
-  const opruim = filter(D.info).length + filter(D.overgeslagen).length;
-  const tabs = [["beoordelen","inbox","Beoordelen",wacht.length],["taken","task","Taken",taken.length],["opruimen","sparkle","Opruimen",opruim]];
-  document.getElementById("tabs").innerHTML = tabs.map(([k,i,l,n]) =>
-    `<button class="tab${staat.tab===k?" actief":""}" data-tab="${k}">${ik(i)}${l}<span class="tel">${n||""}</span></button>`).join("");
+  const titels = {te_doen:"Te doen", planning:"Planning", opruimen:"Opruimen"};
+  document.getElementById("titel").textContent = titels[staat.tab] + (staat.project !== "alles" ? " · " + naamProject(staat.project) : "");
+  document.getElementById("koptel").textContent = staat.tab === "te_doen" ? (teDoen().length || "") : "";
 
   const inhoud = document.getElementById("inhoud");
-  if (staat.tab === "beoordelen") inhoud.innerHTML = tekenBeoordelen(wacht);
-  else if (staat.tab === "taken") inhoud.innerHTML = tekenTaken(taken);
+  if (staat.tab === "te_doen") inhoud.innerHTML = tekenBeoordelen(teDoen());
+  else if (staat.tab === "planning") inhoud.innerHTML = tekenPlanning();
   else inhoud.innerHTML = tekenOpruimen();
   tekenBalk();
+
+  // derde kolom / paneel
+  if (taak || antwoord) return;
   if (staat.open !== null){
     const it = [...D.zelf, ...D.wacht].find(i => i.id === staat.open);
-    it ? tekenPaneel(it) : sluitPaneel();
+    if (it) return tekenPaneel(it);
+    staat.open = null;
   }
+  if (drieKolommen()){
+    const lijst = teDoen();
+    if (staat.tab === "te_doen" && lijst.length && !staat.geenAuto){ staat.open = lijst[0].id; return teken(); }
+    tekenLeegPaneel();
+  } else sluitPaneel();
+}
+
+function tekenLeegPaneel(){
+  const p = document.getElementById("paneel");
+  p.dataset.id = "";
+  const klaar = staat.tab === "te_doen" && !teDoen().length;
+  p.innerHTML = `<div class="leegpaneel">
+      ${klaar ? `<div class="rond">${ik("check")}</div><b style="color:var(--tekst)">Alles bijgewerkt</b>Er wacht niets op je.` :
+        staat.tab === "opruimen" ? `${ik("sparkle")}<b style="color:var(--tekst)">Opruimen</b>Archiveer, gooi weg of maak een taak. Bij een taak verschijnt het formulier hier.` :
+        `${ik("mail")}<b style="color:var(--tekst)">Kies een mail</b>`}
+      <div class="sneltoetsen"><span><kbd>J</kbd> <kbd>K</kbd> volgende, vorige</span><span><kbd>⌘</kbd><kbd>↵</kbd> goedkeuren</span>
+        <span><kbd>E</kbd> archiveren</span><span><kbd>#</kbd> prullenbak</span><span><kbd>T</kbd> taak</span><span><kbd>X</kbd> afwijzen</span>
+        <span><kbd>1</kbd>–<kbd>${D.projecten.length}</kbd> project</span></div></div>`;
+  p.classList.add("open"); p.setAttribute("aria-hidden","false");
+}
+
+// volgende mail in Te doen na een actie, zodat je door kunt werken
+function volgendeNa(id){
+  const lijst = teDoen().map(i => i.id), i = lijst.indexOf(id);
+  return i < 0 ? null : (lijst[i+1] ?? lijst[i-1] ?? null);
 }
 
 const leeg = (titel, tekst) => `<div class="lijst"><div class="leeg"><div class="rond">${ik("check")}</div><b>${titel}</b>${tekst}</div></div>`;
@@ -412,12 +494,16 @@ function taakMail(t){
     <button class="knop" data-beantwoord="${t.id}" title="Antwoord schrijven">${ik("reply")}Beantwoorden</button></div>`;
 }
 
-function tekenTaken(items){
+function afgerondHTML(){
   const afgerond = filter(D.afgerond || [], true);
-  const lijstAfgerond = afgerond.length ? `<details class="regels"><summary>Afgerond (${afgerond.length})</summary><div class="lijst">${afgerond.map(t => `
+  return afgerond.length ? `<details class="regels"><summary>Afgerond (${afgerond.length})</summary><div class="lijst">${afgerond.map(t => `
       <div class="rij afgerond" style="cursor:default"><span class="ikoon" style="color:var(--ok)">${ik("check")}</span>
         <div class="midden">${esc(t.omschrijving)}</div><span class="datum">${t.afgerond ? datum(t.afgerond) : ""}</span>
         <button class="knop klein" data-terug="${t.id}">Terugzetten</button></div>`).join("")}</div></details>` : "";
+}
+
+function tekenTaken(items){
+  const lijstAfgerond = afgerondHTML();
   if (!items.length) return leeg("Geen open taken", "Taken verschijnen hier zodra je er een maakt of een uitwerking goedkeurt.") + lijstAfgerond;
   return `<div class="lijst">${items.map(t => `
     <div class="rij taak" data-taak="${t.id}">
@@ -539,16 +625,21 @@ function tekenBalk(){
 function tekenPaneel(it){
   const p = document.getElementById("paneel"), a = afzender(it.van), [ai, al] = ACTIES[it.actie] || ["mail", it.actie];
   const zelf = it.status === "fout" || it.status === "handmatig";
-  const bestaand = p.querySelector("textarea");
-  const concept = bestaand && Number(p.dataset.id) === it.id ? bestaand.value : it.concept;
+  const bestaand = p.querySelector("textarea#concept");
+  const zelfdeMail = Number(p.dataset.id) === it.id;
+  const concept = bestaand && zelfdeMail ? bestaand.value : it.concept;
+  const scroll = zelfdeMail ? (p.querySelector(".p-inhoud")?.scrollTop || 0) : 0;
+  const origOpen = zelfdeMail && p.querySelector("details.origineel")?.open;
+  const focusId = zelfdeMail && p.contains(document.activeElement) ? document.activeElement.id : null;
   p.dataset.id = it.id;
   p.innerHTML = `
     <div class="p-kop">${avatar(it)}
       <div style="min-width:0"><h2>${esc(it.onderwerp)}</h2><div class="van">${esc(a.naam)} · ${esc(a.adres)} · ${datum(it.datum)}</div>
-        <div class="chips"><span class="chip project" style="background:${kleur(it.project)}">${esc(naamProject(it.project))}</span>
+        <div class="chips"><select class="projectkies" data-projectkies="${it.id}" style="background-color:${kleur(it.project)}" aria-label="Project">
+            ${D.projecten.map((pr, i) => `<option value="${esc(pr.naam)}"${pr.naam===it.project?" selected":""}>${esc(naamProject(pr.naam))} (${i+1})</option>`).join("")}</select>
           <span class="chip">${ik(ai)}${al}</span>${it.prioriteit==="hoog"?`<span class="chip hoog">${ik("alert")}Hoog</span>`:""}
           ${it.deadline?`<span class="chip">${ik("clock")}${esc(it.deadline)}</span>`:""}</div></div>
-      <button class="ikoon" id="sluit" title="Sluiten (Esc)">${ik("x")}</button></div>
+      <button class="ikoon sluit-mail" id="sluit" title="Sluiten (Esc)">${ik("x")}</button></div>
     <div class="p-inhoud">
       ${it.samenvatting && it.samenvatting !== it.onderwerp ? `<div class="melding info">${ik("sparkle")}<div>${esc(it.samenvatting)}</div></div>` : ""}
       ${zelf ? `<div class="melding fout">${ik("alert")}<div>${esc(it.opmerking || it.reden || "Bekijk deze mail zelf.")}</div></div>` : ""}
@@ -566,12 +657,16 @@ function tekenPaneel(it){
     </div>
     <div class="p-voet">
       <span class="uitleg">Opent een antwoord in Apple Mail. Je verstuurt zelf.</span>
-      <button class="knop" data-maaktaak="${it.id}" title="Taak maken en inplannen">${ik("calendar")}Taak</button>
-      <button class="knop" id="afwijzen">${ik("x")}Afwijzen</button>
-      <button class="knop goed" id="goedkeuren">${ik("check")}${zelf ? "Afgehandeld" : "Goedkeuren"}</button>
+      <button class="knop" data-maaktaak="${it.id}" title="Taak maken en inplannen (T)">${ik("calendar")}Taak<kbd>T</kbd></button>
+      <button class="knop" data-een="archief" data-id="${it.id}" title="Archiveren zonder antwoord (E)">${ik("archive")}<kbd>E</kbd></button>
+      <button class="knop" id="afwijzen" title="Afwijzen (X)">${ik("x")}Afwijzen<kbd>X</kbd></button>
+      <button class="knop goed" id="goedkeuren" title="Goedkeuren (⌘↵)">${ik("check")}${zelf ? "Afgehandeld" : "Goedkeuren"}<kbd>⌘↵</kbd></button>
     </div>`;
   p.classList.add("open"); p.setAttribute("aria-hidden","false");
-  document.getElementById("dek").classList.add("open");
+  if (!drieKolommen()) document.getElementById("dek").classList.add("open");
+  const inh = p.querySelector(".p-inhoud"); if (inh) inh.scrollTop = scroll;
+  if (origOpen) p.querySelector("details.origineel").open = true;
+  if (focusId){ const f = document.getElementById(focusId); if (f) f.focus(); }
 }
 
 const duurTekst = m => m < 60 ? `${m} min` : `${Math.floor(m/60)} u${m%60 ? " " + (m%60) + " min" : ""}`;
@@ -601,6 +696,7 @@ async function laadDag(dag){
     dagen[dag] = j.ok ? j.afspraken : {fout: j.melding};
   } catch(e){ dagen[dag] = {fout: "Agenda niet bereikbaar"}; }
   if (taak && taak.dag === dag) tekenTaak();
+  else if (staat.tab === "planning" && staat.planDag === dag) teken();
 }
 
 function zetStart(ms){
@@ -736,7 +832,9 @@ async function bevestigTaak(){
   const data = {id: v.id, titel: document.getElementById("t-titel").value, stappen: document.getElementById("t-stappen").value.split("\n"),
                 minuten: v.minuten, deadline: document.getElementById("t-deadline").value || null, start: start || null,
                 archiveren: !!document.getElementById("t-archief")?.checked};
+  const volgende = drieKolommen() && staat.tab === "te_doen" ? volgendeNa(v.id) : null;
   sluitPaneel();
+  if (volgende !== null) staat.open = volgende;
   const weg = [v.id];   // verdwijnt uit Beoordelen of Opruimen; de mail staat daarna bij de taak
   weg.forEach(i => verborgen.add(i)); teken();
   const ok = await actie("taak-maak", data);
@@ -757,18 +855,21 @@ document.addEventListener("input", ev => {
   bewerkt[staat.open][Number(d.tk)][d.veld] = ev.target.value;
 });
 
-function openPaneel(id){ staat.open = id; teken(); }
+function openPaneel(id){ staat.open = id; staat.geenAuto = false; taak = null; antwoord = null; teken();
+  document.querySelector(`.rij[data-open="${id}"]`)?.scrollIntoView({block:"nearest"}); }
 function sluitPaneel(){
   staat.open = null; taak = null; antwoord = null;
+  document.querySelectorAll(".rij.gekozen[data-open]").forEach(r => r.classList.remove("gekozen"));
+  document.getElementById("dek").classList.remove("open");
+  if (drieKolommen() && D){ return tekenLeegPaneel(); }
   document.getElementById("paneel").classList.remove("open");
   document.getElementById("paneel").setAttribute("aria-hidden","true");
-  document.getElementById("dek").classList.remove("open");
-  document.querySelectorAll(".rij.gekozen[data-open]").forEach(r => r.classList.remove("gekozen"));
 }
 
 function verplaats(ids, doel){
   if (!ids.length) return;
   ids.forEach(i => staat.gekozen.delete(i));
+  if (staat.tab === "te_doen" && ids.includes(staat.open)){ const v = volgendeNa(staat.open); staat.open = v; staat.geenAuto = v === null; }
   if (doel === "overslaan") return actie("verplaats", {ids, doel}).then(laad);
   return meteen(ids, "verplaats", {ids, doel});
 }
@@ -799,8 +900,8 @@ document.addEventListener("click", async ev => {
   if (t.id === "taakmaak") return bevestigTaak();
   if (taak && t.id === "t-archief"){ taak.archiveren = t.checked; return; }
   if (t.id === "sluit2") return sluitPaneel();
-  if (d.project){ staat.project = d.project; staat.gekozen.clear(); bewaar(); sluitPaneel(); return teken(); }
-  if (d.tab){ staat.tab = d.tab; bewaar(); sluitPaneel(); return teken(); }
+  if (d.project){ staat.project = d.project; staat.gekozen.clear(); staat.geenAuto = false; bewaar(); sluitPaneel(); return teken(); }
+  if (d.tab){ staat.tab = d.tab; staat.geenAuto = false; bewaar(); sluitPaneel(); return teken(); }
   if (d.open){ return openPaneel(Number(d.open)); }
   if (d.klaar){ return vinkAf(Number(d.klaar)); }
   if (d.terug){ return zetTerug(Number(d.terug)); }
@@ -825,7 +926,9 @@ document.addEventListener("click", async ev => {
     const goed = t.id === "goedkeuren";
     const data = goed ? {id, concept: document.getElementById("concept").value,
                          taken: (bewerkt[id] || null)} : {id};
+    const volgende = drieKolommen() ? volgendeNa(id) : null;
     sluitPaneel();
+    if (volgende !== null){ staat.open = volgende; }
     if (goed && data.concept.trim()) toast("Concept gaat naar Apple Mail…");
     const ok = await meteen([id], goed ? "goedkeuren" : "afwijzen", data);
     if (!ok){ staat.open = id; teken(); }   // mislukt: paneel met je tekst weer openen
@@ -888,8 +991,211 @@ document.addEventListener("pointerup", ev => {
 });
 document.getElementById("dek").addEventListener("click", sluitPaneel);
 document.addEventListener("keydown", ev => {
-  if (ev.key === "Escape") sluitPaneel();
-  if (ev.key === "Enter" && ev.target.dataset && ev.target.dataset.open) openPaneel(Number(ev.target.dataset.open));
+  const inVeld = ev.target.closest && ev.target.closest("input, textarea, select");
+  if (ev.key === "Escape"){ if (inVeld) return ev.target.blur(); if (plaatsing){ plaatsing = null; return teken(); } return (staat.geenAuto = true, sluitPaneel()); }
+  if (ev.key === "Enter" && ev.target.dataset && ev.target.dataset.open) return openPaneel(Number(ev.target.dataset.open));
+  if (staat.tab !== "te_doen" || taak || antwoord) return;
+  const id = staat.open;
+  if ((ev.metaKey || ev.ctrlKey) && ev.key === "Enter" && id !== null){ ev.preventDefault(); return document.getElementById("goedkeuren")?.click(); }
+  if (inVeld || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  const lijst = teDoen().map(i => i.id), i = lijst.indexOf(id);
+  if (ev.key === "j" || ev.key === "ArrowDown"){ ev.preventDefault(); if (lijst.length) openPaneel(lijst[Math.min(lijst.length-1, i+1)]); return; }
+  if (ev.key === "k" || ev.key === "ArrowUp"){ ev.preventDefault(); if (lijst.length) openPaneel(lijst[Math.max(0, i-1)]); return; }
+  if (id === null) return;
+  if (ev.key === "e") return verplaats([id], "archief");
+  if (ev.key === "#" || ev.key === "Delete" || ev.key === "Backspace"){ ev.preventDefault(); return verplaats([id], "prullenbak"); }
+  if (ev.key === "x") return document.getElementById("afwijzen")?.click();
+  if (ev.key === "t") return openTaak(id);
+  const n = Number(ev.key);
+  if (n >= 1 && n <= D.projecten.length) return zetProject(id, D.projecten[n-1].naam);
+});
+
+async function zetProject(id, project){
+  const it = [...D.zelf, ...D.wacht].find(x => x.id === id);
+  if (!it || it.project === project) return;
+  it.project = project; teken();
+  const j = await stil("project", {id, project});
+  toast(j.melding, !j.ok);
+  laad();
+}
+document.addEventListener("change", ev => {
+  if (ev.target.dataset && ev.target.dataset.projectkies) zetProject(Number(ev.target.dataset.projectkies), ev.target.value);
+});
+window.addEventListener("resize", () => { if (D) teken(); });
+
+// ---------------- Planning (voorstel B): taken links, dag rechts ----------------
+let plaatsing = null;        // {id, start(ms), minuten} — nog niet bevestigd
+let gekozenKaart = null;     // taak-id om met een tik op de dag te plaatsen (telefoon)
+let kaartSleep = null, plSleep = null;
+
+function vandaagWerkdag(){
+  const d = new Date(), dagen = (D.werktijd && D.werktijd.dagen) || [1,2,3,4,5];
+  for (let i = 0; i < 7 && !dagen.includes(d.getDay() === 0 ? 7 : d.getDay()); i++) d.setDate(d.getDate() + 1);
+  return isoDag(d);
+}
+
+function tekenPlanning(){
+  if (!staat.planDag) staat.planDag = vandaagWerkdag();
+  const taken = filter(D.taken, true);
+  const open = taken.filter(t => !t.gepland), ingepland = taken.filter(t => t.gepland).sort((a, b) => a.gepland.localeCompare(b.gepland));
+  const totaal = open.reduce((a, t) => a + (t.minuten || 30), 0);
+  const kaart = (t, plan) => `
+    <div class="kaart${plan ? " ingepland" : ""}${gekozenKaart === t.id ? " gekozen" : ""}" ${plan ? "" : `data-kaart="${t.id}"`}>
+      <div class="r"><button class="rondje" data-klaar="${t.id}" title="Afvinken">${ik("check")}</button>
+        <span class="stip" style="background:${kleur(t.project)}"></span><span class="titel">${esc(t.omschrijving)}</span></div>
+      <div class="chips">
+        <span class="chip">${ik("clock")}${duurTekst(t.minuten || 30)}</span>
+        ${plan ? `<span class="chip let">${ik("calendar")}${momentTekst(t.gepland, t.minuten)}</span>` : ""}
+        ${t.deadline ? `<span class="chip">deadline ${esc(t.deadline)}</span>` : ""}</div>
+      ${taakMail(t)}
+    </div>`;
+  const links = `<div class="kaarten">
+      <div class="groep-kop"><h2>Nog in te plannen · ${open.length}</h2><span class="meta" style="margin-left:auto">${open.length ? duurTekst(totaal) : ""}</span></div>
+      ${open.length ? open.map(t => kaart(t, false)).join("") : `<div class="lijst"><div class="leeg" style="padding:30px"><b>Alles ingepland</b>Nieuwe taken verschijnen hier.</div></div>`}
+      ${ingepland.length ? `<div class="groep-kop" style="margin-top:14px"><h2>Ingepland · ${ingepland.length}</h2></div>${ingepland.map(t => kaart(t, true)).join("")}` : ""}
+      ${afgerondHTML()}
+    </div>`;
+  let rechts;
+  if (!D.agenda_aan) rechts = `<div class="melding">${ik("alert")}<div>Koppel je agenda om taken te kunnen inplannen: zet <code>agenda:</code> in config.yaml (zie README).</div></div>`;
+  else {
+    const dagLabel = new Date(staat.planDag + "T12:00").toLocaleDateString("nl-NL", {weekday:"long", day:"numeric", month:"long"});
+    laadDag(staat.planDag);
+    const t = plaatsing && D.taken.find(x => x.id === plaatsing.id);
+    rechts = `<div class="dagkop">
+        <button class="ikoon" data-pldag="-1" title="Vorige dag">${ik("chevron").replace("<path", '<path transform="rotate(180 12 12)"')}</button>
+        <b>${esc(dagLabel)}</b>
+        <button class="ikoon" data-pldag="1" title="Volgende dag">${ik("chevron")}</button>
+        <button class="knop klein" data-pldag="0">Vandaag</button>
+        <span class="meta" style="margin-left:auto">${gekozenKaart ? "Tik op een tijd om de taak te plaatsen" : "Sleep een taak naar een tijd"}</span></div>
+      ${t ? `<div class="plaatsbalk">${ik("calendar")}<span><b>${esc(t.omschrijving)}</b> · ${blokTijdVan(plaatsing.start, plaatsing.minuten)}${plBotsingen().length ? ` · <span style="color:var(--hoog)">overlapt met ${esc(plBotsingen().map(a => a.titel).join(", "))}</span>` : ""}</span>
+          <button class="knop klein" id="pl-annuleer">Annuleren</button><button class="knop klein goed" id="pl-bevestig">${ik("check")}Inplannen</button></div>` : ""}
+      ${plTijdlijnHTML()}`;
+  }
+  return `<div class="planning-grid">${links}<div>${rechts}</div></div>`;
+}
+
+const blokTijdVan = (start, minuten) => `${tijdVan(start)}–${tijdVan(start + minuten*60000)} · ${duurTekst(minuten)}`;
+function plBotsingen(){
+  if (!plaatsing) return [];
+  const lijst = Array.isArray(dagen[staat.planDag]) ? dagen[staat.planDag] : [];
+  const b = plaatsing.start, e = b + plaatsing.minuten*60000;
+  return lijst.filter(a => !a.heledag && !a.vrij && Date.parse(a.start) < e && Date.parse(a.eind) > b);
+}
+
+function plTijdlijnHTML(){
+  const lijst = dagen[staat.planDag];
+  if (lijst === undefined || lijst === "laden") return `<div class="tijdlijn"><div class="tl-laden">Agenda laden…</div></div>`;
+  if (lijst.fout) return `<div class="melding">${ik("alert")}<div>${esc(lijst.fout)}</div></div>`;
+  const w = D.werktijd || {begin:"09:00", eind:"17:00"}, d0 = dagBegin(staat.planDag);
+  let van = Math.max(0, uurMin(w.begin) - 60), tot = Math.min(24*60, uurMin(w.eind) + 60);
+  if (plaatsing && isoDag(new Date(plaatsing.start)) === staat.planDag){
+    const sm = (plaatsing.start - d0)/60000;
+    van = Math.min(van, Math.floor(sm/60)*60); tot = Math.max(tot, Math.ceil((sm + plaatsing.minuten)/60)*60);
+  }
+  const y = m => (m - van) * PX;
+  let h = "";
+  if (uurMin(w.begin) > van) h += `<div class="buiten" style="top:0;height:${y(uurMin(w.begin))}px"></div>`;
+  if (uurMin(w.eind) < tot) h += `<div class="buiten" style="top:${y(uurMin(w.eind))}px;height:${y(tot)-y(uurMin(w.eind))}px"></div>`;
+  for (let m = van; m < tot; m += 30) h += `<div class="uur${m % 60 ? " half" : ""}" style="top:${y(m)}px">${m % 60 ? "" : `<span>${tweeCijfers(m/60)}:00</span>`}</div>`;
+  const blokken = lijst.filter(a => !a.heledag).map(a => ({...a, b: Math.max(van, (Date.parse(a.start)-d0)/60000), e: Math.min(tot, (Date.parse(a.eind)-d0)/60000)}))
+                       .filter(a => a.e > a.b).sort((p, q) => p.b - q.b);
+  const kolEind = [];
+  blokken.forEach(a => { let k = kolEind.findIndex(e => e <= a.b); if (k < 0){ k = kolEind.length; kolEind.push(0); } kolEind[k] = a.e; a.kol = k; });
+  const n = Math.max(1, kolEind.length);
+  blokken.forEach(a => { h += `<div class="afs${a.vrij ? " vrij" : ""}" style="top:${y(a.b)}px;height:${Math.max(16, (a.e-a.b)*PX - 2)}px;left:${a.kol*100/n}%;width:calc(${100/n}% - 3px)" title="${esc(a.titel)}">${esc(a.titel)}</div>`; });
+  if (plaatsing && isoDag(new Date(plaatsing.start)) === staat.planDag){
+    const t = D.taken.find(x => x.id === plaatsing.id);
+    h += `<div class="tb concept${plBotsingen().length ? " botst" : ""}" id="pl-blok" style="top:${y((plaatsing.start-d0)/60000)}px;height:${plaatsing.minuten*PX - 2}px">
+            <b>${esc(t ? t.omschrijving : "Taak")}</b><span id="pl-tijd">${blokTijdVan(plaatsing.start, plaatsing.minuten)}</span><div class="rek"></div></div>`;
+  }
+  const heledag = lijst.filter(a => a.heledag);
+  return (heledag.length ? `<div class="heledag">${heledag.map(a => `<span>${esc(a.titel)}</span>`).join("")}</div>` : "") +
+    `<div class="tijdlijn" id="pl-tijdlijn"><div class="tl-binnen" id="pl-binnen" data-van="${van}" style="height:${(tot-van)*PX}px">${h}</div></div>`;
+}
+
+function minuutOp(clientY){
+  const binnen = document.getElementById("pl-binnen");
+  if (!binnen) return null;
+  const r = binnen.getBoundingClientRect();
+  if (clientY < r.top || clientY > r.bottom) return null;
+  return Math.round(((clientY - r.top) / PX + Number(binnen.dataset.van)) / 15) * 15;
+}
+function plaats(id, clientY){
+  const t = D.taken.find(x => x.id === id), m = minuutOp(clientY);
+  if (!t || m === null) return false;
+  const duur = t.minuten || 30;
+  plaatsing = {id, minuten: duur, start: dagBegin(staat.planDag) + Math.max(0, Math.min(24*60 - duur, m)) * 60000};
+  gekozenKaart = null;
+  teken();
+  return true;
+}
+
+document.addEventListener("pointerdown", ev => {
+  if (staat.tab !== "planning") return;
+  const kaartEl = ev.target.closest("[data-kaart]");
+  if (kaartEl && !ev.target.closest("button") && ev.pointerType !== "touch"){
+    kaartSleep = {id: Number(kaartEl.dataset.kaart), x0: ev.clientX, y0: ev.clientY, spook: null};
+    return;
+  }
+  const blok = ev.target.closest("#pl-blok");
+  if (blok && plaatsing){
+    plSleep = {modus: ev.target.closest(".rek") ? "rek" : "schuif", y0: ev.clientY, start0: plaatsing.start, duur0: plaatsing.minuten};
+    blok.setPointerCapture(ev.pointerId); ev.preventDefault();
+  }
+});
+document.addEventListener("pointermove", ev => {
+  if (kaartSleep){
+    if (!kaartSleep.spook && Math.hypot(ev.clientX - kaartSleep.x0, ev.clientY - kaartSleep.y0) > 6){
+      const t = D.taken.find(x => x.id === kaartSleep.id);
+      kaartSleep.spook = Object.assign(document.createElement("div"), {className: "spook", textContent: `${t.omschrijving} · ${duurTekst(t.minuten || 30)}`});
+      document.body.append(kaartSleep.spook);
+    }
+    if (kaartSleep.spook){ kaartSleep.spook.style.left = ev.clientX + "px"; kaartSleep.spook.style.top = ev.clientY + "px"; }
+    return;
+  }
+  if (!plSleep || !plaatsing) return;
+  const stap = Math.round((ev.clientY - plSleep.y0) / PX / 15) * 15, d0 = dagBegin(staat.planDag);
+  if (plSleep.modus === "schuif") plaatsing.start = d0 + Math.min(24*60 - plaatsing.minuten, Math.max(0, (plSleep.start0 - d0)/60000 + stap)) * 60000;
+  else plaatsing.minuten = Math.max(15, Math.min(24*60 - (plaatsing.start - d0)/60000, plSleep.duur0 + stap));
+  const blok = document.getElementById("pl-blok"), van = Number(document.getElementById("pl-binnen").dataset.van);
+  blok.style.top = ((plaatsing.start - d0)/60000 - van) * PX + "px";
+  blok.style.height = plaatsing.minuten * PX - 2 + "px";
+  blok.classList.toggle("botst", plBotsingen().length > 0);
+  document.getElementById("pl-tijd").textContent = blokTijdVan(plaatsing.start, plaatsing.minuten);
+});
+document.addEventListener("pointerup", ev => {
+  if (kaartSleep){
+    const k = kaartSleep; kaartSleep = null;
+    if (k.spook){ k.spook.remove(); if (!plaats(k.id, ev.clientY)) toast("Laat de taak los boven een tijd in de dag", true); }
+    else { gekozenKaart = gekozenKaart === k.id ? null : k.id; teken(); }   // klik zonder slepen: kiezen
+    return;
+  }
+  if (plSleep){ plSleep = null; return teken(); }
+  if (staat.tab === "planning" && gekozenKaart && ev.target.closest("#pl-tijdlijn") && !ev.target.closest("#pl-blok")) plaats(gekozenKaart, ev.clientY);
+  else if (staat.tab === "planning" && ev.pointerType === "touch" && ev.target.closest("[data-kaart]") && !ev.target.closest("button")){
+    const id = Number(ev.target.closest("[data-kaart]").dataset.kaart); gekozenKaart = gekozenKaart === id ? null : id; teken();
+  }
+});
+document.addEventListener("click", async ev => {
+  const t = ev.target.closest("button");
+  if (!t || staat.tab !== "planning") return;
+  if (t.dataset.pldag !== undefined){
+    const stap = Number(t.dataset.pldag);
+    staat.planDag = stap === 0 ? vandaagWerkdag() : isoDag(new Date(dagBegin(staat.planDag) + stap * 86400000 + 3600000));
+    if (plaatsing){ const sm = plaatsing.start - dagBegin(isoDag(new Date(plaatsing.start))); plaatsing.start = dagBegin(staat.planDag) + sm; }
+    return teken();
+  }
+  if (t.id === "pl-annuleer"){ plaatsing = null; return teken(); }
+  if (t.id === "pl-bevestig" && plaatsing){
+    const p = plaatsing, dag = isoDag(new Date(p.start));
+    plaatsing = null;
+    const taakRij = D.taken.find(x => x.id === p.id); if (taakRij){ taakRij.gepland = lokaalIso(p.start); taakRij.minuten = p.minuten; }
+    teken();
+    const j = await stil("taak-plannen", {id: p.id, start: lokaalIso(p.start), minuten: p.minuten});
+    toast(j.melding, !j.ok);
+    delete dagen[dag];
+    laad();
+  }
 });
 document.querySelectorAll("[data-ikoon]").forEach(el => el.innerHTML = ik(el.dataset.ikoon));
 laad();

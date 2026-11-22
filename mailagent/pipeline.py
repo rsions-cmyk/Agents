@@ -162,6 +162,24 @@ def maak_taak(store: Store, bronnen: dict, agenda, item_id: int, titel: str, sta
     return "; ".join(meldingen)
 
 
+def plan_bestaande_taak(store: Store, agenda, taak_id: int, start: datetime, minuten: int) -> str:
+    """Een open taak in de agenda zetten (vanuit Planning). Alleen na een klik."""
+    if agenda is None:
+        raise ValueError("geen agenda gekoppeld")
+    t = store.taak(taak_id)
+    if t is None:
+        raise ValueError("taak niet gevonden")
+    stappen = json.loads(t["stappen"] or "[]")
+    notities = "\n".join(f"- {s}" for s in stappen)
+    if t["item_id"]:
+        it = store.item(t["item_id"])
+        if it is not None:
+            notities += f"\n\nNaar aanleiding van: {it['onderwerp']} ({it['van']})"
+    melding = agenda.maak_afspraak(t["omschrijving"], start, start + timedelta(minutes=minuten), notities.strip())
+    store.plan_taak(taak_id, start.isoformat(timespec="minutes"), minuten)
+    return melding
+
+
 def open_antwoord(store: Store, bronnen: dict, item_id: int, tekst: str) -> str:
     """Antwoordvenster openen voor de mail achter een taak. Verandert niets aan taak of status."""
     item = store.item(item_id)

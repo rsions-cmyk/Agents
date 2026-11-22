@@ -22,7 +22,7 @@ from .agenda import lees_werktijd, maak_agenda, vrije_momenten
 from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
-from .pipeline import afzender_adres, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
+from .pipeline import afzender_adres, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
 from .store import Store
 
 APP_HTML = Path(__file__).with_name("static") / "app.html"
@@ -66,6 +66,7 @@ def afzender_voorstellen(store: Store) -> dict:
 
 
 def verzamel(cfg: Config, store: Store, ophalen: dict) -> dict:
+    werk = lees_werktijd(cfg.agenda)
     tellingen = {p: len(store.items(status="wacht", project=p)) for p in cfg.projecten}
     zelf = store.items(status="fout") + store.items(status="handmatig")
     return {
@@ -79,6 +80,8 @@ def verzamel(cfg: Config, store: Store, ophalen: dict) -> dict:
         "regels": [dict(r) for r in store.afzender_regels()],
         **afzender_voorstellen(store),
         "ophalen": {"bezig": ophalen["bezig"], "laatste": ophalen["laatste"]},
+        "werktijd": {"begin": werk.begin.strftime("%H:%M"), "eind": werk.eind.strftime("%H:%M"), "dagen": sorted(werk.dagen)},
+        "agenda_aan": bool((cfg.agenda or {}).get("kalender")),
     }
 
 
@@ -265,6 +268,18 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                                             stappen, int(v.get("minuten") or 30), v.get("deadline") or None,
                                             start, bool(v.get("archiveren")),
                                             vlag=cfg.vlag_kleur if cfg.vlag_aan else None)
+                elif actie == "taak-plannen":
+                    ag, fout = agenda()
+                    if ag is None:
+                        return self._json({"ok": False, "melding": fout or "geen agenda gekoppeld"})
+                    start = datetime.fromisoformat(v["start"]).astimezone()
+                    with mail_slot:
+                        melding = plan_bestaande_taak(store, ag, int(v["id"]), start, int(v.get("minuten") or 30))
+                elif actie == "project":
+                    if v.get("project") not in cfg.projecten:
+                        return self._json({"ok": False, "melding": "Onbekend project"})
+                    store.zet_project(int(v["id"]), v["project"])
+                    melding = f"Verplaatst naar {v['project']}"
                 elif actie == "regels-toevoegen":
                     adressen = [a.strip().lower() for a in v.get("adressen", []) if a.strip()]
                     for a in adressen:

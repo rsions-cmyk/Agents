@@ -205,6 +205,17 @@ class Store:
         self.db.commit()
         self.log(None, f"taak {taak_id} teruggezet")
 
+    def plan_taak(self, taak_id: int, gepland: str, minuten: int) -> None:
+        self.db.execute("UPDATE taken SET gepland=?, minuten=? WHERE id=?", (gepland, minuten, taak_id))
+        self.db.commit()
+        self.log(None, f"taak {taak_id} ingepland op {gepland}")
+
+    def zet_project(self, item_id: int, project: str) -> None:
+        self.db.execute("UPDATE items SET project=? WHERE id=?", (project, item_id))
+        self.db.execute("UPDATE taken SET project=? WHERE item_id=?", (project, item_id))
+        self.db.commit()
+        self.log(item_id, f"project gecorrigeerd naar {project}")
+
     def taak(self, taak_id: int) -> Optional[sqlite3.Row]:
         return self.db.execute("SELECT * FROM taken WHERE id=?", (taak_id,)).fetchone()
 
