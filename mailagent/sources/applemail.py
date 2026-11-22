@@ -7,11 +7,13 @@ De eerste keer vraagt macOS of Terminal (of Python) Mail mag besturen: dat moet 
 
 from __future__ import annotations
 
+import logging
 import subprocess
 from datetime import datetime, timedelta
 
 from ..models import Email
 
+log = logging.getLogger("mailagent")
 RS, US = "\x1e", "\x1f"  # scheidingstekens tussen berichten en velden
 
 SCRIPT_LIJST = r'''
@@ -265,16 +267,20 @@ class AppleMailBron:
         nu = datetime.now().astimezone()
         oudste = min(d for mid, d in rijen[:maximum])
         seconden = int((nu - oudste).total_seconds()) + 120
-        uit = _osascript(SCRIPT_DETAILS, self.account, self.mailbox, str(seconden), *kies)
         mails = []
-        for rec in uit.split(RS):
-            velden = rec.split(US)
-            if len(velden) < 8:
-                continue
-            mid, message_id, van, aan, onderwerp, geleden, bulk, inhoud = velden[:7] + [US.join(velden[7:])]
-            mails.append(Email(bron=self.naam, bron_id=mid.strip(), van=van, aan=aan.rstrip(", "),
-                               onderwerp=onderwerp, datum=nu - timedelta(seconds=int(geleden or 0)),
-                               tekst=inhoud.strip(), thread_id=message_id, extra={"bulk": bulk == "1"}))
+        stuk = 20   # in stukken, zodat je voortgang ziet en een trage mail niet alles ophoudt
+        for i in range(0, len(kies), stuk):
+            deel = kies[i:i + stuk]
+            log.info("%s: inhoud ophalen %d-%d van %d…", self.naam, i + 1, i + len(deel), len(kies))
+            uit = _osascript(SCRIPT_DETAILS, self.account, self.mailbox, str(seconden), *deel)
+            for rec in uit.split(RS):
+                velden = rec.split(US)
+                if len(velden) < 8:
+                    continue
+                mid, message_id, van, aan, onderwerp, geleden, bulk, inhoud = velden[:7] + [US.join(velden[7:])]
+                mails.append(Email(bron=self.naam, bron_id=mid.strip(), van=van, aan=aan.rstrip(", "),
+                                   onderwerp=onderwerp, datum=nu - timedelta(seconds=int(geleden or 0)),
+                                   tekst=inhoud.strip(), thread_id=message_id, extra={"bulk": bulk == "1"}))
         return sorted(mails, key=lambda m: m.datum)
 
     def maak_concept(self, bron_id: str, tekst: str, onderwerp: str, aan: str, message_id: str | None = None) -> str:
