@@ -227,7 +227,10 @@ const avatar = (it, klein) => { const a = afzender(it.van);
 let D = null, staat = {project:"alles", tab:"beoordelen", open:null, gekozen:new Set()};
 try { const o = JSON.parse(localStorage.getItem("mailagent-ui")||"{}"); Object.assign(staat, {project:o.project||"alles", tab:o.tab||"beoordelen"}); } catch(e){}
 const bewaar = () => { try { localStorage.setItem("mailagent-ui", JSON.stringify({project:staat.project, tab:staat.tab})); } catch(e){} };
-const filter = lijst => staat.project === "alles" ? lijst : lijst.filter(i => i.project === staat.project);
+// Items waarvoor een actie onderweg is: meteen van het scherm, terug als de actie mislukt.
+const verborgen = new Set(), takenVerborgen = new Set();
+const filter = (lijst, taken) => lijst.filter(i => !(taken ? takenVerborgen : verborgen).has(i.id)
+  && (staat.project === "alles" || i.project === staat.project));
 
 async function laad(){
   const r = await fetch("/api/data", {cache:"no-store"});
@@ -243,7 +246,17 @@ async function actie(naam, data){
     toast(j.melding, !j.ok);
     return j.ok;
   } catch(e){ toast("Geen verbinding met mailagent. Draait 'scripts/mailagent.sh inbox' nog?", true); return false; }
-  finally { await laad(); }
+}
+
+// Eerst het scherm bijwerken, daarna de actie op de achtergrond uitvoeren.
+async function meteen(ids, naam, data, set = verborgen){
+  ids.forEach(i => set.add(i));
+  teken();
+  const ok = await actie(naam, data);
+  ids.forEach(i => set.delete(i));
+  if (!ok) teken();
+  laad();
+  return ok;
 }
 
 function toast(tekst, fout){
@@ -258,7 +271,7 @@ function toast(tekst, fout){
 function teken(){
   if(!D) return;
   // zijbalk
-  const alleWacht = [...D.zelf, ...D.wacht];
+  const alleWacht = [...D.zelf, ...D.wacht].filter(i => !verborgen.has(i.id));
   const tel = n => n === "alles" ? alleWacht.length : alleWacht.filter(i => i.project === n).length;
   document.getElementById("nav").innerHTML = [{naam:"alles"}, ...D.projecten].map(p => ({...p, wacht: tel(p.naam)})).map(p => `
     <button class="nav${p.naam===staat.project?" actief":""}" data-project="${esc(p.naam)}">
@@ -271,7 +284,7 @@ function teken(){
   document.getElementById("status").textContent = D.ophalen.bezig ? "Claude sorteert en schrijft concepten" : (D.ophalen.laatste || "");
   document.getElementById("titel").textContent = naamProject(staat.project);
 
-  const wacht = filter([...D.zelf, ...D.wacht]), taken = filter(D.taken);
+  const wacht = filter([...D.zelf, ...D.wacht]), taken = filter(D.taken, true);
   const opruim = filter(D.info).length + filter(D.overgeslagen).length;
   const tabs = [["beoordelen","inbox","Beoordelen",wacht.length],["taken","task","Taken",taken.length],["opruimen","sparkle","Opruimen",opruim]];
   document.getElementById("tabs").innerHTML = tabs.map(([k,i,l,n]) =>
@@ -408,12 +421,11 @@ function sluitPaneel(){
   document.querySelectorAll(".rij.gekozen[data-open]").forEach(r => r.classList.remove("gekozen"));
 }
 
-async function verplaats(ids, doel){
+function verplaats(ids, doel){
   if (!ids.length) return;
-  if (doel === "prullenbak" && ids.length > 1 && !confirm(`${ids.length} mails naar de prullenbak verplaatsen? Je kunt ze in Apple Mail terughalen.`)) return;
-  await actie("verplaats", {ids, doel});
   ids.forEach(i => staat.gekozen.delete(i));
-  teken();
+  if (doel === "overslaan") return actie("verplaats", {ids, doel}).then(laad);
+  return meteen(ids, "verplaats", {ids, doel});
 }
 
 document.addEventListener("click", async ev => {
@@ -423,25 +435,26 @@ document.addEventListener("click", async ev => {
   if (d.project){ staat.project = d.project; staat.gekozen.clear(); bewaar(); sluitPaneel(); return teken(); }
   if (d.tab){ staat.tab = d.tab; bewaar(); sluitPaneel(); return teken(); }
   if (d.open){ return openPaneel(Number(d.open)); }
-  if (d.klaar){ t.closest(".taak").classList.add("weg"); return setTimeout(() => actie("taak-klaar", {id:Number(d.klaar)}), 220); }
+  if (d.klaar){ return meteen([Number(d.klaar)], "taak-klaar", {id:Number(d.klaar)}, takenVerborgen); }
   if (d.een){ ev.stopPropagation(); return verplaats([Number(d.id)], d.een); }
   if (d.groep){ return verplaats(d.ids.split(",").map(Number), d.groep); }
   if (d.bulk){ if (d.bulk === "leeg"){ staat.gekozen.clear(); return teken(); } return verplaats([...staat.gekozen], d.bulk); }
-  if (d.regelweg){ return actie("regel-weg", {adres:d.regelweg}); }
+  if (d.regelweg){ return actie("regel-weg", {adres:d.regelweg}).then(laad); }
   if (d.vink || d.kies){
     const id = Number(d.vink || d.kies);
     staat.gekozen.has(id) ? staat.gekozen.delete(id) : staat.gekozen.add(id);
     return teken();
   }
   if (t.id === "sluit") return sluitPaneel();
-  if (t.id === "ophalen") return actie("ophalen");
+  if (t.id === "ophalen"){ D.ophalen.bezig = true; teken(); return actie("ophalen").then(laad); }
   if (t.id === "goedkeuren" || t.id === "afwijzen"){
     const id = Number(document.getElementById("paneel").dataset.id);
-    t.disabled = true;
-    const ok = t.id === "goedkeuren"
-      ? await actie("goedkeuren", {id, concept: document.getElementById("concept").value})
-      : await actie("afwijzen", {id});
-    if (ok) sluitPaneel();
+    const goed = t.id === "goedkeuren";
+    const data = goed ? {id, concept: document.getElementById("concept").value} : {id};
+    sluitPaneel();
+    if (goed && data.concept.trim()) toast("Concept gaat naar Apple Mail…");
+    const ok = await meteen([id], goed ? "goedkeuren" : "afwijzen", data);
+    if (!ok){ staat.open = id; teken(); }   // mislukt: paneel met je tekst weer openen
   }
 });
 document.getElementById("dek").addEventListener("click", sluitPaneel);

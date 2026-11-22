@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import secrets
 import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -50,11 +50,13 @@ def verzamel(cfg: Config, store: Store, ophalen: dict) -> dict:
 
 def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
     token = secrets.token_urlsafe(24)
+    db_pad = store.pad
     ophalen = {"bezig": False, "laatste": ""}
+    mail_slot = threading.Lock()  # Apple Mail krijgt één opdracht tegelijk
 
     def ophalen_op_achtergrond():
         try:
-            res = run(cfg, Store(store.pad), bronnen, llm_factory())
+            res = run(cfg, Store(db_pad), bronnen, llm_factory())
             ophalen["laatste"] = ", ".join(f"{k}: {'mislukt' if v < 0 else f'{v} nieuw'}" for k, v in res.items())
         except Exception as ex:
             ophalen["laatste"] = f"ophalen mislukt: {ex}"
@@ -82,6 +84,7 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
             self._stuur(json.dumps(obj, ensure_ascii=False), status, "application/json; charset=utf-8")
 
         def do_GET(self):
+            store = Store(db_pad)  # eigen verbinding per verzoek: verzoeken lopen naast elkaar
             pad = urlparse(self.path).path
             if pad == "/":
                 html = APP_HTML.read_text(encoding="utf-8").replace("__TOKEN__", token)
@@ -101,9 +104,11 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
             except json.JSONDecodeError:
                 return self._json({"ok": False, "melding": "Ongeldig verzoek"}, 400)
             actie = urlparse(self.path).path.removeprefix("/api/")
+            store = Store(db_pad)
             try:
                 if actie == "goedkeuren":
-                    melding = keur_goed(store, bronnen, int(v["id"]), v.get("concept"))
+                    with mail_slot:
+                        melding = keur_goed(store, bronnen, int(v["id"]), v.get("concept"))
                 elif actie == "afwijzen":
                     wijs_af(store, int(v["id"]))
                     melding = "Afgewezen"
@@ -124,7 +129,8 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                                 store.zet_afzender_regel(adres, "negeren", it["project"])
                         melding = f"{len(adressen)} afzender(s) worden voortaan overgeslagen"
                     else:
-                        melding = verplaats_items(store, bronnen, ids, v.get("doel", ""))
+                        with mail_slot:
+                            melding = verplaats_items(store, bronnen, ids, v.get("doel", ""))
                         if "niet gelukt" in melding:
                             return self._json({"ok": False, "melding": melding})
                 elif actie == "regel-weg":
@@ -147,7 +153,7 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
 
 
 def serveer(cfg: Config, store: Store, bronnen: dict, llm_factory) -> None:
-    server = HTTPServer((cfg.web_host, cfg.web_poort), maak_handler(cfg, store, bronnen, llm_factory))
+    server = ThreadingHTTPServer((cfg.web_host, cfg.web_poort), maak_handler(cfg, store, bronnen, llm_factory))
     print(f"Goedkeuringsapp: http://{cfg.web_host}:{cfg.web_poort}  (stoppen met Ctrl+C)")
     try:
         server.serve_forever()

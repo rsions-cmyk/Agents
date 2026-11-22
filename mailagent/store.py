@@ -75,6 +75,7 @@ class Store:
         self.pad = str(pad)
         self.db = sqlite3.connect(self.pad, check_same_thread=False, timeout=30)
         self.db.row_factory = sqlite3.Row
+        self.db.execute("PRAGMA journal_mode=WAL")  # lezen en schrijven tegelijk vanuit meerdere verbindingen
         self.db.executescript(SCHEMA)
 
     # --- bronnen -------------------------------------------------------------
