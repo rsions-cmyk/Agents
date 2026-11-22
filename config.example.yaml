@@ -24,8 +24,8 @@ bronnen:
     naam: google
     account: "Google"            # naam van het account zoals Apple Mail het toont
     mailbox: "INBOX"
-    archief: "All Mail"          # Gmail: archiveren = uit de inbox, blijft in All Mail
-    prullenbak: "Trash"
+    archief: "[Gmail]/All Mail"  # Gmail: archiveren = uit de inbox, blijft in All Mail
+    prullenbak: "[Gmail]/Trash"  # de echte Gmail-prullenbak, niet een label dat "Trash" heet
   # - type: outlook               # alleen als je een app-registratie in Entra hebt
   #   naam: buas-graph
   #   client_id: "VUL-IN"

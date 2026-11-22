@@ -65,21 +65,52 @@ end run
 
 
 SCRIPT_VERPLAATS = r'''
+on splits(tekst, teken)
+    set oud to AppleScript's text item delimiters
+    set AppleScript's text item delimiters to teken
+    set delen to text items of tekst
+    set AppleScript's text item delimiters to oud
+    return delen
+end splits
+
+on zoekMap(accountNaam, pad)
+    tell application "Mail"
+        -- 1. een pad als "[Gmail]/Trash": stap voor stap door de submappen
+        if pad contains "/" then
+            try
+                set delen to my splits(pad, "/")
+                set huidig to mailbox (item 1 of delen) of account accountNaam
+                repeat with i from 2 to count of delen
+                    set huidig to mailbox (item i of delen) of huidig
+                end repeat
+                return huidig
+            end try
+            try
+                return mailbox pad of account accountNaam
+            end try
+            set pad to last item of my splits(pad, "/")
+        end if
+        -- 2. zoeken op naam; bij meer dan één treffer gaat een Gmail-systeemmap voor
+        set kandidaten to (every mailbox of account accountNaam whose name is pad)
+        if (count of kandidaten) is 0 then error "map '" & pad & "' niet gevonden in account " & accountNaam
+        repeat with k in kandidaten
+            try
+                set ouder to name of container of k
+                if ouder starts with "[G" then return contents of k
+            end try
+        end repeat
+        return item 1 of kandidaten
+    end tell
+end zoekMap
+
 on run argv
     set accountNaam to item 1 of argv
     set mailboxNaam to item 2 of argv
     set doelNaam to item 3 of argv
     set uitvoer to ""
+    set doel to my zoekMap(accountNaam, doelNaam)
     tell application "Mail"
         set mb to mailbox mailboxNaam of account accountNaam
-        try
-            set doel to mailbox doelNaam of account accountNaam
-        on error
-            -- submappen, zoals "[Gmail]/All Mail": zoek op naam in alle mappen van het account
-            set kandidaten to (every mailbox of account accountNaam whose name is doelNaam)
-            if (count of kandidaten) is 0 then error "map '" & doelNaam & "' niet gevonden in account " & accountNaam
-            set doel to item 1 of kandidaten
-        end try
         repeat with i from 4 to count of argv
             set berichtId to (item i of argv) as integer
             try
