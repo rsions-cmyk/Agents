@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import secrets
+import subprocess
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -20,7 +21,8 @@ from datetime import date, datetime, timedelta
 from .agenda import lees_werktijd, maak_agenda, vrije_momenten
 from .config import anonimiseer, mag_naar_claude
 from .models import Email
-from .pipeline import afzender_adres, keur_goed, maak_taak, overzicht, run, verplaats_items, wijs_af
+from .models import Sortering
+from .pipeline import afzender_adres, keur_goed, maak_taak, open_antwoord, overzicht, run, verplaats_items, wijs_af
 from .store import Store
 
 APP_HTML = Path(__file__).with_name("static") / "app.html"
@@ -38,6 +40,17 @@ def item_dict(rij, volledig: bool = False) -> dict:
     return d
 
 
+def taak_dict(store: Store, t, mail: bool = True) -> dict:
+    d = {**dict(t), "stappen": json.loads(t["stappen"] or "[]"), "mail": None}
+    if mail and t["item_id"]:
+        it = store.item(t["item_id"])
+        if it is not None:
+            d["mail"] = {"id": it["id"], "van": it["van"], "onderwerp": it["onderwerp"], "datum": it["datum"],
+                         "project": it["project"], "concept": it["concept"] or "", "tekst": (it["tekst"] or "")[:8000],
+                         "kan_openen": bool(it["thread_id"])}
+    return d
+
+
 def verzamel(cfg: Config, store: Store, ophalen: dict) -> dict:
     tellingen = {p: len(store.items(status="wacht", project=p)) for p in cfg.projecten}
     zelf = store.items(status="fout") + store.items(status="handmatig")
@@ -47,7 +60,8 @@ def verzamel(cfg: Config, store: Store, ophalen: dict) -> dict:
         "zelf": [item_dict(store.item(r["id"]), True) for r in zelf],
         "info": [item_dict(r) for r in store.items(status="ter_info")[:100]],
         "overgeslagen": [item_dict(r) for r in store.items(status="genegeerd")[:100]],
-        "taken": [{**dict(t), "stappen": json.loads(t["stappen"] or "[]")} for t in store.open_taken()],
+        "taken": [taak_dict(store, t) for t in store.open_taken()],
+        "afgerond": [taak_dict(store, t, mail=False) for t in store.afgeronde_taken()],
         "regels": [dict(r) for r in store.afzender_regels()],
         "ophalen": {"bezig": ophalen["bezig"], "laatste": ophalen["laatste"]},
     }
@@ -161,6 +175,29 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                 elif actie == "taak-klaar":
                     store.taak_klaar(int(v["id"]))
                     melding = "Taak afgevinkt"
+                elif actie == "taak-heropen":
+                    store.taak_heropen(int(v["id"]))
+                    melding = "Taak teruggezet"
+                elif actie == "mail-openen":
+                    it = store.item(int(v["id"]))
+                    mid = (it["thread_id"] or "").strip().strip("<>") if it else ""
+                    if not mid:
+                        return self._json({"ok": False, "melding": "Deze mail kan niet in Mail worden geopend"})
+                    subprocess.run(["open", f"message://%3c{mid}%3e"], check=False, timeout=20)
+                    melding = ""
+                elif actie == "antwoord-concept":
+                    it = store.item(int(v["id"]))
+                    mail = Email(bron=it["bron"], bron_id=it["bron_id"], van=it["van"] or "", aan=it["aan"] or "",
+                                 onderwerp=it["onderwerp"] or "", datum=datetime.fromisoformat(it["datum"]), tekst=it["tekst"] or "")
+                    if not mag_naar_claude(cfg, mail):
+                        return self._json({"ok": False, "melding": "Deze afzender gaat niet naar Claude; schrijf het antwoord zelf"})
+                    s = Sortering(project=it["project"], actie="antwoorden", prioriteit=it["prioriteit"],
+                                  deadline=it["deadline"], samenvatting=it["samenvatting"] or it["onderwerp"], reden="")
+                    u = llm_factory().werk_uit(mail, anonimiseer(cfg, mail.tekst), s)
+                    return self._json({"ok": True, "concept": u.concept_antwoord or "", "vragen": u.vragen_aan_jou})
+                elif actie == "antwoord-openen":
+                    with mail_slot:
+                        melding = open_antwoord(store, bronnen, int(v["id"]), v.get("tekst", ""))
                 elif actie == "verplaats":
                     ids = [int(x) for x in v.get("ids", [])]
                     if not ids:

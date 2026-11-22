@@ -105,13 +105,27 @@ def maak_taak(store: Store, bronnen: dict, agenda, item_id: int, titel: str, sta
         meldingen.append(agenda.maak_afspraak(titel, start, start + timedelta(minutes=minuten), notities))
         gepland = start.isoformat(timespec="minutes")
     store.nieuwe_taak(item_id, item["project"], titel, deadline, minuten, stappen, gepland)
-    meldingen.insert(0, "Taak gemaakt")
+    meldingen.insert(0, "Taak gemaakt, mail gekoppeld")
     if archiveren and item["status"] in ("ter_info", "genegeerd"):
         meldingen.append(verplaats_items(store, bronnen, [item_id], "archief"))
     elif item["status"] in ("ter_info", "genegeerd"):
-        store.zet_status(item_id, "taak", opmerking="omgezet in taak")
+        store.zet_status(item_id, "taak", opmerking="omgezet in taak; mail blijft in de inbox")
     # een item dat op beoordeling wacht, blijft staan: het concept-antwoord kan nog nodig zijn
     return "; ".join(meldingen)
+
+
+def open_antwoord(store: Store, bronnen: dict, item_id: int, tekst: str) -> str:
+    """Antwoordvenster openen voor de mail achter een taak. Verandert niets aan taak of status."""
+    item = store.item(item_id)
+    if item is None:
+        raise ValueError("mail niet gevonden")
+    bron = bronnen.get(item["bron"])
+    if bron is None:
+        raise ValueError(f"Bron '{item['bron']}' staat niet meer in de configuratie")
+    store.zet_concept(item_id, tekst)
+    melding = bron.maak_concept(item["bron_id"], tekst, item["onderwerp"], item["van"], message_id=item["thread_id"])
+    store.log(item_id, "antwoord geopend vanuit taak")
+    return melding
 
 
 def run(cfg: Config, store: Store, bronnen: dict, llm: LLM) -> dict[str, int]:
@@ -160,7 +174,8 @@ def keur_goed(store: Store, bronnen: dict, item_id: int, concept: str | None) ->
         bron = bronnen.get(item["bron"])
         if bron is None:
             raise ValueError(f"Bron '{item['bron']}' staat niet meer in de configuratie")
-        meldingen.append(bron.maak_concept(item["bron_id"], concept, item["onderwerp"], item["van"]))
+        meldingen.append(bron.maak_concept(item["bron_id"], concept, item["onderwerp"], item["van"],
+                                           message_id=item["thread_id"]))
     taken = json.loads(item["taken"] or "[]")
     if taken:
         store.voeg_taken_toe(item_id, item["project"], taken)

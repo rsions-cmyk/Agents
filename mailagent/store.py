@@ -47,7 +47,8 @@ CREATE TABLE IF NOT EXISTS taken (
     aangemaakt TEXT NOT NULL,
     minuten INTEGER,
     stappen TEXT,
-    gepland TEXT
+    gepland TEXT,
+    afgerond TEXT
 );
 CREATE TABLE IF NOT EXISTS bron_stand (
     bron TEXT PRIMARY KEY,
@@ -82,7 +83,7 @@ class Store:
         self.db.executescript(SCHEMA)
         # oudere databases bijwerken
         kolommen = {r["name"] for r in self.db.execute("PRAGMA table_info(taken)")}
-        for kolom, soort in (("minuten", "INTEGER"), ("stappen", "TEXT"), ("gepland", "TEXT")):
+        for kolom, soort in (("minuten", "INTEGER"), ("stappen", "TEXT"), ("gepland", "TEXT"), ("afgerond", "TEXT")):
             if kolom not in kolommen:
                 self.db.execute(f"ALTER TABLE taken ADD COLUMN {kolom} {soort}")
         self.db.commit()
@@ -186,7 +187,21 @@ class Store:
         return self.db.execute(q, args).fetchall()
 
     def taak_klaar(self, taak_id: int) -> None:
-        self.db.execute("UPDATE taken SET klaar=1 WHERE id=?", (taak_id,))
+        self.db.execute("UPDATE taken SET klaar=1, afgerond=? WHERE id=?", (nu(), taak_id))
+        self.db.commit()
+        self.log(None, f"taak {taak_id} afgevinkt")
+
+    def taak_heropen(self, taak_id: int) -> None:
+        self.db.execute("UPDATE taken SET klaar=0, afgerond=NULL WHERE id=?", (taak_id,))
+        self.db.commit()
+        self.log(None, f"taak {taak_id} teruggezet")
+
+    def afgeronde_taken(self, limiet: int = 30) -> list[sqlite3.Row]:
+        return self.db.execute("SELECT * FROM taken WHERE klaar=1 ORDER BY afgerond IS NULL, afgerond DESC, id DESC LIMIT ?",
+                               (limiet,)).fetchall()
+
+    def zet_concept(self, item_id: int, concept: str) -> None:
+        self.db.execute("UPDATE items SET concept=? WHERE id=?", (concept, item_id))
         self.db.commit()
 
     # --- geleerde afzenderregels ---------------------------------------------

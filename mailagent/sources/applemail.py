@@ -43,28 +43,7 @@ on run argv
 end run
 '''
 
-SCRIPT_CONCEPT = r'''
-on run argv
-    set accountNaam to item 1 of argv
-    set mailboxNaam to item 2 of argv
-    set berichtId to (item 3 of argv) as integer
-    set conceptTekst to item 4 of argv
-    tell application "Mail"
-        set m to first message of mailbox mailboxNaam of account accountNaam whose id is berichtId
-        set antwoord to reply m with opening window
-        try
-            set content of antwoord to conceptTekst & return & return & (content of antwoord)
-            return "venster"
-        on error
-            set the clipboard to conceptTekst
-            return "klembord"
-        end try
-    end tell
-end run
-'''
-
-
-SCRIPT_VERPLAATS = r'''
+HULP = r'''
 on splits(tekst, teken)
     set oud to AppleScript's text item delimiters
     set AppleScript's text item delimiters to teken
@@ -103,6 +82,46 @@ on zoekMap(accountNaam, pad)
     end tell
 end zoekMap
 
+'''
+
+
+SCRIPT_CONCEPT = HULP + r'''
+on run argv
+    set accountNaam to item 1 of argv
+    set mailboxNaam to item 2 of argv
+    set berichtId to (item 3 of argv) as integer
+    set conceptTekst to item 4 of argv
+    set berichtMid to item 5 of argv
+    set archiefNaam to item 6 of argv
+    set m to missing value
+    tell application "Mail"
+        try
+            set m to first message of mailbox mailboxNaam of account accountNaam whose id is berichtId
+        end try
+    end tell
+    -- al gearchiveerd? zoek in het archief op het Message-ID, dat bij verplaatsen gelijk blijft
+    if m is missing value and berichtMid is not "" then
+        try
+            set arch to my zoekMap(accountNaam, archiefNaam)
+            tell application "Mail" to set m to first message of arch whose message id is berichtMid
+        end try
+    end if
+    if m is missing value then error "mail niet meer gevonden in " & mailboxNaam & " of " & archiefNaam
+    tell application "Mail"
+        set antwoord to reply m with opening window
+        try
+            set content of antwoord to conceptTekst & return & return & (content of antwoord)
+            return "venster"
+        on error
+            set the clipboard to conceptTekst
+            return "klembord"
+        end try
+    end tell
+end run
+'''
+
+
+SCRIPT_VERPLAATS = HULP + r'''
 on run argv
     set accountNaam to item 1 of argv
     set mailboxNaam to item 2 of argv
@@ -156,8 +175,9 @@ class AppleMailBron:
                                tekst=inhoud.strip(), thread_id=message_id))
         return mails
 
-    def maak_concept(self, bron_id: str, tekst: str, onderwerp: str, aan: str) -> str:
-        hoe = _osascript(SCRIPT_CONCEPT, self.account, self.mailbox, bron_id, tekst).strip()
+    def maak_concept(self, bron_id: str, tekst: str, onderwerp: str, aan: str, message_id: str | None = None) -> str:
+        hoe = _osascript(SCRIPT_CONCEPT, self.account, self.mailbox, bron_id, tekst,
+                         message_id or "", self.mappen["archief"]).strip()
         if hoe == "klembord":
             return "antwoordvenster geopend in Apple Mail; concepttekst staat op het klembord"
         return "antwoordvenster geopend in Apple Mail met het concept"

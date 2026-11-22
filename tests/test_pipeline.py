@@ -318,3 +318,25 @@ def test_taak_maken_en_inplannen(omgeving):
     # zonder moment wel; een wachtend item blijft wachten
     maak_taak(store, bronnen, None, wacht["id"], "Reageren", [], 30, None, None, False)
     assert store.item(wacht["id"])["status"] == "wacht"
+
+
+def test_taak_terugzetten_en_antwoord_vanuit_taak(omgeving):
+    from mailagent.pipeline import maak_taak, open_antwoord
+
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    info = store.items(status="ter_info")[0]
+    maak_taak(store, bronnen, None, info["id"], "Reageren op nieuwsbrief", [], 30, None, None, archiveren=False)
+    # mail blijft in de inbox, maar verdwijnt uit Opruimen
+    assert store.item(info["id"])["status"] == "taak"
+    assert (bronnen["test"].pad / "04-nieuwsbrief.eml").exists()
+
+    taak = store.open_taken()[0]
+    store.taak_klaar(taak["id"])
+    assert store.open_taken() == [] and store.afgeronde_taken()[0]["afgerond"]
+    store.taak_heropen(taak["id"])
+    assert store.open_taken()[0]["id"] == taak["id"] and store.afgeronde_taken() == []
+
+    melding = open_antwoord(store, bronnen, info["id"], "Dank, ik lees hem.")
+    assert "opgeslagen" in melding and store.item(info["id"])["concept"] == "Dank, ik lees hem."
+    assert store.open_taken()[0]["id"] == taak["id"]          # taak blijft staan

@@ -17,6 +17,10 @@ Na elke run staat er een overzicht per project in `data/overzicht.md`.
 
 **Van een mail een taak maken.** Elke mail heeft een knop Taak. Claude schat in hoeveel tijd het kost en welke stappen nodig zijn, en de app zoekt tot drie vrije momenten in je agenda (binnen je werktijd, vóór de deadline, hoogstens één per dag). Je past titel, duur en stappen aan, kiest een moment of "Niet inplannen", en klikt. De afspraak komt in de agenda die je in `config.yaml` bij `agenda:` instelt. Staat je Exchange-agenda in de app Agenda, dan verschijnt hij ook in Outlook. Namen opzoeken met `scripts/mailagent.sh agendas`. De eerste keer vraagt macOS of de app bij je agenda mag.
 
+**De mail blijft aan de taak vast.** Een taak gemaakt vanuit een mail houdt die mail erbij: in Taken zie je afzender en onderwerp, met "Open" (opent de mail in Apple Mail) en "Beantwoorden" (antwoord typen of door Claude laten schrijven, en openen in Apple Mail). De mail wordt niet gearchiveerd, tenzij je dat aanvinkt. Ook gearchiveerd blijft hij gekoppeld.
+
+**Per ongeluk afgevinkt?** Na afvinken verschijnt een melding met "Ongedaan maken". Later terugzetten kan via "Afgerond" onderaan Taken.
+
 **Ter info en overgeslagen mail opruimen.** Onderaan de pagina staan twee lijsten. Bij "Ter info" is alles aangevinkt voor archiveren, bij "Overgeslagen" (nieuwsbrieven, meldingen, reclame) voor de prullenbak. Vink uit wat je wilt houden en klik op de knop. Verwijderen verplaatst naar de prullenbak van dat account, dus je haalt het in Apple Mail terug als het nodig is. Met "Afzender voortaan overslaan" gaat mail van die afzender niet meer naar Claude en komt hij meteen bij "Overgeslagen". Die lijst beheer je onderaan de pagina. De mapnamen stel je per bron in met `archief:` en `prullenbak:` in `config.yaml`.
 
 ## Hoe het veilig blijft

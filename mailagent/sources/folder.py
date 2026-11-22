@@ -37,7 +37,7 @@ class MapBron:
                                datum=datum, tekst=tekst.strip(), thread_id=msg["Message-ID"]))
         return mails[:maximum]
 
-    def maak_concept(self, bron_id: str, tekst: str, onderwerp: str, aan: str) -> str:
+    def maak_concept(self, bron_id: str, tekst: str, onderwerp: str, aan: str, message_id: str | None = None) -> str:
         self.uit.mkdir(parents=True, exist_ok=True)
         msg = email.message.EmailMessage()
         msg["To"] = aan
