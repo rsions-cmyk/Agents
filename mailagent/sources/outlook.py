@@ -111,3 +111,8 @@ class OutlookBron:
                 r = c.post(f"/me/messages/{i}/move", json={"destinationId": bestemming})
                 resultaat[i] = None if r.is_success else f"HTTP {r.status_code}"
         return resultaat
+
+    def markeer(self, bron_id: str, message_id: str | None, aan: bool, kleur: int = 4) -> None:
+        with self._client() as c:
+            r = c.patch(f"/me/messages/{bron_id}", json={"flag": {"flagStatus": "flagged" if aan else "notFlagged"}})
+            r.raise_for_status()

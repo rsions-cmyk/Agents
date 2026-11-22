@@ -32,12 +32,17 @@ class Config:
     eerste_run_dagen_terug: int = 2
     max_mails_per_run: int = 60
     agenda: dict = field(default_factory=dict)
+    vlag_aan: bool = True
+    vlag_kleur: int = 4
     web_host: str = "127.0.0.1"
     web_poort: int = 8765
 
     @property
     def db_pad(self) -> Path:
         return self.data_dir / "mailagent.sqlite"
+
+
+KLEUREN = {"rood": 0, "oranje": 1, "geel": 2, "groen": 3, "blauw": 4, "paars": 5, "grijs": 6}
 
 
 def laad(pad: str | Path = "config.yaml") -> Config:
@@ -82,6 +87,8 @@ def laad(pad: str | Path = "config.yaml") -> Config:
         eerste_run_dagen_terug=int(ruw.get("eerste_run_dagen_terug", 2)),
         max_mails_per_run=int(ruw.get("max_mails_per_run", 60)),
         agenda=ruw.get("agenda") or {},
+        vlag_aan=bool((ruw.get("markeren") or {}).get("aan", True)),
+        vlag_kleur=KLEUREN.get(str((ruw.get("markeren") or {}).get("kleur", "blauw")).lower(), 4),
         web_host=web.get("host", "127.0.0.1"),
         web_poort=int(web.get("poort", 8765)),
     )

@@ -356,3 +356,26 @@ def test_inhalen_in_rondes_oudste_eerst(omgeving):
     # een inhaalronde ziet alles opnieuw maar verwerkt niets dubbel
     assert run(cfg, store, bronnen, llm, dagen=100000, maximum=50) == {"test": 0}
     assert len(store.items()) == 5
+
+
+def test_vlag_bij_taak(omgeving):
+    from mailagent.pipeline import maak_taak, markeer_mail
+
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    info = store.items(status="ter_info")[0]
+    bron = bronnen["test"]
+    melding = maak_taak(store, bronnen, None, info["id"], "Lezen", [], 30, None, None, False, vlag=4)
+    assert "ingepland" in melding and bron.vlaggen == {"04-nieuwsbrief.eml": 4}
+    # tweede taak bij dezelfde mail; eentje afvinken laat de vlag staan
+    maak_taak(store, bronnen, None, info["id"], "Delen", [], 15, None, None, False, vlag=4)
+    eerste, tweede = store.open_taken()
+    store.taak_klaar(eerste["id"])
+    markeer_mail(store, bronnen, info["id"], False)
+    assert bron.vlaggen                                   # nog een open taak
+    store.taak_klaar(tweede["id"])
+    markeer_mail(store, bronnen, info["id"], False)
+    assert bron.vlaggen == {}
+    # zonder vlag-instelling geen markering
+    maak_taak(store, bronnen, None, info["id"], "Nog eens", [], 15, None, None, False, vlag=None)
+    assert bron.vlaggen == {}

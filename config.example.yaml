@@ -99,6 +99,14 @@ agenda:
   werktijd: "09:00-17:00"
   dagen_vooruit: 10
 
+# Mail met een taak krijgt in Apple Mail een gekleurde vlag (in Outlook een opvolgvlag,
+# in Gmail een ster). Afvinken haalt de vlag weg. Hernoem die vlagkleur in Apple Mail naar
+# "Ingepland": rechtsklik op de vlag in de zijbalk onder Gemarkeerd.
+# Kleuren: rood, oranje, geel, groen, blauw, paars, grijs.
+markeren:
+  aan: true
+  kleur: blauw
+
 # Lokale goedkeuringspagina
 web:
   host: 127.0.0.1

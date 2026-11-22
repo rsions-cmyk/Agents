@@ -138,6 +138,46 @@ end run
 '''
 
 
+SCRIPT_MARKEER = HULP + r'''
+on run argv
+    set accountNaam to item 1 of argv
+    set mailboxNaam to item 2 of argv
+    set berichtId to (item 3 of argv) as integer
+    set berichtMid to item 4 of argv
+    set archiefNaam to item 5 of argv
+    set aan to (item 6 of argv) is "1"
+    set kleur to (item 7 of argv) as integer
+    set m to missing value
+    tell application "Mail"
+        try
+            set m to first message of mailbox mailboxNaam of account accountNaam whose id is berichtId
+        end try
+        if m is missing value and berichtMid is not "" then
+            try
+                set m to first message of mailbox mailboxNaam of account accountNaam whose message id is berichtMid
+            end try
+        end if
+    end tell
+    if m is missing value and berichtMid is not "" then
+        try
+            set arch to my zoekMap(accountNaam, archiefNaam)
+            tell application "Mail" to set m to first message of arch whose message id is berichtMid
+        end try
+    end if
+    if m is missing value then error "mail niet gevonden"
+    tell application "Mail"
+        if aan then
+            set flag index of m to kleur
+            set flagged status of m to true
+        else
+            set flagged status of m to false
+        end if
+    end tell
+    return "ok"
+end run
+'''
+
+
 SCRIPT_VERPLAATS = HULP + r'''
 on run argv
     set accountNaam to item 1 of argv
@@ -215,6 +255,11 @@ class AppleMailBron:
         if hoe == "klembord":
             return "antwoordvenster geopend in Apple Mail; concepttekst staat op het klembord"
         return "antwoordvenster geopend in Apple Mail met het concept"
+
+    def markeer(self, bron_id: str, message_id: str | None, aan: bool, kleur: int = 4) -> None:
+        """Vlag zetten (aan) of weghalen. Kleur: 0 rood, 1 oranje, 2 geel, 3 groen, 4 blauw, 5 paars, 6 grijs."""
+        _osascript(SCRIPT_MARKEER, self.account, self.mailbox, bron_id, message_id or "",
+                   self.mappen["archief"], "1" if aan else "0", str(kleur))
 
     def verplaats(self, bron_ids: list[str], doel: str) -> dict[str, str | None]:
         """Verplaatst berichten naar de archief- of prullenbakmap. Niets wordt definitief verwijderd."""

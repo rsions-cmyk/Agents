@@ -21,6 +21,8 @@ Na elke run staat er een overzicht per project in `data/overzicht.md`.
 
 **De mail blijft aan de taak vast.** Een taak gemaakt vanuit een mail houdt die mail erbij: in Taken zie je afzender en onderwerp, met "Open" (opent de mail in Apple Mail) en "Beantwoorden" (antwoord typen of door Claude laten schrijven, en openen in Apple Mail). De mail wordt niet gearchiveerd, tenzij je dat aanvinkt. Ook gearchiveerd blijft hij gekoppeld.
 
+**Zichtbaar in Mail.** Een mail met een taak krijgt in Apple Mail een gekleurde vlag (standaard blauw; in Outlook een opvolgvlag, in Gmail een ster). Afvinken haalt de vlag weg, tenzij er nog een andere open taak bij die mail hoort. Hernoem de vlagkleur in Apple Mail eenmalig naar "Ingepland". Instellen of uitzetten: `markeren:` in `config.yaml`.
+
 **Per ongeluk afgevinkt?** Na afvinken verschijnt een melding met "Ongedaan maken". Later terugzetten kan via "Afgerond" onderaan Taken.
 
 **Ter info en overgeslagen mail opruimen.** Onderaan de pagina staan twee lijsten. Bij "Ter info" is alles aangevinkt voor archiveren, bij "Overgeslagen" (nieuwsbrieven, meldingen, reclame) voor de prullenbak. Vink uit wat je wilt houden en klik op de knop. Verwijderen verplaatst naar de prullenbak van dat account, dus je haalt het in Apple Mail terug als het nodig is. Met "Afzender voortaan overslaan" gaat mail van die afzender niet meer naar Claude en komt hij meteen bij "Overgeslagen". Die lijst beheer je onderaan de pagina. De mapnamen stel je per bron in met `archief:` en `prullenbak:` in `config.yaml`.

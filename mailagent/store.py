@@ -199,6 +199,12 @@ class Store:
         self.db.commit()
         self.log(None, f"taak {taak_id} teruggezet")
 
+    def taak(self, taak_id: int) -> Optional[sqlite3.Row]:
+        return self.db.execute("SELECT * FROM taken WHERE id=?", (taak_id,)).fetchone()
+
+    def open_taken_bij_mail(self, item_id: int) -> int:
+        return self.db.execute("SELECT COUNT(*) FROM taken WHERE item_id=? AND klaar=0", (item_id,)).fetchone()[0]
+
     def afgeronde_taken(self, limiet: int = 30) -> list[sqlite3.Row]:
         return self.db.execute("SELECT * FROM taken WHERE klaar=1 ORDER BY afgerond IS NULL, afgerond DESC, id DESC LIMIT ?",
                                (limiet,)).fetchall()

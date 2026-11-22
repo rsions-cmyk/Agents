@@ -90,8 +90,27 @@ def verplaats_items(store: Store, bronnen: dict, item_ids: list[int], doel: str)
     return melding
 
 
+def markeer_mail(store: Store, bronnen: dict, item_id: int | None, aan: bool, kleur: int = 4) -> str | None:
+    """Vlag op de mail achter een taak. Geeft een waarschuwing terug als het niet lukt; de taak gaat altijd door."""
+    if not item_id:
+        return None
+    item = store.item(item_id)
+    bron = bronnen.get(item["bron"]) if item else None
+    if bron is None or not hasattr(bron, "markeer"):
+        return None
+    if not aan and store.open_taken_bij_mail(item_id) > 0:
+        return None   # er staat nog een andere open taak bij deze mail
+    try:
+        bron.markeer(item["bron_id"], item["thread_id"], aan, kleur)
+        store.log(item_id, "vlag gezet" if aan else "vlag weggehaald")
+        return None
+    except Exception as e:
+        return f"vlag in Mail {'zetten' if aan else 'weghalen'} lukte niet ({e})"
+
+
 def maak_taak(store: Store, bronnen: dict, agenda, item_id: int, titel: str, stappen: list[str],
-              minuten: int, deadline: str | None, start: datetime | None, archiveren: bool) -> str:
+              minuten: int, deadline: str | None, start: datetime | None, archiveren: bool,
+              vlag: int | None = 4) -> str:
     """Taak opslaan, eventueel inplannen in de agenda en de mail archiveren. Alleen na een klik."""
     item = store.item(item_id)
     if item is None:
@@ -106,6 +125,9 @@ def maak_taak(store: Store, bronnen: dict, agenda, item_id: int, titel: str, sta
         gepland = start.isoformat(timespec="minutes")
     store.nieuwe_taak(item_id, item["project"], titel, deadline, minuten, stappen, gepland)
     meldingen.insert(0, "Taak gemaakt, mail gekoppeld")
+    if vlag is not None:   # eerst markeren, dan pas eventueel archiveren
+        fout = markeer_mail(store, bronnen, item_id, True, vlag)
+        meldingen.append(fout or "gemarkeerd als ingepland in Mail")
     if archiveren and item["status"] in ("ter_info", "genegeerd"):
         meldingen.append(verplaats_items(store, bronnen, [item_id], "archief"))
     elif item["status"] in ("ter_info", "genegeerd"):

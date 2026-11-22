@@ -22,7 +22,7 @@ from .agenda import lees_werktijd, maak_agenda, vrije_momenten
 from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
-from .pipeline import afzender_adres, keur_goed, maak_taak, open_antwoord, overzicht, run, verplaats_items, wijs_af
+from .pipeline import afzender_adres, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
 from .store import Store
 
 APP_HTML = Path(__file__).with_name("static") / "app.html"
@@ -172,12 +172,16 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                 elif actie == "afwijzen":
                     wijs_af(store, int(v["id"]))
                     melding = "Afgewezen"
-                elif actie == "taak-klaar":
-                    store.taak_klaar(int(v["id"]))
-                    melding = "Taak afgevinkt"
-                elif actie == "taak-heropen":
-                    store.taak_heropen(int(v["id"]))
-                    melding = "Taak teruggezet"
+                elif actie in ("taak-klaar", "taak-heropen"):
+                    klaar = actie == "taak-klaar"
+                    (store.taak_klaar if klaar else store.taak_heropen)(int(v["id"]))
+                    melding = "Taak afgevinkt" if klaar else "Taak teruggezet"
+                    t = store.taak(int(v["id"]))
+                    if cfg.vlag_aan and t is not None and t["item_id"]:
+                        def vlag(item_id=t["item_id"], aan=not klaar):
+                            with mail_slot:
+                                markeer_mail(Store(db_pad), bronnen, item_id, aan, cfg.vlag_kleur)
+                        threading.Thread(target=vlag, daemon=True).start()   # niet wachten op Apple Mail
                 elif actie == "mail-openen":
                     it = store.item(int(v["id"]))
                     mid = (it["thread_id"] or "").strip().strip("<>") if it else ""
@@ -240,7 +244,8 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                     with mail_slot:
                         melding = maak_taak(store, bronnen, ag, int(v["id"]), v["titel"].strip() or "Taak",
                                             stappen, int(v.get("minuten") or 30), v.get("deadline") or None,
-                                            start, bool(v.get("archiveren")))
+                                            start, bool(v.get("archiveren")),
+                                            vlag=cfg.vlag_kleur if cfg.vlag_aan else None)
                 elif actie == "regel-weg":
                     store.verwijder_afzender_regel(v["adres"])
                     melding = f"{v['adres']} wordt niet meer overgeslagen"

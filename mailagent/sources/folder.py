@@ -17,6 +17,7 @@ class MapBron:
         self.naam = naam
         self.pad = Path(pad)
         self.uit = Path(data_dir) / "concepten"
+        self.vlaggen: dict[str, int] = {}   # bron_id -> kleur; alleen voor tests
 
     def haal_op(self, sinds, maximum: int, overslaan=None) -> list[Email]:
         mails = []
@@ -63,3 +64,9 @@ class MapBron:
             else:
                 resultaat[i] = "bestand niet gevonden"
         return resultaat
+
+    def markeer(self, bron_id: str, message_id: str | None, aan: bool, kleur: int = 4) -> None:
+        if aan:
+            self.vlaggen[bron_id] = kleur
+        else:
+            self.vlaggen.pop(bron_id, None)
