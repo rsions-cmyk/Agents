@@ -218,3 +218,39 @@ def test_archiveren_verwijderen_en_overslaan(omgeving):
 
     with pytest.raises(ValueError):
         verplaats_items(store, bronnen, [1], "definitief")
+
+
+def test_web_api(omgeving):
+    """De app levert gegevens en weigert acties zonder sessiesleutel."""
+    import threading
+    import urllib.error
+    import urllib.request
+    from http.server import HTTPServer
+
+    from mailagent.web import maak_handler
+
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    server = HTTPServer(("127.0.0.1", 0), maak_handler(cfg, store, bronnen, NepLLM))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    basis = f"http://127.0.0.1:{server.server_port}"
+    try:
+        pagina = urllib.request.urlopen(basis + "/").read().decode()
+        token = pagina.split('const TOKEN = "')[1].split('"')[0]
+        data = json.loads(urllib.request.urlopen(basis + "/api/data").read())
+        assert len(data["wacht"]) == 3 and data["wacht"][0]["concept"]
+
+        def post(actie, body, sleutel):
+            req = urllib.request.Request(basis + "/api/" + actie, data=json.dumps(body).encode(), method="POST",
+                                         headers={"Content-Type": "application/json", "X-Token": sleutel})
+            try:
+                return json.loads(urllib.request.urlopen(req).read())
+            except urllib.error.HTTPError as e:
+                return json.loads(e.read())
+
+        assert post("afwijzen", {"id": data["wacht"][0]["id"]}, "verkeerd")["ok"] is False
+        assert store.item(data["wacht"][0]["id"])["status"] == "wacht"
+        assert post("afwijzen", {"id": data["wacht"][0]["id"]}, token)["ok"] is True
+        assert store.item(data["wacht"][0]["id"])["status"] == "afgewezen"
+    finally:
+        server.shutdown()
