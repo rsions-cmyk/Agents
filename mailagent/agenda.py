@@ -85,11 +85,13 @@ class Agenda(Protocol):
 class AppleAgenda:
     """macOS-agenda via EventKit (pip install pyobjc-framework-EventKit)."""
 
-    def __init__(self, kalender: str, account: Optional[str] = None):
+    def __init__(self, kalender: str, account: Optional[str] = None, bezet_agendas: Optional[list[str]] = None):
         import EventKit  # alleen op macOS beschikbaar
         import Foundation
         self.EK, self.NS = EventKit, Foundation
         self.kalender_naam, self.account = kalender, account
+        # "Account/Kalender" of alleen "Kalender"; leeg = alle agenda's tellen mee als bezet
+        self.bezet_agendas = [b.strip() for b in (bezet_agendas or []) if b.strip()]
         self.store = EventKit.EKEventStore.alloc().init()
         self._toegang()
 
@@ -137,7 +139,13 @@ class AppleAgenda:
         return datetime.fromtimestamp(d.timeIntervalSince1970()).astimezone()
 
     def bezet(self, van: datetime, tot: datetime) -> list[tuple[datetime, datetime]]:
-        pred = self.store.predicateForEventsWithStartDate_endDate_calendars_(self._nsdate(van), self._nsdate(tot), None)
+        kalenders = None
+        if self.bezet_agendas:
+            kalenders = [k for k in self.store.calendarsForEntityType_(self.EK.EKEntityTypeEvent)
+                         if f"{k.source().title()}/{k.title()}" in self.bezet_agendas or str(k.title()) in self.bezet_agendas]
+            if not kalenders:
+                raise RuntimeError("Geen van de agenda's bij 'bezet:' in config.yaml gevonden (zie: mailagent agendas)")
+        pred = self.store.predicateForEventsWithStartDate_endDate_calendars_(self._nsdate(van), self._nsdate(tot), kalenders)
         uit = []
         for ev in self.store.eventsMatchingPredicate_(pred) or []:
             if ev.isAllDay() or ev.availability() == self.EK.EKEventAvailabilityFree:
@@ -164,7 +172,7 @@ def maak_agenda(cfg) -> tuple[Optional[Agenda], Optional[str]]:
     if not ruw.get("kalender"):
         return None, "Geen agenda ingesteld (agenda: kalender: in config.yaml)"
     try:
-        return AppleAgenda(ruw["kalender"], ruw.get("account")), None
+        return AppleAgenda(ruw["kalender"], ruw.get("account"), ruw.get("bezet")), None
     except ImportError:
         return None, "Agendakoppeling niet geïnstalleerd: .venv/bin/pip install pyobjc-framework-EventKit"
     except Exception as e:

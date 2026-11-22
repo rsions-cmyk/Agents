@@ -93,6 +93,8 @@ anonimiseren:
 agenda:
   kalender: "Calendar"           # naam van de agenda
   account: "Exchange"            # nodig als meerdere agenda's dezelfde naam hebben
+  bezet:                         # welke agenda's tellen als bezet bij vrije momenten (leeg = alle)
+    - "Exchange/Calendar"
   werkdagen: [1, 2, 3, 4, 5]     # 1 = maandag
   werktijd: "09:00-17:00"
   dagen_vooruit: 10
