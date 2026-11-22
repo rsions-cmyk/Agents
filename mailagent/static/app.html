@@ -20,7 +20,7 @@
 body{margin:0;background:var(--bg);color:var(--tekst);font:14px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
 button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
 svg{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.app{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
+.app{display:grid;grid-template-columns:var(--zij-b,220px) 1fr;min-height:100vh;position:relative}
 
 /* zijbalk */
 .zij{background:var(--vlak2);border-right:1px solid var(--lijn);padding:20px 12px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh}
@@ -222,7 +222,7 @@ kbd{font:600 11px var(--romp,inherit);font-family:inherit;padding:1px 6px;border
 
 /* drie kolommen op een breed scherm (voorstel A) */
 @media (min-width:1100px){
-  .app.drie{grid-template-columns:210px minmax(330px,420px) 1fr}
+  .app.drie{grid-template-columns:var(--zij-b,220px) var(--lijst-b,400px) minmax(0,1fr)}
   .app.drie main{height:100vh;overflow-y:auto;position:sticky;top:0;padding:20px 14px 120px;border-right:1px solid var(--lijn)}
   .app.drie .paneel{position:sticky;top:0;transform:none;transition:none;width:auto;height:100vh;box-shadow:none;border-left:0;z-index:auto}
   .app.drie ~ .dek{display:none}
@@ -396,6 +396,29 @@ textarea#concept::placeholder,#a-tekst::placeholder{color:#8a929b}
 .mailframe{width:100%;height:min(62vh,720px);border:1px solid #dde1dc;border-radius:var(--r1);background:#fdfdfc;color-scheme:light}
 .weergavekeuze .meta{font-size:12px}
 
+/* verstelbare kolommen en inklapbare zijbalk */
+.logo{position:relative}
+.logo .inklap{margin-left:auto;width:28px;height:28px}
+.greep{position:absolute;top:0;bottom:0;width:9px;margin-left:-4px;cursor:col-resize;z-index:6;touch-action:none}
+.greep::after{content:"";position:absolute;left:4px;top:0;bottom:0;width:1px;background:transparent;transition:background var(--snel)}
+.greep:hover::after,.greep.actief::after{background:var(--accent);width:2px;left:3.5px}
+#greep-zij{left:var(--zij-b,220px)}
+#greep-lijst{left:calc(var(--zij-b,220px) + var(--lijst-b,400px));display:none}
+@media (min-width:1100px){ .app.drie #greep-lijst{display:block} }
+body.slepen{cursor:col-resize;user-select:none;-webkit-user-select:none}
+body.slepen iframe{pointer-events:none}
+.app.ingeklapt{--zij-b:60px}
+.app.ingeklapt #greep-zij{display:none}
+.app.ingeklapt .zij{padding:16px 8px;align-items:center}
+.app.ingeklapt .navtekst,.app.ingeklapt .nav-kop,.app.ingeklapt .status{display:none}
+.app.ingeklapt .logo{flex-direction:column;gap:10px;padding:4px 0 14px}
+.app.ingeklapt .logo .inklap{margin:0}
+.app.ingeklapt .nav{justify-content:center;width:44px;height:38px;padding:0;position:relative}
+.app.ingeklapt .nav .tel{position:absolute;top:2px;right:0;font-size:10px;min-width:16px;padding:0 4px;line-height:16px}
+.app.ingeklapt .knop-ophalen{width:44px;padding:10px 0}
+.app.ingeklapt .zij .onder{align-items:center}
+@media (max-width:760px){ .greep,.logo .inklap{display:none} }
+
 /* sneltoetsen-overzicht */
 .overlay{position:fixed;inset:0;background:rgba(10,14,18,.35);display:grid;place-items:center;z-index:50;animation:inkomen var(--snel) ease}
 .overlay .vel{background:var(--vlak);border-radius:16px;box-shadow:var(--schaduw-hoog);padding:22px 24px;width:min(520px,calc(100vw - 32px))}
@@ -409,10 +432,11 @@ textarea#concept::placeholder,#a-tekst::placeholder{color:#8a929b}
 <body>
 <div class="app" id="app">
   <aside class="zij">
-    <div class="logo"><span class="blok" data-ikoon="inbox"></span>Mail-inbox</div>
+    <div class="logo"><span class="blok" data-ikoon="inbox"></span><span class="navtekst">Mail-inbox</span>
+      <button class="ikoon inklap" id="inklappen" title="Zijbalk inklappen ( [ )" aria-label="Zijbalk in- of uitklappen"><span data-ikoon="paneel"></span></button></div>
     <div id="nav" style="display:contents"></div>
     <div class="onder">
-      <button class="knop-ophalen" id="ophalen"><span data-ikoon="refresh"></span><span>Mail ophalen</span></button>
+      <button class="knop-ophalen" id="ophalen" title="Mail ophalen"><span data-ikoon="refresh"></span><span class="navtekst">Mail ophalen</span></button>
       <div class="status" id="status"></div>
     </div>
   </aside>
@@ -424,6 +448,8 @@ textarea#concept::placeholder,#a-tekst::placeholder{color:#8a929b}
     <div id="inhoud"></div>
   </main>
   <aside class="paneel" id="paneel" aria-hidden="true"></aside>
+  <div class="greep" id="greep-zij" title="Sleep om de breedte aan te passen; dubbelklik om te herstellen" role="separator" aria-orientation="vertical"></div>
+  <div class="greep" id="greep-lijst" title="Sleep om de breedte aan te passen; dubbelklik om te herstellen" role="separator" aria-orientation="vertical"></div>
 </div>
 
 <div class="dek" id="dek"></div>
@@ -449,6 +475,7 @@ const IKONEN = {
   clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   chevron:'<path d="M9 18l6-6-6-6"/>',
+  paneel:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>',
   folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>', mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
 };
 const ik = n => `<svg viewBox="0 0 24 24" aria-hidden="true">${IKONEN[n]||""}</svg>`;
@@ -588,16 +615,16 @@ function teken(){
   const opruimN = filter(D.info).length + filter(D.overgeslagen).length;
   const weergaven = [["te_doen","inbox","Te doen",teDoen().length],["planning","calendar","Planning",inPlan],["opruimen","sparkle","Opruimen",opruimN]];
   document.getElementById("nav").innerHTML =
-    weergaven.map(([k,i,l,n]) => `<button class="nav${staat.tab===k?" actief":""}" data-tab="${k}">${ik(i)}${l}${n ? `<span class="tel">${n}</span>` : ""}</button>`).join("")
+    weergaven.map(([k,i,l,n]) => `<button class="nav${staat.tab===k?" actief":""}" data-tab="${k}" title="${l}">${ik(i)}<span class="navtekst">${l}</span>${n ? `<span class="tel">${n}</span>` : ""}</button>`).join("")
     + `<div class="nav-kop">Projecten</div>`
     + [{naam:"alles"}, ...D.projecten].map(p => `
-    <button class="nav${p.naam===staat.project?" actief":""}" data-project="${esc(p.naam)}">
+    <button class="nav${p.naam===staat.project?" actief":""}" data-project="${esc(p.naam)}" title="${esc(naamProject(p.naam))}">
       ${p.naam==="alles" ? `<span class="stip" style="background:var(--lijn)"></span>` : `<span class="stip" style="background:${kleur(p.naam)}"></span>`}
-      ${esc(naamProject(p.naam))}${tel(p.naam) ? `<span class="tel">${tel(p.naam)}</span>` : ""}
+      <span class="navtekst">${esc(naamProject(p.naam))}</span>${tel(p.naam) ? `<span class="tel">${tel(p.naam)}</span>` : ""}
     </button>`).join("");
   const knop = document.getElementById("ophalen");
   knop.classList.toggle("bezig", D.ophalen.bezig);
-  knop.lastElementChild.textContent = D.ophalen.bezig ? "Bezig met ophalen…" : "Mail ophalen";
+  knop.querySelector(".navtekst").textContent = D.ophalen.bezig ? "Bezig met ophalen…" : "Mail ophalen";
   document.getElementById("status").textContent = D.ophalen.bezig ? "Claude sorteert en schrijft concepten" : (D.ophalen.laatste || "");
   const titels = {te_doen:"Te doen", planning:"Planning", opruimen:"Opruimen"};
   document.getElementById("titel").textContent = titels[staat.tab] + (staat.project !== "alles" ? " · " + naamProject(staat.project) : "");
@@ -1294,6 +1321,7 @@ function toonSneltoetsen(){
     <dt><kbd>T</kbd></dt><dd>taak maken en inplannen</dd>
     <dt><kbd>X</kbd></dt><dd>afwijzen</dd>
     <dt><kbd>1</kbd>–<kbd>${D ? D.projecten.length : 4}</kbd></dt><dd>project wijzigen</dd>
+    <dt><kbd>[</kbd></dt><dd>zijbalk in- of uitklappen</dd>
     <dt><kbd>Esc</kbd></dt><dd>sluiten</dd>
     <dt><kbd>?</kbd></dt><dd>dit overzicht</dd></dl></div>`;
   o.addEventListener("click", () => o.remove());
@@ -1642,6 +1670,47 @@ document.addEventListener("toggle", ev => {
   const id = Number(d.dataset.orig), it = [...D.zelf, ...D.wacht].find(i => i.id === id);
   d.insertAdjacentHTML("beforeend", mailWeergave(id, it ? it.tekst : ""));
 }, true);
+// ---------------- kolombreedtes en inklappen (onthouden per browser) ----------------
+const STANDAARD = {zij: 220, lijst: 400};
+let breedte = {...STANDAARD}, ingeklapt = false;
+try { Object.assign(breedte, JSON.parse(localStorage.getItem("mailagent-breedte") || "{}")); ingeklapt = localStorage.getItem("mailagent-ingeklapt") === "1"; } catch(e){}
+function zetBreedtes(){
+  const app = document.getElementById("app");
+  app.style.setProperty("--zij-b", ingeklapt ? "60px" : breedte.zij + "px");
+  app.style.setProperty("--lijst-b", breedte.lijst + "px");
+  app.classList.toggle("ingeklapt", ingeklapt);
+  const k = document.getElementById("inklappen");
+  if (k) k.title = ingeklapt ? "Zijbalk uitklappen ( [ )" : "Zijbalk inklappen ( [ )";
+}
+function bewaarBreedtes(){
+  try { localStorage.setItem("mailagent-breedte", JSON.stringify(breedte)); localStorage.setItem("mailagent-ingeklapt", ingeklapt ? "1" : "0"); } catch(e){}
+}
+function wisselInklappen(){ ingeklapt = !ingeklapt; zetBreedtes(); bewaarBreedtes(); }
+document.getElementById("inklappen").addEventListener("click", ev => { ev.stopPropagation(); wisselInklappen(); });
+document.addEventListener("keydown", ev => {
+  if (ev.key === "[" && !(ev.target.closest && ev.target.closest("input, textarea, select")) && !ev.metaKey && !ev.ctrlKey){ ev.preventDefault(); wisselInklappen(); }
+});
+let kolomSleep = null;
+for (const [id, soort] of [["greep-zij", "zij"], ["greep-lijst", "lijst"]]){
+  const g = document.getElementById(id);
+  g.addEventListener("pointerdown", ev => {
+    ev.preventDefault(); g.setPointerCapture(ev.pointerId); g.classList.add("actief"); document.body.classList.add("slepen");
+    kolomSleep = {soort, x0: ev.clientX, b0: soort === "zij" ? breedte.zij : breedte.lijst, g};
+  });
+  g.addEventListener("dblclick", () => { breedte[soort] = STANDAARD[soort]; zetBreedtes(); bewaarBreedtes(); });
+}
+document.addEventListener("pointermove", ev => {
+  if (!kolomSleep) return;
+  const b = kolomSleep.b0 + ev.clientX - kolomSleep.x0;
+  if (kolomSleep.soort === "zij") breedte.zij = Math.round(Math.max(170, Math.min(340, b)));
+  else breedte.lijst = Math.round(Math.max(280, Math.min(Math.max(320, innerWidth - breedte.zij - 420), b)));
+  zetBreedtes();
+});
+document.addEventListener("pointerup", () => {
+  if (!kolomSleep) return;
+  kolomSleep.g.classList.remove("actief"); document.body.classList.remove("slepen"); kolomSleep = null; bewaarBreedtes();
+});
+zetBreedtes();
 document.querySelectorAll("[data-ikoon]").forEach(el => el.innerHTML = ik(el.dataset.ikoon));
 laad();
 setInterval(() => { if (!document.hidden && staat.open === null) laad(); }, 60000);
