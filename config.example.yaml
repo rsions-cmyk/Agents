@@ -87,6 +87,16 @@ anonimiseren:
   - patroon: '\b[A-Z]{2}\d{2}[A-Z0-9]{4}\d{7,16}\b'
     vervang: '[IBAN]'
 
+# Agenda voor 'Taak maken en inplannen'. Je Exchange-agenda moet in de app Agenda staan;
+# afspraken die de app daar maakt, verschijnen ook in Outlook. Namen opzoeken met:
+#   scripts/mailagent.sh agendas
+agenda:
+  kalender: "Calendar"           # naam van de agenda
+  account: "Exchange"            # nodig als meerdere agenda's dezelfde naam hebben
+  werkdagen: [1, 2, 3, 4, 5]     # 1 = maandag
+  werktijd: "09:00-17:00"
+  dagen_vooruit: 10
+
 # Lokale goedkeuringspagina
 web:
   host: 127.0.0.1

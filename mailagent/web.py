@@ -15,7 +15,12 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from .config import Config
-from .pipeline import afzender_adres, keur_goed, overzicht, run, verplaats_items, wijs_af
+from datetime import date, datetime, timedelta
+
+from .agenda import lees_werktijd, maak_agenda, vrije_momenten
+from .config import anonimiseer, mag_naar_claude
+from .models import Email
+from .pipeline import afzender_adres, keur_goed, maak_taak, overzicht, run, verplaats_items, wijs_af
 from .store import Store
 
 APP_HTML = Path(__file__).with_name("static") / "app.html"
@@ -42,7 +47,7 @@ def verzamel(cfg: Config, store: Store, ophalen: dict) -> dict:
         "zelf": [item_dict(store.item(r["id"]), True) for r in zelf],
         "info": [item_dict(r) for r in store.items(status="ter_info")[:100]],
         "overgeslagen": [item_dict(r) for r in store.items(status="genegeerd")[:100]],
-        "taken": [dict(t) for t in store.open_taken()],
+        "taken": [{**dict(t), "stappen": json.loads(t["stappen"] or "[]")} for t in store.open_taken()],
         "regels": [dict(r) for r in store.afzender_regels()],
         "ophalen": {"bezig": ophalen["bezig"], "laatste": ophalen["laatste"]},
     }
@@ -53,6 +58,45 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
     db_pad = store.pad
     ophalen = {"bezig": False, "laatste": ""}
     mail_slot = threading.Lock()  # Apple Mail krijgt één opdracht tegelijk
+    agenda_cache: dict = {}
+
+    def agenda():
+        """Agenda pas koppelen als hij nodig is; een fout wordt onthouden tot de volgende poging."""
+        if "agenda" not in agenda_cache or agenda_cache["agenda"] is None:
+            agenda_cache["agenda"], agenda_cache["fout"] = maak_agenda(cfg)
+        return agenda_cache["agenda"], agenda_cache["fout"]
+
+    def taakvoorstel(store: Store, item_id: int) -> dict:
+        it = store.item(item_id)
+        if it is None:
+            raise ValueError("onbekende mail")
+        mail = Email(bron=it["bron"], bron_id=it["bron_id"], van=it["van"] or "", aan=it["aan"] or "",
+                     onderwerp=it["onderwerp"] or "", datum=datetime.fromisoformat(it["datum"]), tekst=it["tekst"] or "")
+        if mag_naar_claude(cfg, mail):
+            plan = llm_factory().plan_taak(mail, anonimiseer(cfg, mail.tekst), it["project"])
+            voorstel = plan.model_dump()
+        else:
+            voorstel = {"titel": f"Afhandelen: {mail.onderwerp}", "stappen": [], "minuten": 30,
+                        "deadline": it["deadline"], "toelichting": "Deze afzender gaat niet naar Claude; standaard 30 minuten."}
+        voorstel["deadline"] = voorstel["deadline"] or it["deadline"]
+        ag, fout = agenda()
+        voorstel["momenten"], voorstel["agenda_fout"] = [], fout
+        if ag is not None:
+            werk = lees_werktijd(cfg.agenda)
+            nu = datetime.now().astimezone()
+            try:
+                dl = date.fromisoformat(voorstel["deadline"]) if voorstel["deadline"] else None
+            except ValueError:
+                dl = None
+            try:
+                bezet = ag.bezet(nu, nu + timedelta(days=werk.dagen_vooruit + 1))
+                momenten = vrije_momenten(bezet, voorstel["minuten"], nu, werk, dl)
+                if not momenten and dl:  # vóór de deadline is niets vrij: kijk erna
+                    momenten = vrije_momenten(bezet, voorstel["minuten"], nu, werk, None)
+                voorstel["momenten"] = [m.isoformat(timespec="minutes") for m in momenten]
+            except Exception as ex:
+                voorstel["agenda_fout"] = f"Agenda niet te lezen: {ex}"
+        return voorstel
 
     def ophalen_op_achtergrond():
         try:
@@ -133,6 +177,16 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                             melding = verplaats_items(store, bronnen, ids, v.get("doel", ""))
                         if "niet gelukt" in melding:
                             return self._json({"ok": False, "melding": melding})
+                elif actie == "taak-voorstel":
+                    return self._json({"ok": True, "voorstel": taakvoorstel(store, int(v["id"]))})
+                elif actie == "taak-maak":
+                    start = datetime.fromisoformat(v["start"]).astimezone() if v.get("start") else None
+                    stappen = [s.strip() for s in v.get("stappen", []) if s.strip()]
+                    ag = agenda()[0] if start else None
+                    with mail_slot:
+                        melding = maak_taak(store, bronnen, ag, int(v["id"]), v["titel"].strip() or "Taak",
+                                            stappen, int(v.get("minuten") or 30), v.get("deadline") or None,
+                                            start, bool(v.get("archiveren")))
                 elif actie == "regel-weg":
                     store.verwijder_afzender_regel(v["adres"])
                     melding = f"{v['adres']} wordt niet meer overgeslagen"

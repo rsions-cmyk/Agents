@@ -90,6 +90,30 @@ def verplaats_items(store: Store, bronnen: dict, item_ids: list[int], doel: str)
     return melding
 
 
+def maak_taak(store: Store, bronnen: dict, agenda, item_id: int, titel: str, stappen: list[str],
+              minuten: int, deadline: str | None, start: datetime | None, archiveren: bool) -> str:
+    """Taak opslaan, eventueel inplannen in de agenda en de mail archiveren. Alleen na een klik."""
+    item = store.item(item_id)
+    if item is None:
+        raise ValueError(f"Item {item_id} bestaat niet")
+    meldingen = []
+    gepland = None
+    if start is not None:
+        if agenda is None:
+            raise ValueError("geen agenda gekoppeld; maak de taak zonder inplannen")
+        notities = "\n".join(f"- {s}" for s in stappen) + f"\n\nNaar aanleiding van: {item['onderwerp']} ({item['van']})"
+        meldingen.append(agenda.maak_afspraak(titel, start, start + timedelta(minutes=minuten), notities))
+        gepland = start.isoformat(timespec="minutes")
+    store.nieuwe_taak(item_id, item["project"], titel, deadline, minuten, stappen, gepland)
+    meldingen.insert(0, "Taak gemaakt")
+    if archiveren and item["status"] in ("ter_info", "genegeerd"):
+        meldingen.append(verplaats_items(store, bronnen, [item_id], "archief"))
+    elif item["status"] in ("ter_info", "genegeerd"):
+        store.zet_status(item_id, "taak", opmerking="omgezet in taak")
+    # een item dat op beoordeling wacht, blijft staan: het concept-antwoord kan nog nodig zijn
+    return "; ".join(meldingen)
+
+
 def run(cfg: Config, store: Store, bronnen: dict, llm: LLM) -> dict[str, int]:
     """Haalt per bron nieuwe mail op en verwerkt die. Geeft per bron het aantal nieuwe items."""
     resultaat: dict[str, int] = {}

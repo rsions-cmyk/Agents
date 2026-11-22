@@ -31,6 +31,7 @@ class Config:
     uitwerken_effort: str = "medium"
     eerste_run_dagen_terug: int = 2
     max_mails_per_run: int = 60
+    agenda: dict = field(default_factory=dict)
     web_host: str = "127.0.0.1"
     web_poort: int = 8765
 
@@ -80,6 +81,7 @@ def laad(pad: str | Path = "config.yaml") -> Config:
         uitwerken_effort=claude.get("uitwerken_effort", "medium"),
         eerste_run_dagen_terug=int(ruw.get("eerste_run_dagen_terug", 2)),
         max_mails_per_run=int(ruw.get("max_mails_per_run", 60)),
+        agenda=ruw.get("agenda") or {},
         web_host=web.get("host", "127.0.0.1"),
         web_poort=int(web.get("poort", 8765)),
     )

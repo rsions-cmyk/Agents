@@ -137,6 +137,19 @@ details.origineel pre{white-space:pre-wrap;font:13px/1.5 -apple-system,sans-seri
 .toast svg{color:var(--ok)}.toast.fout svg{color:var(--hoog)}
 @keyframes in{from{opacity:0;transform:translateY(-6px)}}
 .regels{margin-top:8px}
+.veld{display:flex;flex-direction:column;gap:6px}
+.veld input[type=text],.veld input[type=date],.veld input[type=datetime-local],.veld textarea{font:inherit;padding:10px 12px;border:1px solid var(--lijn);border-radius:10px;background:var(--vlak2);color:var(--tekst);min-height:0}
+.veld textarea{min-height:110px}
+.keuzes{display:flex;flex-wrap:wrap;gap:6px}
+.keuze{padding:6px 12px;border-radius:999px;border:1px solid var(--lijn);background:var(--vlak);font-weight:550;font-size:13px}
+.keuze.aan{background:var(--accent);border-color:var(--accent);color:var(--vlak)}
+.moment{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--lijn);border-radius:11px;background:var(--vlak);text-align:left;width:100%}
+.moment.aan{border-color:var(--accent);background:var(--accent-zacht)}
+.moment b{font-weight:600}
+.laden{display:flex;flex-direction:column;align-items:center;gap:12px;padding:60px 20px;color:var(--zacht);text-align:center}
+.laden svg{width:28px;height:28px;color:var(--accent);animation:draai 1.2s linear infinite}
+.vinkregel{display:flex;gap:8px;align-items:center;color:var(--zacht)}
+.stappen-klein{margin:4px 0 0;padding-left:18px;color:var(--zacht);font-size:13px}
 .regels summary{cursor:pointer;color:var(--zacht);font-size:13px;padding:4px}
 
 /* telefoon en smal scherm */
@@ -331,8 +344,11 @@ function tekenTaken(items){
     <div class="rij taak" data-taak="${t.id}">
       <button class="rondje" data-klaar="${t.id}" title="Afvinken">${ik("check")}</button>
       <div class="midden"><div>${esc(t.omschrijving)}</div>
+        ${t.stappen && t.stappen.length ? `<ul class="stappen-klein">${t.stappen.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
         <div class="chips">${staat.project==="alles" ? `<span class="chip project" style="background:${kleur(t.project)}">${esc(naamProject(t.project))}</span>` : ""}
-        ${t.deadline ? `<span class="chip">${ik("clock")}${esc(t.deadline)}</span>` : ""}</div></div>
+        ${t.minuten ? `<span class="chip">${ik("clock")}${duurTekst(t.minuten)}</span>` : ""}
+        ${t.gepland ? `<span class="chip let">${ik("calendar")}${momentTekst(t.gepland, t.minuten)}</span>` : ""}
+        ${t.deadline ? `<span class="chip">deadline ${esc(t.deadline)}</span>` : ""}</div></div>
     </div>`).join("")}</div>`;
 }
 
@@ -352,6 +368,7 @@ function opruimGroep(titel, items, hoofd){
           <div class="samenvatting">${esc(it.samenvatting || it.onderwerp)}</div>
         </div>
         <div class="snel">
+          <button class="ikoon" data-maaktaak="${it.id}" title="Taak maken en inplannen">${ik("task")}</button>
           <button class="ikoon" data-een="archief" data-id="${it.id}" title="Archiveren">${ik("archive")}</button>
           <button class="ikoon rood" data-een="prullenbak" data-id="${it.id}" title="Naar prullenbak">${ik("trash")}</button>
           <button class="ikoon" data-een="overslaan" data-id="${it.id}" title="Afzender voortaan overslaan">${ik("ban")}</button>
@@ -405,6 +422,7 @@ function tekenPaneel(it){
     </div>
     <div class="p-voet">
       <span class="uitleg">Opent een antwoord in Apple Mail. Je verstuurt zelf.</span>
+      <button class="knop" data-maaktaak="${it.id}" title="Taak maken en inplannen">${ik("calendar")}Taak</button>
       <button class="knop" id="afwijzen">${ik("x")}Afwijzen</button>
       <button class="knop goed" id="goedkeuren">${ik("check")}${zelf ? "Afgehandeld" : "Goedkeuren"}</button>
     </div>`;
@@ -412,9 +430,86 @@ function tekenPaneel(it){
   document.getElementById("dek").classList.add("open");
 }
 
+const duurTekst = m => m < 60 ? `${m} min` : `${Math.floor(m/60)} u${m%60 ? " " + (m%60) + " min" : ""}`;
+function momentTekst(iso, minuten){
+  const b = new Date(iso), e = new Date(b.getTime() + (minuten||30)*60000);
+  const tijd = d => d.toLocaleTimeString("nl-NL",{hour:"2-digit",minute:"2-digit"});
+  return `${b.toLocaleDateString("nl-NL",{weekday:"short",day:"numeric",month:"short"})} · ${tijd(b)}–${tijd(e)}`;
+}
+const vindItem = id => [...D.zelf, ...D.wacht, ...D.info, ...D.overgeslagen].find(i => i.id === id);
+let taak = null;   // {id, item, voorstel, minuten, moment, archiveren}
+
+async function openTaak(id){
+  const it = vindItem(id);
+  if (!it) return;
+  staat.open = null;
+  taak = {id, item: it, voorstel: null, minuten: 30, moment: null, archiveren: it.status !== "wacht" && it.status !== "fout" && it.status !== "handmatig"};
+  tekenTaak();
+  try {
+    const r = await fetch("/api/taak-voorstel", {method:"POST", headers:{"Content-Type":"application/json","X-Token":TOKEN}, body:JSON.stringify({id})});
+    const j = await r.json();
+    if (!taak || taak.id !== id) return;
+    if (!j.ok){ toast(j.melding, true); return sluitPaneel(); }
+    taak.voorstel = j.voorstel; taak.minuten = j.voorstel.minuten; taak.moment = j.voorstel.momenten[0] || null;
+    tekenTaak();
+  } catch(e){ toast("Geen verbinding met mailagent", true); sluitPaneel(); }
+}
+
+function tekenTaak(){
+  const p = document.getElementById("paneel"), it = taak.item, a = afzender(it.van), v = taak.voorstel;
+  p.dataset.id = "";
+  const kop = `<div class="p-kop">${avatar(it)}<div style="min-width:0"><h2>Taak maken</h2>
+      <div class="van">${esc(it.onderwerp)} · ${esc(a.naam)}</div></div>
+      <button class="ikoon" id="sluit" title="Sluiten (Esc)">${ik("x")}</button></div>`;
+  if (!v){
+    p.innerHTML = kop + `<div class="p-inhoud"><div class="laden">${ik("refresh")}<div><b style="color:var(--tekst)">Claude schat de taak in</b><br>tijd, stappen en vrije momenten in je agenda</div></div></div>`;
+  } else {
+    const duren = [15,30,45,60,90,120,180,240];
+    if (!duren.includes(taak.minuten)) duren.push(taak.minuten), duren.sort((x,y)=>x-y);
+    const momenten = v.momenten.map(m => `<button class="moment${taak.moment===m?" aan":""}" data-moment="${m}">${ik("calendar")}<span><b>${momentTekst(m, taak.minuten)}</b></span></button>`).join("");
+    p.innerHTML = kop + `<div class="p-inhoud">
+      <div class="melding info">${ik("sparkle")}<div>${esc(v.toelichting)}</div></div>
+      <div class="veld"><div class="label">Taak</div><input type="text" id="t-titel" value="${esc(document.getElementById("t-titel")?.value ?? v.titel)}"></div>
+      <div class="veld"><div class="label">${ik("clock")}Geschatte tijd</div>
+        <div class="keuzes">${duren.map(d => `<button class="keuze${d===taak.minuten?" aan":""}" data-duur="${d}">${duurTekst(d)}</button>`).join("")}</div></div>
+      <div class="veld"><div class="label">${ik("task")}Wat te doen (één stap per regel)</div>
+        <textarea id="t-stappen">${esc(document.getElementById("t-stappen")?.value ?? v.stappen.join("\n"))}</textarea></div>
+      <div class="veld"><div class="label">Deadline</div><input type="date" id="t-deadline" value="${esc(document.getElementById("t-deadline")?.value ?? (v.deadline || ""))}"></div>
+      <div class="veld"><div class="label">${ik("calendar")}Inplannen in je agenda</div>
+        ${v.agenda_fout ? `<div class="melding">${ik("alert")}<div>${esc(v.agenda_fout)}</div></div>` : ""}
+        ${momenten}
+        ${v.agenda_fout ? "" : `<button class="moment${taak.moment==="anders"?" aan":""}" data-moment="anders">${ik("clock")}<span>Ander moment</span></button>
+        ${taak.moment==="anders" ? `<input type="datetime-local" id="t-anders" step="900" value="${esc(document.getElementById("t-anders")?.value || "")}">` : ""}`}
+        <button class="moment${taak.moment===null?" aan":""}" data-moment="">${ik("x")}<span>Niet inplannen</span></button>
+      </div>
+      ${it.status === "ter_info" || it.status === "genegeerd" ? `<label class="vinkregel"><input type="checkbox" class="vink" id="t-archief" ${taak.archiveren?"checked":""}> Mail daarna archiveren</label>` : ""}
+    </div>
+    <div class="p-voet"><span class="uitleg">${taak.moment ? "Maakt een afspraak in je agenda, die naar Outlook synchroniseert." : "Komt in je takenlijst."}</span>
+      <button class="knop" id="sluit2">Annuleren</button>
+      <button class="knop goed" id="taakmaak">${ik("check")}${taak.moment ? "Maken en inplannen" : "Taak maken"}</button></div>`;
+  }
+  p.classList.add("open"); p.setAttribute("aria-hidden","false");
+  document.getElementById("dek").classList.add("open");
+}
+
+async function bevestigTaak(){
+  const v = taak, start = v.moment === "anders" ? (document.getElementById("t-anders")?.value || "") : v.moment;
+  if (v.moment === "anders" && !start) return toast("Kies een datum en tijd, of kies Niet inplannen", true);
+  const data = {id: v.id, titel: document.getElementById("t-titel").value, stappen: document.getElementById("t-stappen").value.split("\n"),
+                minuten: v.minuten, deadline: document.getElementById("t-deadline").value || null, start: start || null,
+                archiveren: !!document.getElementById("t-archief")?.checked};
+  sluitPaneel();
+  const weg = data.archiveren ? [v.id] : (v.item.status === "ter_info" || v.item.status === "genegeerd" ? [v.id] : []);
+  weg.forEach(i => verborgen.add(i)); teken();
+  const ok = await actie("taak-maak", data);
+  weg.forEach(i => verborgen.delete(i));
+  if (!ok){ taak = v; tekenTaak(); }
+  laad();
+}
+
 function openPaneel(id){ staat.open = id; teken(); }
 function sluitPaneel(){
-  staat.open = null;
+  staat.open = null; taak = null;
   document.getElementById("paneel").classList.remove("open");
   document.getElementById("paneel").setAttribute("aria-hidden","true");
   document.getElementById("dek").classList.remove("open");
@@ -432,6 +527,12 @@ document.addEventListener("click", async ev => {
   const t = ev.target.closest("button, .rij, input");
   if (!t) return;
   const d = t.dataset;
+  if (d.maaktaak){ ev.stopPropagation(); return openTaak(Number(d.maaktaak)); }
+  if (taak && d.duur){ taak.minuten = Number(d.duur); return tekenTaak(); }
+  if (taak && d.moment !== undefined){ taak.moment = d.moment || null; return tekenTaak(); }
+  if (t.id === "taakmaak") return bevestigTaak();
+  if (taak && t.id === "t-archief"){ taak.archiveren = t.checked; return; }
+  if (t.id === "sluit2") return sluitPaneel();
   if (d.project){ staat.project = d.project; staat.gekozen.clear(); bewaar(); sluitPaneel(); return teken(); }
   if (d.tab){ staat.tab = d.tab; bewaar(); sluitPaneel(); return teken(); }
   if (d.open){ return openPaneel(Number(d.open)); }

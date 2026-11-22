@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS items (
     taken TEXT,
     agenda TEXT,
     vragen TEXT,
-    status TEXT NOT NULL,       -- wacht | goedgekeurd | afgewezen | ter_info | genegeerd | handmatig | fout | gearchiveerd | verwijderd
+    status TEXT NOT NULL,       -- wacht | goedgekeurd | afgewezen | ter_info | genegeerd | handmatig | fout | gearchiveerd | verwijderd | taak
     opmerking TEXT,
     aangemaakt TEXT NOT NULL,
     afgehandeld TEXT
@@ -44,7 +44,10 @@ CREATE TABLE IF NOT EXISTS taken (
     omschrijving TEXT NOT NULL,
     deadline TEXT,
     klaar INTEGER NOT NULL DEFAULT 0,
-    aangemaakt TEXT NOT NULL
+    aangemaakt TEXT NOT NULL,
+    minuten INTEGER,
+    stappen TEXT,
+    gepland TEXT
 );
 CREATE TABLE IF NOT EXISTS bron_stand (
     bron TEXT PRIMARY KEY,
@@ -77,6 +80,12 @@ class Store:
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA journal_mode=WAL")  # lezen en schrijven tegelijk vanuit meerdere verbindingen
         self.db.executescript(SCHEMA)
+        # oudere databases bijwerken
+        kolommen = {r["name"] for r in self.db.execute("PRAGMA table_info(taken)")}
+        for kolom, soort in (("minuten", "INTEGER"), ("stappen", "TEXT"), ("gepland", "TEXT")):
+            if kolom not in kolommen:
+                self.db.execute(f"ALTER TABLE taken ADD COLUMN {kolom} {soort}")
+        self.db.commit()
 
     # --- bronnen -------------------------------------------------------------
     def laatst_opgehaald(self, bron: str) -> Optional[datetime]:
@@ -156,6 +165,16 @@ class Store:
             self.db.execute("INSERT INTO taken(item_id, project, omschrijving, deadline, aangemaakt) VALUES (?,?,?,?,?)",
                             (item_id, project, t["omschrijving"], t.get("deadline"), nu()))
         self.db.commit()
+
+    def nieuwe_taak(self, item_id: Optional[int], project: str, titel: str, deadline: Optional[str],
+                    minuten: Optional[int], stappen: list[str], gepland: Optional[str]) -> int:
+        cur = self.db.execute(
+            "INSERT INTO taken(item_id, project, omschrijving, deadline, aangemaakt, minuten, stappen, gepland) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (item_id, project, titel, deadline, nu(), minuten, json.dumps(stappen, ensure_ascii=False), gepland))
+        self.db.commit()
+        self.log(item_id, f"taak gemaakt: {titel}" + (f" (gepland {gepland})" if gepland else ""))
+        return cur.lastrowid
 
     def open_taken(self, project: Optional[str] = None) -> list[sqlite3.Row]:
         q = "SELECT * FROM taken WHERE klaar=0"

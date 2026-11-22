@@ -20,6 +20,7 @@ def main(argv: list[str] | None = None) -> int:
     ov.add_argument("--uren", type=int, default=24)
     ov.add_argument("--bestand", help="schrijf het overzicht naar dit bestand")
     sub.add_parser("login", help="eenmalig inloggen bij Outlook (Microsoft 365)")
+    sub.add_parser("agendas", help="agenda's op deze Mac tonen, voor agenda: in config.yaml")
     tb = sub.add_parser("test-bronnen", help="mail van het afgelopen etmaal tonen, zonder Claude en zonder iets op te slaan")
     tb.add_argument("--uren", type=int, default=24)
     args = ap.parse_args(argv)
@@ -34,6 +35,17 @@ def main(argv: list[str] | None = None) -> int:
         if args.bestand:
             open(args.bestand, "w", encoding="utf-8").write(tekst)
         print(tekst)
+        return 0
+
+    if args.opdracht == "agendas":
+        from .agenda import AppleAgenda
+        try:
+            ag = AppleAgenda(kalender="")
+        except ImportError:
+            print("Installeer eerst: .venv/bin/pip install pyobjc-framework-EventKit")
+            return 1
+        for account, naam, schrijfbaar in sorted(ag.kalenders()):
+            print(f"  account: {account!r:28} kalender: {naam!r}" + ("" if schrijfbaar else "   (alleen lezen)"))
         return 0
 
     from .sources import maak_bronnen

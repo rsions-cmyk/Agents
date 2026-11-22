@@ -42,6 +42,12 @@ class NepLLM:
                           taken=[Taak(omschrijving="Opvolgen", deadline=sortering.deadline)],
                           agenda_voorstel=None, vragen_aan_jou="Akkoord?")
 
+    def plan_taak(self, mail, tekst, project):
+        from mailagent.models import Taakplan
+        self.gezien.append(tekst)
+        return Taakplan(titel=f"Afhandelen: {mail.onderwerp}", stappen=["Lezen", "Reageren"], minuten=45,
+                        deadline=None, toelichting="Korte mail, kort antwoord.")
+
 
 @pytest.fixture
 def omgeving(tmp_path):
@@ -254,3 +260,61 @@ def test_web_api(omgeving):
         assert store.item(data["wacht"][0]["id"])["status"] == "afgewezen"
     finally:
         server.shutdown()
+
+
+def test_vrije_momenten():
+    from datetime import datetime, timedelta, timezone, date
+    from mailagent.agenda import Werktijd, vrije_momenten
+
+    tz = timezone(timedelta(hours=1))
+    nu = datetime(2026, 11, 23, 8, 10, tzinfo=tz)          # maandag 08:10
+    werk = Werktijd()
+    bezet = [(datetime(2026, 11, 23, 9, 0, tzinfo=tz), datetime(2026, 11, 23, 12, 0, tzinfo=tz)),
+             (datetime(2026, 11, 24, 0, 0, tzinfo=tz), datetime(2026, 11, 24, 23, 59, tzinfo=tz))]
+    m = vrije_momenten(bezet, 60, nu, werk)
+    assert m[0] == datetime(2026, 11, 23, 12, 0, tzinfo=tz)  # na het blok van 9 tot 12
+    assert m[1].date() == date(2026, 11, 25)                  # dinsdag is vol
+    assert len(m) == 3 and len({x.date() for x in m}) == 3    # één per dag
+    # deadline begrenst
+    assert vrije_momenten(bezet, 60, nu, werk, deadline=date(2026, 11, 24)) == [m[0]]
+    # weekend overslaan
+    zat = datetime(2026, 11, 28, 10, 0, tzinfo=tz)
+    assert vrije_momenten([], 30, zat, werk)[0] == datetime(2026, 11, 30, 9, 0, tzinfo=tz)
+
+
+def test_taak_maken_en_inplannen(omgeving):
+    from datetime import datetime, timedelta
+    from mailagent.models import Taakplan
+    from mailagent.pipeline import maak_taak
+
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    info = store.items(status="ter_info")[0]
+
+    class NepAgenda:
+        def __init__(self):
+            self.afspraken = []
+        def bezet(self, van, tot):
+            return []
+        def maak_afspraak(self, titel, start, eind, notities):
+            self.afspraken.append((titel, start, eind, notities))
+            return "ingepland"
+
+    ag = NepAgenda()
+    start = datetime(2026, 11, 25, 10, 0).astimezone()
+    melding = maak_taak(store, bronnen, ag, info["id"], "Nieuwsbrief lezen", ["Lezen", "Delen met team"],
+                        45, "2026-11-27", start, archiveren=True)
+    assert "Taak gemaakt" in melding and "ingepland" in melding and "archief" in melding
+    titel, b, e, notities = ag.afspraken[0]
+    assert e - b == timedelta(minutes=45) and "- Delen met team" in notities
+    taak = store.open_taken()[0]
+    assert taak["minuten"] == 45 and json.loads(taak["stappen"]) == ["Lezen", "Delen met team"] and taak["gepland"]
+    assert store.item(info["id"])["status"] == "gearchiveerd"
+
+    # zonder agenda kan er niet worden ingepland
+    wacht = store.items(status="wacht")[0]
+    with pytest.raises(ValueError):
+        maak_taak(store, bronnen, None, wacht["id"], "x", [], 30, None, start, False)
+    # zonder moment wel; een wachtend item blijft wachten
+    maak_taak(store, bronnen, None, wacht["id"], "Reageren", [], 30, None, None, False)
+    assert store.item(wacht["id"])["status"] == "wacht"

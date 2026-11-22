@@ -53,6 +53,28 @@ class Uitwerking(BaseModel):
     vragen_aan_jou: Optional[str]
 
 
+class Taakplan(BaseModel):
+    titel: str
+    stappen: list[str]
+    minuten: int
+    deadline: Optional[str]
+    toelichting: str
+
+
+SCHEMA_TAAKPLAN = {
+    "type": "object",
+    "properties": {
+        "titel": {"type": "string", "description": "Korte taaknaam in de gebiedende wijs, Nederlands"},
+        "stappen": {"type": "array", "items": {"type": "string"}, "description": "1 tot 6 concrete stappen"},
+        "minuten": {"type": "integer", "description": "Realistische tijd voor het eigen werk van de eigenaar, 15 tot 480"},
+        "deadline": {"type": ["string", "null"], "description": "JJJJ-MM-DD als er een deadline uit de mail blijkt, anders null"},
+        "toelichting": {"type": "string", "description": "Eén zin: waarom deze tijdsinschatting"},
+    },
+    "required": ["titel", "stappen", "minuten", "deadline", "toelichting"],
+    "additionalProperties": False,
+}
+
+
 def schema_sortering(projecten: list[str]) -> dict:
     return {
         "type": "object",

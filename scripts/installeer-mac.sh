@@ -8,7 +8,7 @@ cd "$MAP"
 
 python3 -m venv .venv
 .venv/bin/pip install -q --upgrade pip
-.venv/bin/pip install -q -e ".[outlook]"
+.venv/bin/pip install -q -e ".[outlook,agenda]"
 chmod +x scripts/mailagent.sh
 
 [ -f config.yaml ] || { cp config.example.yaml config.yaml; echo "config.yaml aangemaakt: vul dit eerst in."; }
