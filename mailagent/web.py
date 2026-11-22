@@ -22,7 +22,7 @@ from .agenda import lees_werktijd, maak_agenda, vrije_momenten
 from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
-from .pipeline import afzender_adres, map_voorstellen, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
+from .pipeline import afzender_adres, map_voorstellen, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
 from .store import Store
 
 APP_HTML = Path(__file__).with_name("static") / "app.html"
@@ -65,6 +65,23 @@ def afzender_voorstellen(store: Store) -> dict:
     return {"gedrag": {a: g for a, g in gedrag.items() if a in namen}, "voorstellen": voorstellen[:8]}
 
 
+def volgende_ronde(cfg: Config) -> str | None:
+    """Eerstvolgende vaste mailronde op een werkdag, als 'ma 12:45' of '12:45' (vandaag)."""
+    werk = lees_werktijd(cfg.agenda)
+    nu = datetime.now()
+    dagen_nl = ["ma", "di", "wo", "do", "vr", "za", "zo"]
+    for plus in range(8):
+        d = nu + timedelta(days=plus)
+        if d.isoweekday() not in werk.dagen:
+            continue
+        for r in sorted(cfg.rondes):
+            h, m = (int(x) for x in r.split(":"))
+            t = d.replace(hour=h, minute=m, second=0, microsecond=0)
+            if t > nu:
+                return r if plus == 0 else f"{dagen_nl[t.weekday()]} {r}"
+    return None
+
+
 def verzamel(cfg: Config, store: Store, ophalen: dict) -> dict:
     werk = lees_werktijd(cfg.agenda)
     tellingen = {p: len(store.items(status="wacht", project=p)) for p in cfg.projecten}
@@ -82,6 +99,8 @@ def verzamel(cfg: Config, store: Store, ophalen: dict) -> dict:
         "ophalen": {"bezig": ophalen["bezig"], "laatste": ophalen["laatste"]},
         "werktijd": {"begin": werk.begin.strftime("%H:%M"), "eind": werk.eind.strftime("%H:%M"), "dagen": sorted(werk.dagen)},
         "agenda_aan": bool((cfg.agenda or {}).get("kalender")),
+        "vandaag_afgehandeld": store.vandaag_afgehandeld(),
+        "volgende_ronde": volgende_ronde(cfg),
     }
 
 
@@ -112,6 +131,11 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
             voorstel = {"titel": f"Afhandelen: {mail.onderwerp}", "stappen": [], "minuten": 30,
                         "deadline": it["deadline"], "toelichting": "Deze afzender gaat niet naar Claude; standaard 30 minuten."}
         voorstel["deadline"] = voorstel["deadline"] or it["deadline"]
+        factor, n = store.tijdfactor(it["project"])
+        if n >= 3 and abs(factor - 1) >= 0.1:
+            voorstel["minuten"] = max(15, min(480, round(voorstel["minuten"] * factor / 15) * 15))
+            voorstel["toelichting"] += (f" Aangepast met ×{factor:.1f}".replace(".", ",")
+                                        + f": je laatste {n} taken in {it['project']} duurden {'langer' if factor > 1 else 'korter'} dan geschat.")
         ag, fout = agenda()
         voorstel["momenten"], voorstel["agenda_fout"] = [], fout
         werk = lees_werktijd(cfg.agenda)
@@ -293,6 +317,32 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                             mappen_cache[it["bron"]] = bron.mappenlijst()
                     mappen = mappen_cache[it["bron"]]
                     return self._json({"ok": True, "mappen": mappen, "voorstellen": map_voorstellen(store, it, mappen)})
+                elif actie == "terugzetten":
+                    with mail_slot:
+                        melding = zet_terug(store, bronnen, [int(x) for x in v.get("ids", [])])
+                    if "niet gelukt" in melding:
+                        return self._json({"ok": False, "melding": melding})
+                elif actie == "taak-oordeel":
+                    store.taak_oordeel(int(v["id"]), int(v["oordeel"]))
+                    melding = "Dank, de volgende schattingen worden daarop aangepast"
+                elif actie == "taak-later":
+                    store.taak_later(int(v["id"]), bool(v.get("later", True)))
+                    melding = "Naar Later" if v.get("later", True) else "Terug in de planning"
+                elif actie == "afsluiten":
+                    ag, fout = agenda()
+                    open_ = [t for t in store.open_taken() if not t["gepland"] and not t["later"]]
+                    voorstellen = {}
+                    if ag is not None:
+                        werk = lees_werktijd(cfg.agenda)
+                        morgen = (datetime.now().astimezone() + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+                        bezet = ag.bezet(morgen, morgen + timedelta(days=werk.dagen_vooruit))
+                        gepland: list = []
+                        for t in open_:
+                            mom = vrije_momenten(bezet + gepland, t["minuten"] or 30, morgen, werk, aantal=1)
+                            if mom:
+                                voorstellen[t["id"]] = mom[0].isoformat(timespec="minutes")
+                                gepland.append((mom[0], mom[0] + timedelta(minutes=t["minuten"] or 30)))
+                    return self._json({"ok": True, "voorstellen": voorstellen, "agenda_fout": fout})
                 elif actie == "regels-toevoegen":
                     adressen = [a.strip().lower() for a in v.get("adressen", []) if a.strip()]
                     for a in adressen:

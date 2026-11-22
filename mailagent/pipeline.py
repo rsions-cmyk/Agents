@@ -130,6 +130,7 @@ def verplaats_items(store: Store, bronnen: dict, item_ids: list[int], doel: str)
         for it in items:
             fout = res.get(it["bron_id"], "geen resultaat")
             if fout is None:
+                store.bewaar_vorige_status(it["id"], it["status"])
                 store.zet_status(it["id"], nieuwe_status, opmerking=doel[4:] if doel.startswith("map:") else None)
                 if doel.startswith("map:"):
                     store.onthoud_map(bron_naam, doel[4:], afzender_adres(it["van"] or ""), it["project"])
@@ -176,7 +177,7 @@ def maak_taak(store: Store, bronnen: dict, agenda, item_id: int, titel: str, sta
         if agenda is None:
             raise ValueError("geen agenda gekoppeld; maak de taak zonder inplannen")
         notities = "\n".join(f"- {s}" for s in stappen) + f"\n\nNaar aanleiding van: {item['onderwerp']} ({item['van']})"
-        meldingen.append(agenda.maak_afspraak(titel, start, start + timedelta(minutes=minuten), notities))
+        meldingen.append(agenda.maak_afspraak(afspraak_titel(titel, stappen), start, start + timedelta(minutes=minuten), notities))
         gepland = start.isoformat(timespec="minutes")
     store.nieuwe_taak(item_id, item["project"], titel, deadline, minuten, stappen, gepland)
     meldingen.insert(0, "Taak gemaakt, mail gekoppeld")
@@ -204,7 +205,8 @@ def plan_bestaande_taak(store: Store, agenda, taak_id: int, start: datetime, min
         it = store.item(t["item_id"])
         if it is not None:
             notities += f"\n\nNaar aanleiding van: {it['onderwerp']} ({it['van']})"
-    melding = agenda.maak_afspraak(t["omschrijving"], start, start + timedelta(minutes=minuten), notities.strip())
+    melding = agenda.maak_afspraak(afspraak_titel(t["omschrijving"], stappen), start,
+                                   start + timedelta(minutes=minuten), notities.strip())
     store.plan_taak(taak_id, start.isoformat(timespec="minutes"), minuten)
     return melding
 
@@ -223,6 +225,47 @@ def open_antwoord(store: Store, bronnen: dict, item_id: int, tekst: str) -> str:
     melding = bron.maak_concept(item["bron_id"], tekst, item["onderwerp"], item["van"], message_id=item["thread_id"])
     store.log(item_id, "antwoord geopend vanuit taak")
     return melding
+
+
+def zet_terug(store: Store, bronnen: dict, item_ids: list[int]) -> str:
+    """Ongedaan maken van archiveren, opbergen of verwijderen: mail terug naar de inbox, item terug in de lijst."""
+    gelukt, mislukt = 0, []
+    for i in item_ids:
+        it = store.item(i)
+        if it is None or it["status"] not in ("gearchiveerd", "verwijderd", "opgeborgen"):
+            continue
+        van = {"gearchiveerd": "archief", "verwijderd": "prullenbak"}.get(it["status"]) or f"map:{it['opmerking']}"
+        bron = bronnen.get(it["bron"])
+        if bron is None or not hasattr(bron, "terugzetten") or not it["thread_id"]:
+            mislukt.append(it["onderwerp"][:40])
+            continue
+        try:
+            res = bron.terugzetten([it["thread_id"]], van)
+        except Exception as e:
+            mislukt.append(f"{it['onderwerp'][:40]} ({e})")
+            continue
+        nieuw = res.get(it["thread_id"], "FOUT:geen antwoord")
+        if nieuw.startswith("FOUT"):
+            mislukt.append(f"{it['onderwerp'][:40]} ({nieuw[5:]})")
+            continue
+        if nieuw != it["bron_id"]:
+            store.nieuw_bron_id(it["sleutel"], it["bron"], nieuw)
+        store.zet_status(i, it["vorige_status"] or "ter_info")
+        store.db.execute("UPDATE items SET opmerking=NULL WHERE id=?", (i,))   # mapnaam e.d. niet als melding tonen
+        store.db.commit()
+        gelukt += 1
+    melding = f"{gelukt} mail(s) terug in je inbox"
+    if mislukt:
+        melding += f"; niet gelukt: {'; '.join(mislukt[:3])}"
+    return melding
+
+
+def afspraak_titel(titel: str, stappen: list[str]) -> str:
+    """Titel met de eerste concrete stap erin (als-dan-plan: om 14:00 begin ik met X)."""
+    eerste = next((s.strip() for s in stappen if s.strip()), "")
+    if not eerste:
+        return titel
+    return f"{titel} · begin met: {eerste[0].lower() + eerste[1:]}"
 
 
 def run(cfg: Config, store: Store, bronnen: dict, llm: LLM, dagen: int | None = None,

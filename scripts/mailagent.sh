@@ -1,5 +1,5 @@
 #!/bin/bash
-# Start mailagent. Gebruik: scripts/mailagent.sh run | inbox | overzicht | test-bronnen | login
+# Start mailagent. Gebruik: scripts/mailagent.sh run | inbox | overzicht | test-bronnen | agendas | rondes-installeren
 # Met backend 'claude-code' (standaard) is geen API-sleutel nodig.
 # Met backend 'api' komt de sleutel uit de macOS-sleutelhanger, nooit uit een bestand.
 set -euo pipefail

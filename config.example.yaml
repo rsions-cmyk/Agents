@@ -40,6 +40,10 @@ bronnen:
 terugkijken_dagen: 14
 max_mails_per_run: 30
 
+# Vaste mailrondes op werkdagen. Tussen de rondes komt er geen nieuwe mail binnen, zodat je
+# niet steeds onderbroken wordt. Na een wijziging: scripts/mailagent.sh rondes-installeren
+rondes: ["07:45", "12:45", "16:15"]
+
 # Nieuwsbrieven en reclame (mail met een afmeldlink of de markering 'bulk') niet naar Claude
 # sturen, maar meteen bij Overgeslagen zetten. Afzenders met een eigen regel gaan wel door.
 nieuwsbrieven_overslaan: true

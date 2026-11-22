@@ -1,6 +1,6 @@
 #!/bin/bash
 # Eenmalige installatie op macOS: virtuele omgeving, config en twee launchd-taken.
-#   nl.mailagent.run    haalt op werkdagen om 07:45 en 12:45 mail op en bereidt concepten voor
+#   nl.mailagent.run    haalt op werkdagen om 07:45, 12:45 en 16:15 mail op (aan te passen: rondes in config.yaml)
 #   nl.mailagent.inbox  houdt de goedkeuringspagina op http://127.0.0.1:8765 open
 set -euo pipefail
 MAP="$(cd "$(dirname "$0")/.." && pwd)"
@@ -31,7 +31,7 @@ PLIST
 
 TIJDEN=""
 for dag in 1 2 3 4 5; do
-  for tijd in "7 45" "12 45"; do
+  for tijd in "7 45" "12 45" "16 15"; do
     set -- $tijd
     TIJDEN="$TIJDEN<dict><key>Weekday</key><integer>$dag</integer><key>Hour</key><integer>$1</integer><key>Minute</key><integer>$2</integer></dict>"
   done

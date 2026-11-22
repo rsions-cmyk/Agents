@@ -23,6 +23,7 @@ def main(argv: list[str] | None = None) -> int:
     ov.add_argument("--uren", type=int, default=24)
     ov.add_argument("--bestand", help="schrijf het overzicht naar dit bestand")
     sub.add_parser("login", help="eenmalig inloggen bij Outlook (Microsoft 365)")
+    sub.add_parser("rondes-installeren", help="de vaste mailrondes uit config.yaml in launchd zetten")
     sub.add_parser("agendas", help="agenda's op deze Mac tonen, voor agenda: in config.yaml")
     tb = sub.add_parser("test-bronnen", help="mail van het afgelopen etmaal tonen, zonder Claude en zonder iets op te slaan")
     tb.add_argument("--uren", type=int, default=24)
@@ -38,6 +39,26 @@ def main(argv: list[str] | None = None) -> int:
         if args.bestand:
             open(args.bestand, "w", encoding="utf-8").write(tekst)
         print(tekst)
+        return 0
+
+    if args.opdracht == "rondes-installeren":
+        import plistlib
+        import subprocess
+        from pathlib import Path
+        from .agenda import lees_werktijd
+        werk = lees_werktijd(cfg.agenda)
+        tijden = [{"Weekday": d % 7, "Hour": int(r.split(":")[0]), "Minute": int(r.split(":")[1])}
+                  for d in sorted(werk.dagen) for r in cfg.rondes]
+        plist = Path.home() / "Library/LaunchAgents/nl.mailagent.run.plist"
+        if not plist.exists():
+            print(f"{plist} bestaat niet; draai eerst scripts/installeer-mac.sh")
+            return 1
+        data = plistlib.loads(plist.read_bytes())
+        data["StartCalendarInterval"] = tijden
+        plist.write_bytes(plistlib.dumps(data))
+        subprocess.run(["launchctl", "unload", str(plist)], capture_output=True)
+        subprocess.run(["launchctl", "load", str(plist)], capture_output=True)
+        print(f"Mailrondes ingesteld: {', '.join(cfg.rondes)} op werkdagen")
         return 0
 
     if args.opdracht == "agendas":

@@ -202,6 +202,33 @@ end run
 '''
 
 
+SCRIPT_TERUG = HULP + r'''
+on run argv
+    set accountNaam to item 1 of argv
+    set inboxNaam to item 2 of argv
+    set vanNaam to item 3 of argv
+    set uitvoer to ""
+    set van to my zoekMap(accountNaam, vanNaam)
+    tell application "Mail"
+        set inbox to mailbox inboxNaam of account accountNaam
+        repeat with i from 4 to count of argv
+            set mid to item i of argv
+            try
+                set m to first message of van whose message id is mid
+                move m to inbox
+                delay 0.3
+                set nieuw to first message of inbox whose message id is mid
+                set uitvoer to uitvoer & mid & tab & (id of nieuw as string) & linefeed
+            on error foutTekst
+                set uitvoer to uitvoer & mid & tab & "FOUT:" & foutTekst & linefeed
+            end try
+        end repeat
+    end tell
+    return uitvoer
+end run
+'''
+
+
 SCRIPT_MAPPEN = r'''
 on run argv
     set accountNaam to item 1 of argv
@@ -327,6 +354,18 @@ class AppleMailBron:
         """Vlag zetten (aan) of weghalen. Kleur: 0 rood, 1 oranje, 2 geel, 3 groen, 4 blauw, 5 paars, 6 grijs."""
         _osascript(SCRIPT_MARKEER, self.account, self.mailbox, bron_id, message_id or "",
                    self.mappen["archief"], "1" if aan else "0", str(kleur))
+
+    def terugzetten(self, message_ids: list[str], van: str) -> dict[str, str]:
+        """Mail terug naar de inbox (ongedaan maken). van: 'archief', 'prullenbak' of 'map:<pad>'.
+        Geeft per Message-ID het nieuwe id in de inbox, of 'FOUT:...'."""
+        map_ = van[4:] if van.startswith("map:") else self.mappen[van]
+        uit = _osascript(SCRIPT_TERUG, self.account, self.mailbox, map_, *message_ids)
+        res = {}
+        for regel in uit.splitlines():
+            mid, _, nieuw = regel.partition("\t")
+            if mid:
+                res[mid] = nieuw.strip()
+        return res
 
     def mappenlijst(self) -> list[str]:
         """Mappen in dit account waar je mail in kunt opbergen, als pad (bijv. 'Projecten/ENTER÷IFITT')."""

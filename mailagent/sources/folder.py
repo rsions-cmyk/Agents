@@ -75,3 +75,14 @@ class MapBron:
 
     def mappenlijst(self) -> list[str]:
         return ["Projecten/ENTER÷IFITT", "ISTTE", "Reviews & tijdschriften", "BUas intern"]
+
+    def terugzetten(self, message_ids: list[str], van: str) -> dict[str, str]:
+        import email as _email
+        map_ = self.pad / (f"_map_{van[4:].replace('/', '_')}" if van.startswith("map:") else f"_{van}")
+        res = {}
+        for f in map_.glob("*.eml") if map_.exists() else []:
+            mid = _email.message_from_bytes(f.read_bytes())["Message-ID"]
+            if mid in message_ids:
+                f.rename(self.pad / f.name)
+                res[mid] = f.name
+        return {m: res.get(m, "FOUT:niet gevonden") for m in message_ids}

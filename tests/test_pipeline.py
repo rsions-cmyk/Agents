@@ -494,3 +494,37 @@ def test_opbergen_in_map_met_voorstel(omgeving):
 
     with pytest.raises(ValueError):
         verplaats_items(store, bronnen, [it2["id"]], "map:")
+
+
+def test_ongedaan_maken_tijdfactor_en_eerste_stap(omgeving):
+    from datetime import datetime
+    from mailagent.pipeline import afspraak_titel, maak_taak, verplaats_items, zet_terug
+
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    info = store.items(status="ter_info")[0]
+    pad = bronnen["test"].pad
+
+    # archiveren en ongedaan maken: mail terug, item terug in Opruimen
+    verplaats_items(store, bronnen, [info["id"]], "archief")
+    assert not (pad / "04-nieuwsbrief.eml").exists()
+    assert "1 mail(s) terug" in zet_terug(store, bronnen, [info["id"]])
+    assert (pad / "04-nieuwsbrief.eml").exists() and store.item(info["id"])["status"] == "ter_info"
+    # ook vanuit een map
+    verplaats_items(store, bronnen, [info["id"]], "map:ISTTE")
+    zet_terug(store, bronnen, [info["id"]])
+    assert store.item(info["id"])["status"] == "ter_info"
+    assert store.vandaag_afgehandeld() == 0          # terugzetten telt niet als afgehandeld
+
+    # eerste stap in de titel van de afspraak
+    assert afspraak_titel("Mentoren benaderen", ["Lijst van vijf mentoren openen", "Mails sturen"]) == \
+        "Mentoren benaderen · begin met: lijst van vijf mentoren openen"
+    assert afspraak_titel("Lezen", []) == "Lezen"
+
+    # tijdfactor uit oordelen
+    for oordeel in (1, 1, 1, 0):
+        tid = store.nieuwe_taak(None, "onderwijs", "x", None, 60, [], None)
+        store.taak_klaar(tid); store.taak_oordeel(tid, oordeel)
+    factor, n = store.tijdfactor("onderwijs")
+    assert n == 4 and abs(factor - (1.4 * 3 + 1.0) / 4) < 1e-9
+    assert store.tijdfactor("istte") == (1.0, 0)

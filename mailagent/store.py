@@ -49,7 +49,9 @@ CREATE TABLE IF NOT EXISTS taken (
     minuten INTEGER,
     stappen TEXT,
     gepland TEXT,
-    afgerond TEXT
+    afgerond TEXT,
+    oordeel INTEGER,             -- -1 korter dan geschat, 0 klopte, 1 langer
+    later INTEGER DEFAULT 0      -- bewust geparkeerd bij het afsluiten van de dag
 );
 CREATE TABLE IF NOT EXISTS bron_stand (
     bron TEXT PRIMARY KEY,
@@ -92,11 +94,15 @@ class Store:
         self.db.executescript(SCHEMA)
         # oudere databases bijwerken
         kolommen = {r["name"] for r in self.db.execute("PRAGMA table_info(taken)")}
-        for kolom, soort in (("minuten", "INTEGER"), ("stappen", "TEXT"), ("gepland", "TEXT"), ("afgerond", "TEXT")):
+        for kolom, soort in (("minuten", "INTEGER"), ("stappen", "TEXT"), ("gepland", "TEXT"), ("afgerond", "TEXT"),
+                             ("oordeel", "INTEGER"), ("later", "INTEGER DEFAULT 0")):
             if kolom not in kolommen:
                 self.db.execute(f"ALTER TABLE taken ADD COLUMN {kolom} {soort}")
-        if "eigen_antwoord" not in {r["name"] for r in self.db.execute("PRAGMA table_info(items)")}:
+        itemkolommen = {r["name"] for r in self.db.execute("PRAGMA table_info(items)")}
+        if "eigen_antwoord" not in itemkolommen:
             self.db.execute("ALTER TABLE items ADD COLUMN eigen_antwoord TEXT")
+        if "vorige_status" not in itemkolommen:
+            self.db.execute("ALTER TABLE items ADD COLUMN vorige_status TEXT")
         # mail met een open taak hoort niet meer in Beoordelen (oudere versies lieten hem staan)
         self.db.execute("UPDATE items SET status='taak' WHERE status IN ('wacht','fout','handmatig') "
                         "AND id IN (SELECT item_id FROM taken WHERE klaar=0 AND item_id IS NOT NULL)")
@@ -194,7 +200,7 @@ class Store:
         self.log(item_id, f"taak gemaakt: {titel}" + (f" (gepland {gepland})" if gepland else ""))
         return cur.lastrowid
 
-    def open_taken(self, project: Optional[str] = None) -> list[sqlite3.Row]:
+    def open_taken(self, project: Optional[str] = None) -> list[sqlite3.Row]:  # noqa: D401
         q = "SELECT * FROM taken WHERE klaar=0"
         args: list = []
         if project:
@@ -223,6 +229,41 @@ class Store:
         self.db.execute("UPDATE taken SET project=? WHERE item_id=?", (project, item_id))
         self.db.commit()
         self.log(item_id, f"project gecorrigeerd naar {project}")
+
+    def taak_oordeel(self, taak_id: int, oordeel: int) -> None:
+        self.db.execute("UPDATE taken SET oordeel=? WHERE id=?", (oordeel, taak_id))
+        self.db.commit()
+
+    def taak_later(self, taak_id: int, later: bool) -> None:
+        self.db.execute("UPDATE taken SET later=? WHERE id=?", (1 if later else 0, taak_id))
+        self.db.commit()
+
+    FACTOR = {-1: 0.75, 0: 1.0, 1: 1.4}
+
+    def tijdfactor(self, project: str, n: int = 10) -> tuple[float, int]:
+        """Hoeveel langer of korter taken in dit project duurden dan geschat (laatste n oordelen)."""
+        rijen = self.db.execute("SELECT oordeel FROM taken WHERE project=? AND oordeel IS NOT NULL "
+                                "ORDER BY afgerond DESC LIMIT ?", (project, n)).fetchall()
+        if not rijen:
+            return 1.0, 0
+        return sum(self.FACTOR[r["oordeel"]] for r in rijen) / len(rijen), len(rijen)
+
+    def vandaag_afgehandeld(self) -> int:
+        begin = datetime.now().astimezone().replace(hour=0, minute=0, second=0, microsecond=0).isoformat(timespec="seconds")
+        return self.db.execute("SELECT COUNT(*) FROM items WHERE afgehandeld >= ? AND status IN "
+                               "('goedgekeurd','afgewezen','gearchiveerd','verwijderd','opgeborgen','taak')",
+                               (begin,)).fetchone()[0]
+
+    def bewaar_vorige_status(self, item_id: int, status: str) -> None:
+        self.db.execute("UPDATE items SET vorige_status=? WHERE id=?", (status, item_id))
+        self.db.commit()
+
+    def nieuw_bron_id(self, sleutel: str, bron: str, nieuw_id: str) -> None:
+        """Na terugzetten geeft Apple Mail de mail een nieuw id: bijwerken, en het nieuwe id als bekend registreren."""
+        self.db.execute("UPDATE mails SET bron_id=? WHERE sleutel=?", (nieuw_id, sleutel))
+        self.db.execute("INSERT OR IGNORE INTO mails SELECT ?, bron, ?, van, aan, onderwerp, datum, thread_id, tekst, opgehaald "
+                        "FROM mails WHERE sleutel=?", (f"{bron}:{nieuw_id}", nieuw_id, sleutel))
+        self.db.commit()
 
     def taak(self, taak_id: int) -> Optional[sqlite3.Row]:
         return self.db.execute("SELECT * FROM taken WHERE id=?", (taak_id,)).fetchone()
