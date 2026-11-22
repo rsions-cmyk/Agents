@@ -14,29 +14,46 @@ from ..models import Email
 
 RS, US = "\x1e", "\x1f"  # scheidingstekens tussen berichten en velden
 
-SCRIPT_OPHALEN = r'''
+SCRIPT_LIJST = r'''
 on run argv
     set accountNaam to item 1 of argv
     set mailboxNaam to item 2 of argv
     set secondenTerug to (item 3 of argv) as integer
-    set maximum to (item 4 of argv) as integer
     set RS to character id 30
     set US to character id 31
-    set grens to (current date) - secondenTerug
+    set nu to current date
+    set grens to nu - secondenTerug
     set uitvoer to ""
     tell application "Mail"
         set mb to mailbox mailboxNaam of account accountNaam
         set berichten to (messages of mb whose date received > grens)
-        set teller to 0
         repeat with m in berichten
-            if teller >= maximum then exit repeat
-            set teller to teller + 1
-            set ontvangers to ""
-            repeat with r in to recipients of m
-                set ontvangers to ontvangers & (address of r) & ", "
-            end repeat
-            set geleden to ((current date) - (date received of m)) as integer
-            set uitvoer to uitvoer & (id of m as string) & US & (message id of m) & US & (sender of m) & US & ontvangers & US & (subject of m) & US & (geleden as string) & US & (content of m) & RS
+            set uitvoer to uitvoer & (id of m as string) & US & ((nu - (date received of m)) as integer as string) & RS
+        end repeat
+    end tell
+    return uitvoer
+end run
+'''
+
+SCRIPT_DETAILS = r'''
+on run argv
+    set accountNaam to item 1 of argv
+    set mailboxNaam to item 2 of argv
+    set RS to character id 30
+    set US to character id 31
+    set uitvoer to ""
+    tell application "Mail"
+        set mb to mailbox mailboxNaam of account accountNaam
+        repeat with i from 3 to count of argv
+            try
+                set m to first message of mb whose id is ((item i of argv) as integer)
+                set ontvangers to ""
+                repeat with r in to recipients of m
+                    set ontvangers to ontvangers & (address of r) & ", "
+                end repeat
+                set geleden to ((current date) - (date received of m)) as integer
+                set uitvoer to uitvoer & (id of m as string) & US & (message id of m) & US & (sender of m) & US & ontvangers & US & (subject of m) & US & (geleden as string) & US & (content of m) & RS
+            end try
         end repeat
     end tell
     return uitvoer
@@ -160,10 +177,27 @@ class AppleMailBron:
         self.naam, self.account, self.mailbox = naam, account, mailbox
         self.mappen = {"archief": archief, "prullenbak": prullenbak}
 
-    def haal_op(self, sinds, maximum: int) -> list[Email]:
+    def lijst(self, sinds) -> list[tuple[str, datetime]]:
+        """Alle berichten sinds `sinds` als (id, datum), oudste eerst. Snel: zonder inhoud."""
         nu = datetime.now().astimezone()
         seconden = int((nu - sinds).total_seconds()) if sinds else 2 * 86400
-        uit = _osascript(SCRIPT_OPHALEN, self.account, self.mailbox, str(seconden), str(maximum))
+        uit = _osascript(SCRIPT_LIJST, self.account, self.mailbox, str(seconden))
+        rijen = []
+        for rec in uit.split(RS):
+            velden = rec.split(US)
+            if len(velden) == 2 and velden[0].strip():
+                rijen.append((velden[0].strip(), nu - timedelta(seconds=int(velden[1] or 0))))
+        return sorted(rijen, key=lambda r: r[1])
+
+    def haal_op(self, sinds, maximum: int, overslaan=None) -> list[Email]:
+        """De oudste `maximum` nog niet verwerkte berichten sinds `sinds`."""
+        rijen = [r for r in self.lijst(sinds) if not (overslaan and overslaan(r[0]))]
+        self.laatste_totaal = len(rijen)
+        kies = [mid for mid, _ in rijen[:maximum]]
+        if not kies:
+            return []
+        nu = datetime.now().astimezone()
+        uit = _osascript(SCRIPT_DETAILS, self.account, self.mailbox, *kies)
         mails = []
         for rec in uit.split(RS):
             velden = rec.split(US)
@@ -173,7 +207,7 @@ class AppleMailBron:
             mails.append(Email(bron=self.naam, bron_id=mid.strip(), van=van, aan=aan.rstrip(", "),
                                onderwerp=onderwerp, datum=nu - timedelta(seconds=int(geleden or 0)),
                                tekst=inhoud.strip(), thread_id=message_id))
-        return mails
+        return sorted(mails, key=lambda m: m.datum)
 
     def maak_concept(self, bron_id: str, tekst: str, onderwerp: str, aan: str, message_id: str | None = None) -> str:
         hoe = _osascript(SCRIPT_CONCEPT, self.account, self.mailbox, bron_id, tekst,

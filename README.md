@@ -15,6 +15,8 @@ Twee keer per werkdag (07:45 en 12:45) gebeurt het volgende:
 
 Na elke run staat er een overzicht per project in `data/overzicht.md`.
 
+**Hoeveel mail per ronde.** Elke ronde verwerkt per account maximaal `max_mails_per_run` mails, de oudste eerst; de volgende ronde gaat verder waar de vorige stopte. Eenmalig verder terugkijken, bijvoorbeeld twee weken: `scripts/mailagent.sh run --dagen 14 --max 100`. Al verwerkte mail gaat niet opnieuw naar Claude. Draai het opnieuw zolang de app meldt dat er nog mail te gaan is. Met `--model sonnet` gebruikt zo'n inhaalronde een zuiniger model. Hoeveel er nog ligt, zie je met `scripts/mailagent.sh test-bronnen --uren 336`.
+
 **Van een mail een taak maken.** Elke mail heeft een knop Taak. Claude schat in hoeveel tijd het kost en welke stappen nodig zijn, en de app zoekt tot drie vrije momenten in je agenda (binnen je werktijd, vóór de deadline, hoogstens één per dag). Je past titel, duur en stappen aan, kiest een moment of "Niet inplannen", en klikt. De afspraak komt in de agenda die je in `config.yaml` bij `agenda:` instelt. Staat je Exchange-agenda in de app Agenda, dan verschijnt hij ook in Outlook. Namen opzoeken met `scripts/mailagent.sh agendas`. De eerste keer vraagt macOS of de app bij je agenda mag.
 
 **De mail blijft aan de taak vast.** Een taak gemaakt vanuit een mail houdt die mail erbij: in Taken zie je afzender en onderwerp, met "Open" (opent de mail in Apple Mail) en "Beantwoorden" (antwoord typen of door Claude laten schrijven, en openen in Apple Mail). De mail wordt niet gearchiveerd, tenzij je dat aanvinkt. Ook gearchiveerd blijft hij gekoppeld.

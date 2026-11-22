@@ -128,34 +128,52 @@ def open_antwoord(store: Store, bronnen: dict, item_id: int, tekst: str) -> str:
     return melding
 
 
-def run(cfg: Config, store: Store, bronnen: dict, llm: LLM) -> dict[str, int]:
-    """Haalt per bron nieuwe mail op en verwerkt die. Geeft per bron het aantal nieuwe items."""
+def run(cfg: Config, store: Store, bronnen: dict, llm: LLM, dagen: int | None = None,
+        maximum: int | None = None) -> dict[str, int]:
+    """Haalt per bron nieuwe mail op en verwerkt die, oudste eerst. Geeft per bron het aantal nieuwe items.
+
+    Met `dagen` kijkt deze ronde zoveel dagen terug, ook als die mail eerder is overgeslagen.
+    Al verwerkte mail wordt herkend en niet opnieuw naar Claude gestuurd.
+    """
     resultaat: dict[str, int] = {}
+    maximum = maximum or cfg.max_mails_per_run
+    nu = datetime.now().astimezone()
     for naam, bron in bronnen.items():
-        sinds = store.laatst_opgehaald(naam) or (
-            datetime.now().astimezone() - timedelta(days=cfg.eerste_run_dagen_terug))
+        laatst = store.laatst_opgehaald(naam)
+        if dagen:
+            sinds = nu - timedelta(days=dagen)
+        else:
+            sinds = laatst or (nu - timedelta(days=cfg.eerste_run_dagen_terug))
         try:
-            mails = bron.haal_op(sinds, cfg.max_mails_per_run)
+            mails = bron.haal_op(sinds, maximum, overslaan=lambda bid, n=naam: store.is_bekend_sleutel(f"{n}:{bid}"))
         except Exception as e:  # een kapotte bron mag de andere niet tegenhouden
             log.error("Ophalen uit %s mislukt: %s", naam, e)
             store.log(None, f"ophalen {naam} mislukt: {e}")
             resultaat[naam] = -1
             continue
 
-        nieuw = 0
-        nieuwste = sinds
+        totaal = getattr(bron, "laatste_totaal", len(mails))
         te_doen = [m for m in sorted(mails, key=lambda m: m.datum) if not store.is_bekend(m)]
-        log.info("%s: %d opgehaald, %d nieuw te verwerken", naam, len(mails), len(te_doen))
-        for mail in mails:
-            nieuwste = max(nieuwste, mail.datum)
+        log.info("%s: %d mail(s) sinds %s, deze ronde %d opgehaald, %d nieuw te verwerken",
+                 naam, totaal, f"{sinds:%d-%m %H:%M}", len(mails), len(te_doen))
+        nieuw = 0
         for i, mail in enumerate(te_doen, 1):
             log.info("%s %d/%d: %s", naam, i, len(te_doen), mail.onderwerp[:70])
             item_id = verwerk_mail(cfg, store, llm, mail)
             item = store.item(item_id)
             log.info("   -> %s, %s (%s)", item["project"], item["actie"], item["status"])
             nieuw += 1
-        store.zet_laatst_opgehaald(naam, nieuwste)
-        store.log(None, f"run {naam}: {len(mails)} opgehaald, {nieuw} nieuw")
+        if mails:
+            nieuwste = max(m.datum for m in mails)
+            # nooit terug in de tijd: een inhaalronde verplaatst het ophaalpunt niet naar achteren
+            if laatst is None or nieuwste > laatst:
+                if not dagen or len(mails) >= totaal:
+                    store.zet_laatst_opgehaald(naam, nieuwste)
+        elif laatst is None:
+            store.zet_laatst_opgehaald(naam, nu)
+        if totaal > len(mails):
+            log.info("%s: nog %d mail(s) te gaan; draai opnieuw om verder te gaan", naam, totaal - len(mails))
+        store.log(None, f"run {naam}: {len(mails)} van {totaal} opgehaald, {nieuw} nieuw")
         resultaat[naam] = nieuw
     return resultaat
 

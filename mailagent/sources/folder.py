@@ -18,7 +18,7 @@ class MapBron:
         self.pad = Path(pad)
         self.uit = Path(data_dir) / "concepten"
 
-    def haal_op(self, sinds, maximum: int) -> list[Email]:
+    def haal_op(self, sinds, maximum: int, overslaan=None) -> list[Email]:
         mails = []
         for f in sorted(self.pad.glob("*.eml")):
             msg = email.message_from_bytes(f.read_bytes(), policy=email.policy.default)
@@ -28,6 +28,8 @@ class MapBron:
                 datum = datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc)
             if sinds and datum <= sinds:
                 continue
+            if overslaan and overslaan(f.name):
+                continue
             deel = msg.get_body(preferencelist=("plain", "html"))
             tekst = deel.get_content() if deel else ""
             if deel is not None and deel.get_content_type() == "text/html":
@@ -35,6 +37,8 @@ class MapBron:
             mails.append(Email(bron=self.naam, bron_id=f.name, van=str(msg["From"] or ""),
                                aan=str(msg["To"] or ""), onderwerp=str(msg["Subject"] or ""),
                                datum=datum, tekst=tekst.strip(), thread_id=msg["Message-ID"]))
+        mails.sort(key=lambda m: m.datum)
+        self.laatste_totaal = len(mails)
         return mails[:maximum]
 
     def maak_concept(self, bron_id: str, tekst: str, onderwerp: str, aan: str, message_id: str | None = None) -> str:

@@ -99,6 +99,9 @@ class Store:
         self.db.commit()
 
     # --- mails ---------------------------------------------------------------
+    def is_bekend_sleutel(self, sleutel: str) -> bool:
+        return self.db.execute("SELECT 1 FROM mails WHERE sleutel=?", (sleutel,)).fetchone() is not None
+
     def is_bekend(self, mail: Email) -> bool:
         return self.db.execute("SELECT 1 FROM mails WHERE sleutel=?", (mail.sleutel,)).fetchone() is not None
 

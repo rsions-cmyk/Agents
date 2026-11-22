@@ -10,7 +10,7 @@ from ..config import Config
 class Bron(Protocol):
     naam: str
 
-    def haal_op(self, sinds, maximum: int) -> list: ...
+    def haal_op(self, sinds, maximum: int, overslaan=None) -> list: ...
 
     def maak_concept(self, bron_id: str, tekst: str, onderwerp: str, aan: str) -> str:
         """Zet een concept-antwoord klaar en geeft een korte beschrijving terug van waar het staat."""

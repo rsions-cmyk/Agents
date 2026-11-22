@@ -68,7 +68,7 @@ class OutlookBron:
                                      "Prefer": 'outlook.body-content-type="text"'})
 
     # --- mail ----------------------------------------------------------------
-    def haal_op(self, sinds, maximum: int) -> list[Email]:
+    def haal_op(self, sinds, maximum: int, overslaan=None) -> list[Email]:
         sinds = sinds or datetime.now(timezone.utc)
         iso = sinds.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         params = {

@@ -340,3 +340,19 @@ def test_taak_terugzetten_en_antwoord_vanuit_taak(omgeving):
     melding = open_antwoord(store, bronnen, info["id"], "Dank, ik lees hem.")
     assert "opgeslagen" in melding and store.item(info["id"])["concept"] == "Dank, ik lees hem."
     assert store.open_taken()[0]["id"] == taak["id"]          # taak blijft staan
+
+
+def test_inhalen_in_rondes_oudste_eerst(omgeving):
+    cfg, store, bronnen = omgeving
+    llm = NepLLM()
+    # eerste ronde met maximum 2: de twee oudste mails
+    assert run(cfg, store, bronnen, llm, maximum=2) == {"test": 2}
+    eerste = {r["onderwerp"] for r in store.items()}
+    assert eerste == {"Nieuwsbrief week 47", "Uw rekeningoverzicht"}   # 07:00 en 08:00
+    # volgende rondes gaan verder waar de vorige stopte, tot alles binnen is
+    assert run(cfg, store, bronnen, llm, maximum=2) == {"test": 2}
+    assert run(cfg, store, bronnen, llm, maximum=2) == {"test": 1}
+    assert run(cfg, store, bronnen, llm, maximum=2) == {"test": 0}
+    # een inhaalronde ziet alles opnieuw maar verwerkt niets dubbel
+    assert run(cfg, store, bronnen, llm, dagen=100000, maximum=50) == {"test": 0}
+    assert len(store.items()) == 5
