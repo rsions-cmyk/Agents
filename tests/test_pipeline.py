@@ -460,3 +460,37 @@ def test_taken_aanpassen_bij_goedkeuren(omgeving):
     assert [(t["omschrijving"], t["deadline"]) for t in taken] == [("Eigen taak", "2026-12-01")]
     keur_goed(store, bronnen, b, "", taken=[])                  # alles weggehaald: geen taken
     assert len(store.open_taken()) == 1
+
+
+def test_opbergen_in_map_met_voorstel(omgeving):
+    from mailagent.pipeline import map_voorstellen, verplaats_items
+
+    cfg, store, bronnen = omgeving
+    pad = bronnen["test"].pad
+    (pad / "12-enter.eml").write_text(
+        "From: ENTER27 <enter27@easychair.example>\nTo: x@buas.nl\nSubject: ENTER27 Doctoral workshop - Submission Outcome\n"
+        "Date: Fri, 20 Nov 2026 16:00:00 +0100\nMessage-ID: <e1@easychair.example>\n\nAccepted.\n")
+    run(cfg, store, bronnen, NepLLM())
+    it = next(r for r in store.items() if r["onderwerp"].startswith("ENTER27"))
+    mappen = bronnen["test"].mappenlijst()
+
+    # zonder geschiedenis: voorstel op basis van de mapnaam
+    vs = map_voorstellen(store, store.item(it["id"]), mappen)
+    assert vs[0]["map"] == "Projecten/ENTER÷IFITT" and "onderwerp" in vs[0]["reden"]
+
+    melding = verplaats_items(store, bronnen, [it["id"]], "map:Projecten/ENTER÷IFITT")
+    assert "map Projecten/ENTER÷IFITT" in melding
+    assert store.item(it["id"])["status"] == "opgeborgen"
+    assert (pad / "_map_Projecten_ENTER÷IFITT" / "12-enter.eml").exists()
+
+    # volgende mail van dezelfde afzender: voorstel op basis van eerdere keuze
+    (pad / "13-enter.eml").write_text(
+        "From: ENTER27 <enter27@easychair.example>\nTo: x@buas.nl\nSubject: Registration reminder\n"
+        "Date: Fri, 20 Nov 2026 17:00:00 +0100\nMessage-ID: <e2@easychair.example>\n\nRegister.\n")
+    run(cfg, store, bronnen, NepLLM())
+    it2 = next(r for r in store.items() if r["onderwerp"] == "Registration reminder")
+    vs2 = map_voorstellen(store, store.item(it2["id"]), mappen)
+    assert vs2[0]["map"] == "Projecten/ENTER÷IFITT" and "afzender" in vs2[0]["reden"]
+
+    with pytest.raises(ValueError):
+        verplaats_items(store, bronnen, [it2["id"]], "map:")

@@ -22,7 +22,7 @@ from .agenda import lees_werktijd, maak_agenda, vrije_momenten
 from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
-from .pipeline import afzender_adres, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
+from .pipeline import afzender_adres, map_voorstellen, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
 from .store import Store
 
 APP_HTML = Path(__file__).with_name("static") / "app.html"
@@ -91,6 +91,7 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
     ophalen = {"bezig": False, "laatste": ""}
     mail_slot = threading.Lock()  # Apple Mail krijgt één opdracht tegelijk
     agenda_cache: dict = {}
+    mappen_cache: dict = {}   # bron -> lijst mappen; eenmaal per sessie opgehaald
 
     def agenda():
         """Agenda pas koppelen als hij nodig is; een fout wordt onthouden tot de volgende poging."""
@@ -280,6 +281,18 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                         return self._json({"ok": False, "melding": "Onbekend project"})
                     store.zet_project(int(v["id"]), v["project"])
                     melding = f"Verplaatst naar {v['project']}"
+                elif actie == "mappen":
+                    it = store.item(int(v["id"]))
+                    if it is None:
+                        return self._json({"ok": False, "melding": "Mail niet gevonden"})
+                    bron = bronnen.get(it["bron"])
+                    if bron is None or not hasattr(bron, "mappenlijst"):
+                        return self._json({"ok": False, "melding": "Opbergen in mappen kan niet voor deze bron"})
+                    if v.get("vernieuw") or it["bron"] not in mappen_cache:
+                        with mail_slot:
+                            mappen_cache[it["bron"]] = bron.mappenlijst()
+                    mappen = mappen_cache[it["bron"]]
+                    return self._json({"ok": True, "mappen": mappen, "voorstellen": map_voorstellen(store, it, mappen)})
                 elif actie == "regels-toevoegen":
                     adressen = [a.strip().lower() for a in v.get("adressen", []) if a.strip()]
                     for a in adressen:

@@ -29,6 +29,8 @@ Na elke run staat er een overzicht per project in `data/overzicht.md`.
 
 **De app leert van wat je doet.** Bij nieuwe concepten krijgt Claude tot drie antwoorden mee die jij eerder goedkeurde of in Mail opende (eerst aan dezelfde afzender, dan binnen hetzelfde project), zodat aanhef, toon, lengte en afsluiting op de jouwe gaan lijken. Antwoorden aan afzenders op de lijst `nooit_naar_claude` gaan nooit mee. Bij Opruimen licht de knop op die je meestal kiest voor een afzender ("meestal weggegooid (3×)"), en afzenders die je drie keer of vaker weggooit stelt de app voor om voortaan over te slaan. Er gebeurt niets vanzelf.
 
+**Opbergen in een map.** Naast archiveren kun je een mail in een eigen map zetten, bijvoorbeeld ENTER÷IFITT: met de mapknop of toets `V`. De kiezer zet bovenaan waar je mail van deze afzender eerder opborg, mappen die je vaak voor dit project gebruikt, en mappen waarvan de naam in het onderwerp staat. Typ om te zoeken, `↵` om op te bergen. De mappenlijst wordt eenmaal per sessie uit Apple Mail gehaald; "Vernieuwen" haalt hem opnieuw op.
+
 **Ter info en overgeslagen mail opruimen.** Onderaan de pagina staan twee lijsten. Bij "Ter info" is alles aangevinkt voor archiveren, bij "Overgeslagen" (nieuwsbrieven, meldingen, reclame) voor de prullenbak. Vink uit wat je wilt houden en klik op de knop. Verwijderen verplaatst naar de prullenbak van dat account, dus je haalt het in Apple Mail terug als het nodig is. Met "Afzender voortaan overslaan" gaat mail van die afzender niet meer naar Claude en komt hij meteen bij "Overgeslagen". Die lijst beheer je onderaan de pagina. De mapnamen stel je per bron in met `archief:` en `prullenbak:` in `config.yaml`.
 
 ## Hoe het veilig blijft

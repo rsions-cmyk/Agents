@@ -55,7 +55,7 @@ class MapBron:
         return f"opgeslagen als {doel}"
 
     def verplaats(self, bron_ids: list[str], doel: str) -> dict[str, str | None]:
-        doelmap = self.pad / f"_{doel}"
+        doelmap = self.pad / (f"_map_{doel[4:].replace('/', '_')}" if doel.startswith("map:") else f"_{doel}")
         doelmap.mkdir(exist_ok=True)
         resultaat: dict[str, str | None] = {}
         for i in bron_ids:
@@ -72,3 +72,6 @@ class MapBron:
             self.vlaggen[bron_id] = kleur
         else:
             self.vlaggen.pop(bron_id, None)
+
+    def mappenlijst(self) -> list[str]:
+        return ["Projecten/ENTER÷IFITT", "ISTTE", "Reviews & tijdschriften", "BUas intern"]

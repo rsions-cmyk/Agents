@@ -78,19 +78,45 @@ def afzender_adres(van: str) -> str:
     return parseaddr(van)[1].lower() or van.strip().lower()
 
 
+def map_voorstellen(store: Store, item, mappen: list[str], aantal: int = 3) -> list[dict]:
+    """Waarschijnlijke mappen voor een mail: eerst waar je deze afzender eerder opborg, dan dit project,
+    dan mappen waarvan de naam in het onderwerp voorkomt (ENTER27 -> 'ENTER÷IFITT')."""
+    import re
+    adres = afzender_adres(item["van"] or "")
+    score: dict[str, float] = {}
+    reden: dict[str, str] = {}
+    for r in store.map_keuzes(item["bron"]):
+        if r["map"] not in mappen:
+            continue
+        if r["adres"] == adres:
+            score[r["map"]] = score.get(r["map"], 0) + 10 * r["aantal"]
+            reden[r["map"]] = f"{r['aantal']}× eerder voor deze afzender"
+        elif r["project"] and r["project"] == item["project"]:
+            score[r["map"]] = score.get(r["map"], 0) + r["aantal"]
+            reden.setdefault(r["map"], f"vaker gebruikt voor {item['project']}")
+    woorden = {w for w in re.findall(r"[a-z0-9]+", (item["onderwerp"] or "").lower()) if len(w) >= 4}
+    for m in mappen:
+        mapwoorden = {w for w in re.findall(r"[a-z0-9]+", m.split("/")[-1].lower()) if len(w) >= 4}
+        if any(w.startswith(mw) or mw.startswith(w) for w in woorden for mw in mapwoorden):
+            score[m] = score.get(m, 0) + 5
+            reden.setdefault(m, "naam past bij het onderwerp")
+    beste = sorted(score, key=lambda m: -score[m])[:aantal]
+    return [{"map": m, "reden": reden[m]} for m in beste]
+
+
 def verplaats_items(store: Store, bronnen: dict, item_ids: list[int], doel: str) -> str:
     """Archiveren of naar de prullenbak, na een klik van de gebruiker. Niets wordt definitief verwijderd."""
-    if doel not in ("archief", "prullenbak"):
+    if doel not in ("archief", "prullenbak") and not (doel.startswith("map:") and len(doel) > 4):
         raise ValueError(f"onbekend doel: {doel}")
     per_bron: dict[str, list] = {}
     for i in item_ids:
         item = store.item(i)
-        if item is None or item["status"] in ("gearchiveerd", "verwijderd"):
+        if item is None or item["status"] in ("gearchiveerd", "verwijderd", "opgeborgen"):
             continue
         per_bron.setdefault(item["bron"], []).append(item)
 
     gelukt, mislukt = 0, []
-    nieuwe_status = "gearchiveerd" if doel == "archief" else "verwijderd"
+    nieuwe_status = {"archief": "gearchiveerd", "prullenbak": "verwijderd"}.get(doel, "opgeborgen")
     for bron_naam, items in per_bron.items():
         bron = bronnen.get(bron_naam)
         if bron is None or not hasattr(bron, "verplaats"):
@@ -104,12 +130,15 @@ def verplaats_items(store: Store, bronnen: dict, item_ids: list[int], doel: str)
         for it in items:
             fout = res.get(it["bron_id"], "geen resultaat")
             if fout is None:
-                store.zet_status(it["id"], nieuwe_status)
+                store.zet_status(it["id"], nieuwe_status, opmerking=doel[4:] if doel.startswith("map:") else None)
+                if doel.startswith("map:"):
+                    store.onthoud_map(bron_naam, doel[4:], afzender_adres(it["van"] or ""), it["project"])
                 gelukt += 1
             else:
                 mislukt.append(f"{it['onderwerp'][:40]} ({fout})")
 
-    waar = "het archief" if doel == "archief" else "de prullenbak (terug te halen in Apple Mail)"
+    waar = ("het archief" if doel == "archief" else "de prullenbak (terug te halen in Apple Mail)"
+            if doel in ("archief", "prullenbak") else f"map {doel[4:]}")
     melding = f"{gelukt} mail(s) verplaatst naar {waar}"
     if mislukt:
         melding += f"; niet gelukt: {'; '.join(mislukt[:5])}"

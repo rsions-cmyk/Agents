@@ -193,10 +193,24 @@ details.origineel pre{white-space:pre-wrap;font:13px/1.5 -apple-system,sans-seri
 .stappen-klein{margin:4px 0 0;padding-left:18px;color:var(--zacht);font-size:13px}
 .regels summary{cursor:pointer;color:var(--zacht);font-size:13px;padding:4px}
 
+/* mappenkiezer */
+.kiezer{position:fixed;z-index:40;width:min(380px,calc(100vw - 32px));max-height:min(460px,70vh);display:flex;flex-direction:column;background:var(--vlak);border:1px solid var(--lijn);border-radius:14px;box-shadow:0 16px 48px rgba(0,0,0,.22);overflow:hidden}
+.kiezer input{font:inherit;border:0;border-bottom:1px solid var(--lijn);padding:12px 14px;background:var(--vlak);color:var(--tekst);outline:none}
+.kiezer .opties{overflow-y:auto;padding:6px}
+.kiezer .kop2{font-size:11px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--zacht);padding:8px 8px 4px}
+.kiezer .optie{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:8px 10px;border-radius:8px;color:var(--tekst)}
+.kiezer .optie svg{color:var(--zacht);width:16px;height:16px}
+.kiezer .optie .pad{color:var(--zacht);font-size:12px}
+.kiezer .optie .waarom{margin-left:auto;font-size:11px;color:var(--zacht);white-space:nowrap}
+.kiezer .optie.actief,.kiezer .optie:hover{background:var(--accent-zacht)}
+.kiezer .leeg2{padding:16px;color:var(--zacht);text-align:center}
+.kiezer .voet{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--lijn);font-size:12px;color:var(--zacht)}
+
 /* zijbalk-koppen */
 .nav-kop{font-size:11px;font-weight:650;text-transform:uppercase;letter-spacing:.06em;color:var(--zacht);padding:14px 10px 4px}
 .kop-tel{color:var(--zacht);font-weight:550}
-.leegpaneel{margin:auto;text-align:center;color:var(--zacht);padding:40px 24px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.leegpaneel{margin:auto;text-align:center;color:var(--zacht);padding:40px 24px;display:flex;flex-direction:column;align-items:center;gap:10px;max-width:420px}
+.leegpaneel p{margin:0;text-wrap:balance}
 .leegpaneel .rond{width:56px;height:56px;border-radius:50%;background:var(--ok-zacht);color:var(--ok);display:grid;place-items:center}
 .leegpaneel .rond svg{width:26px;height:26px}
 .sneltoetsen{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--zacht);justify-content:center;max-width:360px}
@@ -212,6 +226,9 @@ kbd{font:600 11px var(--romp,inherit);font-family:inherit;padding:1px 6px;border
   .app.drie .paneel{position:sticky;top:0;transform:none;transition:none;width:auto;height:100vh;box-shadow:none;border-left:0;z-index:auto}
   .app.drie ~ .dek{display:none}
   .app.drie .rij{padding:10px 12px}
+  .app.drie .rij .snel{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:var(--vlak2);border-radius:10px;padding:2px;box-shadow:-14px 0 14px var(--vlak2);opacity:0!important;pointer-events:none}
+  .app.drie .rij:hover .snel,.app.drie .rij:focus-within .snel{opacity:1!important;pointer-events:auto}
+  .app.drie .gewoonte{display:none}
   .app.drie .sluit-mail{display:none}
 }
 
@@ -296,7 +313,8 @@ const IKONEN = {
   forward:'<path d="M15 17l5-5-5-5"/><path d="M20 12H9a5 5 0 0 0-5 5v2"/>',
   clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
-  chevron:'<path d="M9 18l6-6-6-6"/>', mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
+  chevron:'<path d="M9 18l6-6-6-6"/>',
+  folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>', mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
 };
 const ik = n => `<svg viewBox="0 0 24 24" aria-hidden="true">${IKONEN[n]||""}</svg>`;
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -448,10 +466,10 @@ function tekenLeegPaneel(){
   const klaar = staat.tab === "te_doen" && !teDoen().length;
   p.innerHTML = `<div class="leegpaneel">
       ${klaar ? `<div class="rond">${ik("check")}</div><b style="color:var(--tekst)">Alles bijgewerkt</b>Er wacht niets op je.` :
-        staat.tab === "opruimen" ? `${ik("sparkle")}<b style="color:var(--tekst)">Opruimen</b>Archiveer, gooi weg of maak een taak. Bij een taak verschijnt het formulier hier.` :
+        staat.tab === "opruimen" ? `${ik("sparkle")}<b style="color:var(--tekst)">Opruimen</b><p>Berg op in een map, archiveer, gooi weg of maak een taak. Beweeg over een mail voor de knoppen.</p>` :
         `${ik("mail")}<b style="color:var(--tekst)">Kies een mail</b>`}
       <div class="sneltoetsen"><span><kbd>J</kbd> <kbd>K</kbd> volgende, vorige</span><span><kbd>⌘</kbd><kbd>↵</kbd> goedkeuren</span>
-        <span><kbd>E</kbd> archiveren</span><span><kbd>#</kbd> prullenbak</span><span><kbd>T</kbd> taak</span><span><kbd>X</kbd> afwijzen</span>
+        <span><kbd>V</kbd> opbergen</span><span><kbd>E</kbd> archiveren</span><span><kbd>#</kbd> prullenbak</span><span><kbd>T</kbd> taak</span><span><kbd>X</kbd> afwijzen</span>
         <span><kbd>1</kbd>–<kbd>${D.projecten.length}</kbd> project</span></div></div>`;
   p.classList.add("open"); p.setAttribute("aria-hidden","false");
 }
@@ -591,6 +609,7 @@ function opruimGroep(titel, items, hoofd){
         ${gw ? `<span class="gewoonte">${esc(gw.tekst)}</span>` : ""}
         <div class="snel"${gw ? ' style="opacity:1"' : ""}>
           <button class="ikoon${gw && gw.actie==="taak" ? " voorkeur" : ""}" data-maaktaak="${it.id}" title="Taak maken en inplannen">${ik("task")}</button>
+          <button class="ikoon" data-opbergen="${it.id}" title="Opbergen in een map">${ik("folder")}</button>
           <button class="ikoon${gw && gw.actie==="archief" ? " voorkeur" : ""}" data-een="archief" data-id="${it.id}" title="Archiveren">${ik("archive")}</button>
           <button class="ikoon rood${gw && gw.actie==="prullenbak" ? " voorkeur" : ""}" data-een="prullenbak" data-id="${it.id}" title="Naar prullenbak">${ik("trash")}</button>
           <button class="ikoon" data-een="overslaan" data-id="${it.id}" title="Afzender voortaan overslaan">${ik("ban")}</button>
@@ -658,6 +677,7 @@ function tekenPaneel(it){
     <div class="p-voet">
       <span class="uitleg">Opent een antwoord in Apple Mail. Je verstuurt zelf.</span>
       <button class="knop" data-maaktaak="${it.id}" title="Taak maken en inplannen (T)">${ik("calendar")}Taak<kbd>T</kbd></button>
+      <button class="knop" data-opbergen="${it.id}" title="Opbergen in een map (V)">${ik("folder")}<kbd>V</kbd></button>
       <button class="knop" data-een="archief" data-id="${it.id}" title="Archiveren zonder antwoord (E)">${ik("archive")}<kbd>E</kbd></button>
       <button class="knop" id="afwijzen" title="Afwijzen (X)">${ik("x")}Afwijzen<kbd>X</kbd></button>
       <button class="knop goed" id="goedkeuren" title="Goedkeuren (⌘↵)">${ik("check")}${zelf ? "Afgehandeld" : "Goedkeuren"}<kbd>⌘↵</kbd></button>
@@ -884,6 +904,7 @@ document.addEventListener("click", async ev => {
     const velden = document.querySelectorAll('#paneel input[data-veld="omschrijving"]');
     return velden[velden.length - 1]?.focus();
   }
+  if (d.opbergen){ ev.stopPropagation(); return openKiezer(Number(d.opbergen), t); }
   if (d.maaktaak){ ev.stopPropagation(); return openTaak(Number(d.maaktaak)); }
   if (taak && d.duur){ taak.minuten = Number(d.duur); return tekenTaak(); }
   if (taak && d.moment !== undefined){
@@ -1003,6 +1024,7 @@ document.addEventListener("keydown", ev => {
   if (ev.key === "k" || ev.key === "ArrowUp"){ ev.preventDefault(); if (lijst.length) openPaneel(lijst[Math.max(0, i-1)]); return; }
   if (id === null) return;
   if (ev.key === "e") return verplaats([id], "archief");
+  if (ev.key === "v"){ ev.preventDefault(); return openKiezer(id, document.querySelector('#paneel [data-opbergen]')); }
   if (ev.key === "#" || ev.key === "Delete" || ev.key === "Backspace"){ ev.preventDefault(); return verplaats([id], "prullenbak"); }
   if (ev.key === "x") return document.getElementById("afwijzen")?.click();
   if (ev.key === "t") return openTaak(id);
@@ -1197,6 +1219,68 @@ document.addEventListener("click", async ev => {
     laad();
   }
 });
+
+// ---------------- Opbergen in een map ----------------
+let kiezer = null;   // {id, mappen, voorstellen, zoek, index, el}
+async function openKiezer(id, anker){
+  sluitKiezer();
+  const el = document.createElement("div");
+  el.className = "kiezer";
+  el.innerHTML = `<input type="text" id="kiezer-zoek" placeholder="Zoek een map…" autocomplete="off"><div class="opties"><div class="leeg2">Mappen laden…</div></div>`;
+  document.body.append(el);
+  const r = anker ? anker.getBoundingClientRect() : {left: innerWidth/2 - 190, top: innerHeight/3, bottom: innerHeight/3};
+  const boven = r.top > innerHeight * 0.55;
+  el.style.left = Math.max(16, Math.min(innerWidth - el.offsetWidth - 16, r.left - 40)) + "px";
+  if (boven) el.style.bottom = (innerHeight - r.top + 8) + "px"; else el.style.top = (r.bottom + 8) + "px";
+  kiezer = {id, mappen: [], voorstellen: [], zoek: "", index: 0, el};
+  el.querySelector("input").focus();
+  const j = await stil("mappen", {id});
+  if (!kiezer || kiezer.id !== id) return;
+  if (!j.ok){ sluitKiezer(); return toast(j.melding, true); }
+  kiezer.mappen = j.mappen; kiezer.voorstellen = j.voorstellen;
+  tekenKiezer();
+}
+function kiezerOpties(){
+  const z = kiezer.zoek.trim().toLowerCase();
+  const voorstel = z ? [] : kiezer.voorstellen;
+  const rest = kiezer.mappen.filter(m => !z || m.toLowerCase().includes(z)).filter(m => !voorstel.some(v => v.map === m));
+  return [...voorstel.map(v => ({map: v.map, waarom: v.reden, voorstel: true})), ...rest.map(m => ({map: m}))];
+}
+function tekenKiezer(){
+  const opties = kiezerOpties();
+  kiezer.index = Math.min(kiezer.index, Math.max(0, opties.length - 1));
+  const regel = (o, i) => { const delen = o.map.split("/"), naam = delen.pop();
+    return `<button class="optie${i === kiezer.index ? " actief" : ""}" data-map="${esc(o.map)}">${ik("folder")}<span>${esc(naam)}${delen.length ? ` <span class="pad">${esc(delen.join(" / "))}</span>` : ""}</span>${o.waarom ? `<span class="waarom">${esc(o.waarom)}</span>` : ""}</button>`; };
+  const nVoorstel = opties.filter(o => o.voorstel).length;
+  kiezer.el.querySelector(".opties").innerHTML = !opties.length ? `<div class="leeg2">Geen map gevonden</div>` :
+    (nVoorstel ? `<div class="kop2">Voorstel</div>` + opties.slice(0, nVoorstel).map(regel).join("") + `<div class="kop2">Alle mappen</div>` : "")
+    + opties.slice(nVoorstel).map((o, i) => regel(o, i + nVoorstel)).join("");
+  if (!kiezer.el.querySelector(".voet")) kiezer.el.insertAdjacentHTML("beforeend", `<div class="voet"><span><kbd>↑</kbd><kbd>↓</kbd> <kbd>↵</kbd> <kbd>Esc</kbd></span><button class="knop klein" id="kiezer-vernieuw" title="Mappen opnieuw ophalen uit Mail">Vernieuwen</button></div>`);
+  kiezer.el.querySelector(".optie.actief")?.scrollIntoView({block:"nearest"});
+}
+function sluitKiezer(){ if (kiezer){ kiezer.el.remove(); kiezer = null; } }
+function kiesMap(map){
+  const id = kiezer.id; sluitKiezer();
+  verplaats([id], "map:" + map);
+}
+document.addEventListener("input", ev => { if (kiezer && ev.target.id === "kiezer-zoek"){ kiezer.zoek = ev.target.value; kiezer.index = 0; tekenKiezer(); } });
+document.addEventListener("keydown", ev => {
+  if (!kiezer) return;
+  const opties = kiezerOpties();
+  if (ev.key === "ArrowDown"){ ev.preventDefault(); ev.stopImmediatePropagation(); kiezer.index = Math.min(opties.length - 1, kiezer.index + 1); return tekenKiezer(); }
+  if (ev.key === "ArrowUp"){ ev.preventDefault(); ev.stopImmediatePropagation(); kiezer.index = Math.max(0, kiezer.index - 1); return tekenKiezer(); }
+  if (ev.key === "Enter"){ ev.preventDefault(); ev.stopImmediatePropagation(); if (opties[kiezer.index]) kiesMap(opties[kiezer.index].map); return; }
+  if (ev.key === "Escape"){ ev.preventDefault(); ev.stopImmediatePropagation(); return sluitKiezer(); }
+  if (ev.target.id === "kiezer-zoek") ev.stopImmediatePropagation();   // typen in het zoekveld triggert geen sneltoetsen
+}, true);
+document.addEventListener("mousedown", ev => {
+  if (!kiezer) return;
+  const o = ev.target.closest(".kiezer .optie");
+  if (o){ ev.preventDefault(); return kiesMap(o.dataset.map); }
+  if (ev.target.closest("#kiezer-vernieuw")){ ev.preventDefault(); const id = kiezer.id; kiezer.el.querySelector(".opties").innerHTML = `<div class="leeg2">Mappen laden…</div>`;
+    stil("mappen", {id, vernieuw: true}).then(j => { if (kiezer && j.ok){ kiezer.mappen = j.mappen; kiezer.voorstellen = j.voorstellen; tekenKiezer(); } }); return; }
+  if (!ev.target.closest(".kiezer")) sluitKiezer();
+}, true);
 document.querySelectorAll("[data-ikoon]").forEach(el => el.innerHTML = ik(el.dataset.ikoon));
 laad();
 setInterval(() => { if (!document.hidden && staat.open === null) laad(); }, 60000);

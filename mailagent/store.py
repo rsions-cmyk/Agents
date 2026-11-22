@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS items (
     taken TEXT,
     agenda TEXT,
     vragen TEXT,
-    status TEXT NOT NULL,       -- wacht | goedgekeurd | afgewezen | ter_info | genegeerd | handmatig | fout | gearchiveerd | verwijderd | taak
+    status TEXT NOT NULL,       -- wacht | goedgekeurd | afgewezen | ter_info | genegeerd | handmatig | fout | gearchiveerd | verwijderd | taak | opgeborgen
     opmerking TEXT,
     aangemaakt TEXT NOT NULL,
     afgehandeld TEXT,
@@ -60,6 +60,14 @@ CREATE TABLE IF NOT EXISTS afzender_regels (
     actie TEXT NOT NULL,         -- 'negeren': voortaan overslaan zonder Claude
     project TEXT,
     aangemaakt TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS map_keuzes (
+    bron TEXT NOT NULL,
+    map TEXT NOT NULL,
+    adres TEXT NOT NULL,
+    project TEXT,
+    aantal INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (bron, map, adres, project)
 );
 CREATE TABLE IF NOT EXISTS log (
     tijd TEXT NOT NULL,
@@ -249,6 +257,14 @@ class Store:
             teller = uit.setdefault(adres, {})
             teller[soorten[r["status"]]] = teller.get(soorten[r["status"]], 0) + 1
         return uit
+
+    def onthoud_map(self, bron: str, map_: str, adres: str, project: str | None) -> None:
+        self.db.execute("INSERT INTO map_keuzes VALUES (?,?,?,?,1) ON CONFLICT(bron, map, adres, project) "
+                        "DO UPDATE SET aantal = aantal + 1", (bron, map_, adres.lower(), project))
+        self.db.commit()
+
+    def map_keuzes(self, bron: str) -> list[sqlite3.Row]:
+        return self.db.execute("SELECT * FROM map_keuzes WHERE bron=?", (bron,)).fetchall()
 
     def zet_concept(self, item_id: int, concept: str) -> None:
         self.db.execute("UPDATE items SET concept=? WHERE id=?", (concept, item_id))

@@ -202,6 +202,39 @@ end run
 '''
 
 
+SCRIPT_MAPPEN = r'''
+on run argv
+    set accountNaam to item 1 of argv
+    set uitvoer to ""
+    tell application "Mail"
+        set alle to every mailbox of account accountNaam
+        repeat with mb in alle
+            set pad to name of mb
+            set huidig to mb
+            repeat 6 times
+                try
+                    set ouder to container of huidig
+                    if class of ouder is not mailbox then exit repeat
+                    set pad to (name of ouder) & "/" & pad
+                    set huidig to ouder
+                on error
+                    exit repeat
+                end try
+            end repeat
+            set uitvoer to uitvoer & pad & linefeed
+        end repeat
+    end tell
+    return uitvoer
+end run
+'''
+
+SYSTEEMMAPPEN = {"inbox", "outbox", "drafts", "concepten", "sent", "sent items", "sent mail", "verzonden items",
+                 "deleted items", "verwijderde items", "trash", "junk", "junk email", "spam", "conflicts",
+                 "local failures", "server failures", "sync issues", "rss feeds", "rss subscriptions",
+                 "rss-abonnementen", "conversation history", "snoozed", "gepland", "notes", "tasks", "journal",
+                 "calendar", "contacts", "all mail", "important", "starred", "archive", "outbox"}
+
+
 SCRIPT_VERPLAATS = HULP + r'''
 on run argv
     set accountNaam to item 1 of argv
@@ -295,9 +328,25 @@ class AppleMailBron:
         _osascript(SCRIPT_MARKEER, self.account, self.mailbox, bron_id, message_id or "",
                    self.mappen["archief"], "1" if aan else "0", str(kleur))
 
+    def mappenlijst(self) -> list[str]:
+        """Mappen in dit account waar je mail in kunt opbergen, als pad (bijv. 'Projecten/ENTER÷IFITT')."""
+        uit = _osascript(SCRIPT_MAPPEN, self.account)
+        paden = []
+        for pad in uit.splitlines():
+            pad = pad.strip()
+            laatste = pad.split("/")[-1].strip().lower()
+            if not pad or laatste in SYSTEEMMAPPEN or pad.lower().startswith(("[gmail]", "[google mail]")):
+                continue
+            if laatste in {self.mailbox.lower(), self.mappen["archief"].split("/")[-1].lower(),
+                           self.mappen["prullenbak"].split("/")[-1].lower()}:
+                continue
+            paden.append(pad)
+        return sorted(set(paden), key=str.lower)
+
     def verplaats(self, bron_ids: list[str], doel: str) -> dict[str, str | None]:
-        """Verplaatst berichten naar de archief- of prullenbakmap. Niets wordt definitief verwijderd."""
-        uit = _osascript(SCRIPT_VERPLAATS, self.account, self.mailbox, self.mappen[doel], *bron_ids)
+        """Verplaatst berichten naar archief, prullenbak of 'map:<pad>'. Niets wordt definitief verwijderd."""
+        map_ = doel[4:] if doel.startswith("map:") else self.mappen[doel]
+        uit = _osascript(SCRIPT_VERPLAATS, self.account, self.mailbox, map_, *bron_ids)
         resultaat: dict[str, str | None] = {i: "geen antwoord van Apple Mail" for i in bron_ids}
         for regel in uit.splitlines():
             mid, _, status = regel.partition(":")
