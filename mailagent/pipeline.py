@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from email.utils import parseaddr
 from datetime import datetime, timedelta
 
 from .config import Config, anonimiseer, mag_naar_claude, sorteer_met_regels
@@ -18,6 +19,13 @@ def verwerk_mail(cfg: Config, store: Store, llm: LLM, mail: Email) -> int:
     """Verwerkt één mail en geeft het id van het item in de wachtrij terug."""
     store.bewaar_mail(mail)
     vast_project, sortering = sorteer_met_regels(cfg, mail)
+
+    geleerd = store.afzender_regel(afzender_adres(mail.van))
+    if sortering is None and geleerd is not None:
+        s = Sortering(project=geleerd["project"] or vast_project or "overig", actie=geleerd["actie"],
+                      prioriteit="laag", deadline=None, samenvatting=mail.onderwerp,
+                      reden="afzender staat op je lijst 'voortaan overslaan'")
+        return store.nieuw_item(mail, s, None, "genegeerd")
 
     if not mag_naar_claude(cfg, mail):
         s = Sortering(project=vast_project or "overig", actie="antwoorden", prioriteit="normaal",
@@ -38,6 +46,48 @@ def verwerk_mail(cfg: Config, store: Store, llm: LLM, mail: Email) -> int:
         s = sortering or Sortering(project=vast_project or "overig", actie="antwoorden", prioriteit="normaal",
                                    deadline=None, samenvatting=mail.onderwerp, reden="niet gesorteerd")
         return store.nieuw_item(mail, s, None, "fout", opmerking=str(e))
+
+
+def afzender_adres(van: str) -> str:
+    return parseaddr(van)[1].lower() or van.strip().lower()
+
+
+def verplaats_items(store: Store, bronnen: dict, item_ids: list[int], doel: str) -> str:
+    """Archiveren of naar de prullenbak, na een klik van de gebruiker. Niets wordt definitief verwijderd."""
+    if doel not in ("archief", "prullenbak"):
+        raise ValueError(f"onbekend doel: {doel}")
+    per_bron: dict[str, list] = {}
+    for i in item_ids:
+        item = store.item(i)
+        if item is None or item["status"] in ("gearchiveerd", "verwijderd"):
+            continue
+        per_bron.setdefault(item["bron"], []).append(item)
+
+    gelukt, mislukt = 0, []
+    nieuwe_status = "gearchiveerd" if doel == "archief" else "verwijderd"
+    for bron_naam, items in per_bron.items():
+        bron = bronnen.get(bron_naam)
+        if bron is None or not hasattr(bron, "verplaats"):
+            mislukt += [f"{it['onderwerp'][:40]} (bron {bron_naam} kan niet verplaatsen)" for it in items]
+            continue
+        try:
+            res = bron.verplaats([it["bron_id"] for it in items], doel)
+        except Exception as e:
+            mislukt += [f"{it['onderwerp'][:40]} ({e})" for it in items]
+            continue
+        for it in items:
+            fout = res.get(it["bron_id"], "geen resultaat")
+            if fout is None:
+                store.zet_status(it["id"], nieuwe_status)
+                gelukt += 1
+            else:
+                mislukt.append(f"{it['onderwerp'][:40]} ({fout})")
+
+    waar = "het archief" if doel == "archief" else "de prullenbak (terug te halen in Apple Mail)"
+    melding = f"{gelukt} mail(s) verplaatst naar {waar}"
+    if mislukt:
+        melding += f"; niet gelukt: {'; '.join(mislukt[:5])}"
+    return melding
 
 
 def run(cfg: Config, store: Store, bronnen: dict, llm: LLM) -> dict[str, int]:

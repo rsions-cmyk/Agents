@@ -46,3 +46,16 @@ class MapBron:
         doel = self.uit / f"concept-{Path(bron_id).stem}.eml"
         doel.write_bytes(bytes(msg))
         return f"opgeslagen als {doel}"
+
+    def verplaats(self, bron_ids: list[str], doel: str) -> dict[str, str | None]:
+        doelmap = self.pad / f"_{doel}"
+        doelmap.mkdir(exist_ok=True)
+        resultaat: dict[str, str | None] = {}
+        for i in bron_ids:
+            bron = self.pad / i
+            if bron.exists():
+                bron.rename(doelmap / i)
+                resultaat[i] = None
+            else:
+                resultaat[i] = "bestand niet gevonden"
+        return resultaat

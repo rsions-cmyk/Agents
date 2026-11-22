@@ -64,6 +64,32 @@ end run
 '''
 
 
+SCRIPT_VERPLAATS = r'''
+on run argv
+    set accountNaam to item 1 of argv
+    set mailboxNaam to item 2 of argv
+    set doelNaam to item 3 of argv
+    set uitvoer to ""
+    tell application "Mail"
+        set mb to mailbox mailboxNaam of account accountNaam
+        set doel to mailbox doelNaam of account accountNaam
+        repeat with i from 4 to count of argv
+            set berichtId to (item i of argv) as integer
+            try
+                set m to first message of mb whose id is berichtId
+                set read status of m to true
+                move m to doel
+                set uitvoer to uitvoer & berichtId & ":ok" & linefeed
+            on error foutTekst
+                set uitvoer to uitvoer & berichtId & ":" & foutTekst & linefeed
+            end try
+        end repeat
+    end tell
+    return uitvoer
+end run
+'''
+
+
 def _osascript(script: str, *args: str) -> str:
     r = subprocess.run(["osascript", "-", *args], input=script, capture_output=True, text=True, timeout=180)
     if r.returncode != 0:
@@ -72,8 +98,10 @@ def _osascript(script: str, *args: str) -> str:
 
 
 class AppleMailBron:
-    def __init__(self, naam: str, account: str, mailbox: str = "Inbox"):
+    def __init__(self, naam: str, account: str, mailbox: str = "Inbox",
+                 archief: str = "Archive", prullenbak: str = "Deleted Items"):
         self.naam, self.account, self.mailbox = naam, account, mailbox
+        self.mappen = {"archief": archief, "prullenbak": prullenbak}
 
     def haal_op(self, sinds, maximum: int) -> list[Email]:
         nu = datetime.now().astimezone()
@@ -95,3 +123,13 @@ class AppleMailBron:
         if hoe == "klembord":
             return "antwoordvenster geopend in Apple Mail; concepttekst staat op het klembord"
         return "antwoordvenster geopend in Apple Mail met het concept"
+
+    def verplaats(self, bron_ids: list[str], doel: str) -> dict[str, str | None]:
+        """Verplaatst berichten naar de archief- of prullenbakmap. Niets wordt definitief verwijderd."""
+        uit = _osascript(SCRIPT_VERPLAATS, self.account, self.mailbox, self.mappen[doel], *bron_ids)
+        resultaat: dict[str, str | None] = {i: "geen antwoord van Apple Mail" for i in bron_ids}
+        for regel in uit.splitlines():
+            mid, _, status = regel.partition(":")
+            if mid.strip() in resultaat:
+                resultaat[mid.strip()] = None if status.strip() == "ok" else status.strip()
+        return resultaat

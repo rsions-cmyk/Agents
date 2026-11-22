@@ -16,6 +16,10 @@ class Bron(Protocol):
         """Zet een concept-antwoord klaar en geeft een korte beschrijving terug van waar het staat."""
         ...
 
+    def verplaats(self, bron_ids: list[str], doel: str) -> dict[str, str | None]:
+        """Verplaatst berichten naar 'archief' of 'prullenbak'. Per id: None bij succes, anders de fout."""
+        ...
+
 
 def maak_bronnen(cfg: Config) -> dict[str, Bron]:
     bronnen: dict[str, Bron] = {}
@@ -26,7 +30,8 @@ def maak_bronnen(cfg: Config) -> dict[str, Bron]:
             bronnen[naam] = MapBron(naam, cfg.pad.parent / b["pad"], cfg.data_dir)
         elif soort == "applemail":
             from .applemail import AppleMailBron
-            bronnen[naam] = AppleMailBron(naam, b["account"], b.get("mailbox", "Inbox"))
+            bronnen[naam] = AppleMailBron(naam, b["account"], b.get("mailbox", "Inbox"),
+                                          b.get("archief", "Archive"), b.get("prullenbak", "Deleted Items"))
         elif soort == "outlook":
             from .outlook import OutlookBron
             bronnen[naam] = OutlookBron(naam, b["client_id"], b.get("tenant", "organizations"),

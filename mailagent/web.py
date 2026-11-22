@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, quote, urlparse
 
 from .config import Config
-from .pipeline import keur_goed, overzicht, run, wijs_af
+from .pipeline import afzender_adres, keur_goed, overzicht, run, verplaats_items, wijs_af
 from .store import Store
 
 CSS = """
@@ -28,7 +28,7 @@ button{font:inherit;padding:6px 14px;border-radius:6px;border:1px solid var(--li
 button.ok{background:var(--ok);border-color:var(--ok);color:var(--bg)}details{margin:6px 0}summary{cursor:pointer;color:var(--zacht);font-size:13px}
 pre{white-space:pre-wrap;font:13px/1.45 ui-monospace,Menlo,monospace;background:var(--bg);padding:8px;border-radius:6px;max-height:320px;overflow:auto}
 .rij{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}.melding{background:var(--kaart);border:1px solid var(--ok);padding:8px 12px;border-radius:8px}
-ul{padding-left:20px}
+ul{padding-left:20px}ul.lijst{list-style:none;padding:0;margin:8px 0}.rijtje{padding:4px 0;border-bottom:1px solid var(--lijn)}.rijtje:last-child{border:0}
 """
 
 e = html.escape
@@ -97,13 +97,14 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
             wacht = store.items(status="wacht", project=p)
             zelf = store.items(status="fout", project=p) + store.items(status="handmatig", project=p)
             taken = store.open_taken(p)
-            info = store.items(status="ter_info", project=p)[:30]
+            info = store.items(status="ter_info", project=p)[:50]
+            overgeslagen = store.items(status="genegeerd", project=p)[:50]
 
             tabs = "".join(
                 f'<a href="/?project={x}" class="{"actief" if x == project else ""}">{label(x)}'
                 f' ({len(store.items(status="wacht", project=None if x == "alles" else x))})</a>'
                 for x in ["alles", *cfg.projecten])
-            delen = [f"<h1>Mail-inbox</h1><div class=meta>Niets wordt verstuurd. Goedkeuren zet een concept in je mailbox.</div>",
+            delen = [f"<h1>Mail-inbox</h1><div class=meta>Niets wordt verstuurd. Goedkeuren zet een concept in je mailbox. Verplaatsen gebeurt alleen na jouw klik, verwijderen gaat naar de prullenbak.</div>",
                      f"<nav>{tabs}</nav>",
                      f'<form method=post action="/ophalen" class=rij><input type=hidden name=t value="{token}">'
                      f'<input type=hidden name=project value="{e(project)}"><button>Nu nieuwe mail ophalen</button>'
@@ -133,12 +134,43 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                         f'<button>Klaar</button></form>')
 
             if info:
-                delen.append(f"<h2>Ter info ({len(info)})</h2><ul>")
-                delen += [f"<li>{e(i['samenvatting'] or i['onderwerp'])} <span class=meta>{e(i['van'])}</span></li>" for i in info]
-                delen.append("</ul>")
+                delen.append(self._lijst("Ter info", info, project, standaard="archief",
+                                         uitleg="Alleen lezen. Geselecteerd: alles, voor archiveren."))
+            if overgeslagen:
+                delen.append(self._lijst("Overgeslagen", overgeslagen, project, standaard="prullenbak",
+                                         uitleg="Nieuwsbrieven, meldingen en reclame. Geselecteerd: alles, voor de prullenbak."))
+            regels = store.afzender_regels()
+            if regels:
+                delen.append(f"<details><summary>Afzenders die voortaan worden overgeslagen ({len(regels)})</summary>")
+                for r in regels:
+                    delen.append(
+                        f'<form method=post action="/regel-weg" class=rij><input type=hidden name=t value="{token}">'
+                        f'<input type=hidden name=project value="{e(project)}"><input type=hidden name=adres value="{e(r["adres"])}">'
+                        f'<span style="flex:1">{e(r["adres"])}</span><button>Niet meer overslaan</button></form>')
+                delen.append("</details>")
 
             return (f"<!doctype html><html lang=nl><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>"
                     f"<title>Mail-inbox</title><style>{CSS}</style></head><body><main>{''.join(delen)}</main></body></html>")
+
+        def _lijst(self, titel: str, items, project: str, standaard: str, uitleg: str) -> str:
+            rijen = []
+            for i in items:
+                rijen.append(
+                    f'<li class=rijtje><label><input type=checkbox name=id value="{i["id"]}" checked> '
+                    f'{e(i["samenvatting"] or i["onderwerp"])}</label> <span class=meta>{e(i["van"])} · {e(i["datum"][:10])}</span></li>')
+            knoppen = ('<button class=ok name=doel value=archief>Archiveren</button>'
+                       '<button name=doel value=prullenbak>Naar prullenbak</button>'
+                       '<button name=doel value=overslaan title="Mail van deze afzenders gaat voortaan niet meer naar Claude">'
+                       'Afzender voortaan overslaan</button>')
+            if standaard == "prullenbak":
+                knoppen = ('<button class=ok name=doel value=prullenbak>Naar prullenbak</button>'
+                           '<button name=doel value=archief>Archiveren</button>'
+                           '<button name=doel value=overslaan>Afzender voortaan overslaan</button>')
+            return (f'<h2>{titel} ({len(items)})</h2><div class=meta>{uitleg} Vink uit wat je wilt houden.</div>'
+                    f'<form method=post action="/verplaats" class=kaart><input type=hidden name=t value="{token}">'
+                    f'<input type=hidden name=project value="{e(project)}">'
+                    f'<div class=rij><a href="#" class=meta onclick="for(const c of this.closest(\'form\').querySelectorAll(\'input[type=checkbox]\'))c.checked=!c.checked;return false">selectie omdraaien</a></div>'
+                    f'<ul class=lijst>{"".join(rijen)}</ul><div class=rij>{knoppen}</div></form>')
 
         def _kaart(self, i, project: str) -> str:
             prio = f'<span class="prio-{i["prioriteit"]}">{e(i["prioriteit"])}</span>'
@@ -170,7 +202,8 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
         # --- acties -----------------------------------------------------------
         def do_POST(self):
             lengte = int(self.headers.get("Content-Length", 0))
-            velden = {k: v[0] for k, v in parse_qs(self.rfile.read(lengte).decode("utf-8")).items()}
+            alles = parse_qs(self.rfile.read(lengte).decode("utf-8"))
+            velden = {k: v[0] for k, v in alles.items()}
             if not secrets.compare_digest(velden.get("t", ""), token):
                 return self._stuur("Ongeldig formulier. Herlaad de pagina.", 403)
             project = velden.get("project", "alles")
@@ -183,6 +216,24 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                     else:
                         wijs_af(store, item_id)
                         melding = "afgewezen"
+                elif pad == "/verplaats":
+                    ids = [int(x) for x in alles.get("id", [])]
+                    doel = velden.get("doel")
+                    if not ids:
+                        melding = "niets geselecteerd"
+                    elif doel == "overslaan":
+                        adressen = set()
+                        for i in ids:
+                            it = store.item(i)
+                            if it:
+                                adressen.add(afzender_adres(it["van"]))
+                                store.zet_afzender_regel(afzender_adres(it["van"]), "negeren", it["project"])
+                        melding = f"{len(adressen)} afzender(s) worden voortaan overgeslagen: {', '.join(sorted(adressen))}"
+                    else:
+                        melding = verplaats_items(store, bronnen, ids, doel)
+                elif pad == "/regel-weg":
+                    store.verwijder_afzender_regel(velden["adres"])
+                    melding = f"{velden['adres']} wordt niet meer overgeslagen"
                 elif pad == "/taak-klaar":
                     store.taak_klaar(int(velden["id"]))
                     melding = "taak afgevinkt"

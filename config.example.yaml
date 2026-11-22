@@ -17,11 +17,15 @@ bronnen:
     naam: buas
     account: "Exchange"          # naam van het account zoals Apple Mail het toont
     mailbox: "Inbox"
+    archief: "Archive"           # waar 'Archiveren' de mail heen verplaatst
+    prullenbak: "Deleted Items"  # waar 'Naar prullenbak' de mail heen verplaatst
   # Google-account in Apple Mail. Gmail noemt het postvak meestal "INBOX" (hoofdletters).
   - type: applemail
     naam: google
     account: "Google"            # naam van het account zoals Apple Mail het toont
     mailbox: "INBOX"
+    archief: "All Mail"          # Gmail: archiveren = uit de inbox, blijft in All Mail
+    prullenbak: "Trash"
   # - type: outlook               # alleen als je een app-registratie in Entra hebt
   #   naam: buas-graph
   #   client_id: "VUL-IN"

@@ -52,10 +52,12 @@ def omgeving(tmp_path):
         """  - type: applemail
     naam: buas
     account: "Exchange"          # naam van het account zoals Apple Mail het toont
-    mailbox: "Inbox\"""",
+    mailbox: "Inbox"
+    archief: "Archive"           # waar 'Archiveren' de mail heen verplaatst
+    prullenbak: "Deleted Items"  # waar 'Naar prullenbak' de mail heen verplaatst\n""",
         """  - type: map
     naam: test
-    pad: mail""")
+    pad: mail\n""")
     begin = cfg_tekst.index("  # Google-account in Apple Mail")
     eind = cfg_tekst.index("  # - type: outlook")
     cfg_tekst = cfg_tekst[:begin] + cfg_tekst[eind:]
@@ -187,3 +189,32 @@ def test_claude_code_aanroep(omgeving):
 
     with pytest.raises(LLMFout, match="Not logged in"):
         ClaudeCodeLLM(cfg, uitvoerder=kapot).sorteer(mail, mail.tekst, None)
+
+
+def test_archiveren_verwijderen_en_overslaan(omgeving):
+    from mailagent.pipeline import verplaats_items, afzender_adres
+
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    info = store.items(status="ter_info")
+    assert len(info) == 1                                    # nieuwsbrief
+
+    melding = verplaats_items(store, bronnen, [info[0]["id"]], "archief")
+    assert melding.startswith("1 mail(s) verplaatst naar het archief")
+    assert store.item(info[0]["id"])["status"] == "gearchiveerd"
+    assert (bronnen["test"].pad / "_archief" / "04-nieuwsbrief.eml").exists()
+    # nog een keer verplaatsen doet niets
+    assert verplaats_items(store, bronnen, [info[0]["id"]], "prullenbak").startswith("0 mail(s)")
+
+    # afzender voortaan overslaan: volgende mail van die afzender gaat niet naar Claude
+    store.zet_afzender_regel(afzender_adres("BUas Nieuws <nieuwsbrief@buas.nl>"), "negeren", "overig")
+    (bronnen["test"].pad / "06-nieuwsbrief.eml").write_text(
+        "From: BUas Nieuws <nieuwsbrief@buas.nl>\nTo: x@buas.nl\nSubject: Nieuwsbrief week 48\n"
+        "Date: Fri, 27 Nov 2026 07:00:00 +0100\nMessage-ID: <a6@buas.nl>\n\nKerstborrel.\n")
+    llm = NepLLM()
+    run(cfg, store, bronnen, llm)
+    nieuw = [r for r in store.items(status="genegeerd") if r["onderwerp"] == "Nieuwsbrief week 48"]
+    assert len(nieuw) == 1 and llm.gezien == []              # Claude niet aangeroepen
+
+    with pytest.raises(ValueError):
+        verplaats_items(store, bronnen, [1], "definitief")

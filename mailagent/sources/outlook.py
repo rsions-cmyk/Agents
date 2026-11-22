@@ -102,3 +102,12 @@ class OutlookBron:
             r = c.post(f"/me/messages/{bron_id}/createReply", json={"comment": html.escape(tekst).replace("\n", "<br>")})
             r.raise_for_status()
         return "concept-antwoord staat in je Outlook-map Concepten"
+
+    def verplaats(self, bron_ids: list[str], doel: str) -> dict[str, str | None]:
+        bestemming = {"archief": "archive", "prullenbak": "deleteditems"}[doel]
+        resultaat: dict[str, str | None] = {}
+        with self._client() as c:
+            for i in bron_ids:
+                r = c.post(f"/me/messages/{i}/move", json={"destinationId": bestemming})
+                resultaat[i] = None if r.is_success else f"HTTP {r.status_code}"
+        return resultaat

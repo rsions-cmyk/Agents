@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS items (
     taken TEXT,
     agenda TEXT,
     vragen TEXT,
-    status TEXT NOT NULL,       -- wacht | goedgekeurd | afgewezen | ter_info | handmatig | fout
+    status TEXT NOT NULL,       -- wacht | goedgekeurd | afgewezen | ter_info | genegeerd | handmatig | fout | gearchiveerd | verwijderd
     opmerking TEXT,
     aangemaakt TEXT NOT NULL,
     afgehandeld TEXT
@@ -49,6 +49,12 @@ CREATE TABLE IF NOT EXISTS taken (
 CREATE TABLE IF NOT EXISTS bron_stand (
     bron TEXT PRIMARY KEY,
     laatst TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS afzender_regels (
+    adres TEXT PRIMARY KEY,      -- e-mailadres in kleine letters
+    actie TEXT NOT NULL,         -- 'negeren': voortaan overslaan zonder Claude
+    project TEXT,
+    aangemaakt TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS log (
     tijd TEXT NOT NULL,
@@ -162,6 +168,24 @@ class Store:
     def taak_klaar(self, taak_id: int) -> None:
         self.db.execute("UPDATE taken SET klaar=1 WHERE id=?", (taak_id,))
         self.db.commit()
+
+    # --- geleerde afzenderregels ---------------------------------------------
+    def afzender_regel(self, adres: str) -> Optional[sqlite3.Row]:
+        return self.db.execute("SELECT * FROM afzender_regels WHERE adres=?", (adres.lower(),)).fetchone()
+
+    def zet_afzender_regel(self, adres: str, actie: str, project: Optional[str]) -> None:
+        self.db.execute("INSERT INTO afzender_regels VALUES (?,?,?,?) ON CONFLICT(adres) DO UPDATE SET "
+                        "actie=excluded.actie, project=excluded.project", (adres.lower(), actie, project, nu()))
+        self.db.commit()
+        self.log(None, f"afzenderregel {adres.lower()} -> {actie}")
+
+    def verwijder_afzender_regel(self, adres: str) -> None:
+        self.db.execute("DELETE FROM afzender_regels WHERE adres=?", (adres.lower(),))
+        self.db.commit()
+        self.log(None, f"afzenderregel {adres.lower()} verwijderd")
+
+    def afzender_regels(self) -> list[sqlite3.Row]:
+        return self.db.execute("SELECT * FROM afzender_regels ORDER BY adres").fetchall()
 
     # --- log -----------------------------------------------------------------
     def log(self, item_id: Optional[int], gebeurtenis: str) -> None:
