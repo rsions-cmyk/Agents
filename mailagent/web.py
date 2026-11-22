@@ -81,8 +81,10 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
         voorstel["deadline"] = voorstel["deadline"] or it["deadline"]
         ag, fout = agenda()
         voorstel["momenten"], voorstel["agenda_fout"] = [], fout
+        werk = lees_werktijd(cfg.agenda)
+        voorstel["werktijd"] = {"begin": werk.begin.strftime("%H:%M"), "eind": werk.eind.strftime("%H:%M"),
+                                "dagen": sorted(werk.dagen)}
         if ag is not None:
-            werk = lees_werktijd(cfg.agenda)
             nu = datetime.now().astimezone()
             try:
                 dl = date.fromisoformat(voorstel["deadline"]) if voorstel["deadline"] else None
@@ -179,6 +181,21 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                             return self._json({"ok": False, "melding": melding})
                 elif actie == "taak-voorstel":
                     return self._json({"ok": True, "voorstel": taakvoorstel(store, int(v["id"]))})
+                elif actie == "dag":
+                    ag, fout = agenda()
+                    if ag is None:
+                        return self._json({"ok": False, "melding": fout})
+                    dag = date.fromisoformat(v["datum"])
+                    van = datetime.combine(dag, datetime.min.time()).astimezone()
+                    tot = van + timedelta(days=1)
+                    if hasattr(ag, "afspraken"):
+                        lijst = ag.afspraken(van, tot)
+                    else:
+                        lijst = [{"titel": "Bezet", "start": b, "eind": e, "heledag": False, "vrij": False, "kalender": ""}
+                                 for b, e in ag.bezet(van, tot)]
+                    return self._json({"ok": True, "afspraken": [
+                        {**a, "start": a["start"].isoformat(timespec="minutes"), "eind": a["eind"].isoformat(timespec="minutes")}
+                        for a in lijst]})
                 elif actie == "taak-maak":
                     start = datetime.fromisoformat(v["start"]).astimezone() if v.get("start") else None
                     stappen = [s.strip() for s in v.get("stappen", []) if s.strip()]

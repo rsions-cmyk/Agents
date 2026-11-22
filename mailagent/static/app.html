@@ -149,6 +149,26 @@ details.origineel pre{white-space:pre-wrap;font:13px/1.5 -apple-system,sans-seri
 .laden{display:flex;flex-direction:column;align-items:center;gap:12px;padding:60px 20px;color:var(--zacht);text-align:center}
 .laden svg{width:28px;height:28px;color:var(--accent);animation:draai 1.2s linear infinite}
 .vinkregel{display:flex;gap:8px;align-items:center;color:var(--zacht)}
+.dagnav{display:flex;align-items:center;gap:6px;margin-top:4px}
+.dagnav b{min-width:150px;text-align:center}
+.dagnav .meta{margin-left:auto;font-size:12px;color:var(--zacht)}
+.heledag{display:flex;flex-wrap:wrap;gap:4px}
+.heledag span{font-size:12px;padding:2px 8px;border-radius:6px;background:var(--vlak2);border:1px solid var(--lijn);color:var(--zacht)}
+.tijdlijn{position:relative;border:1px solid var(--lijn);border-radius:12px;background:var(--vlak);max-height:440px;overflow-y:auto;user-select:none;-webkit-user-select:none}
+.tl-binnen{position:relative;margin:10px 8px 10px 52px}
+.uur{position:absolute;left:-52px;right:-8px;border-top:1px solid var(--lijn);height:0}
+.uur span{position:absolute;left:8px;top:-8px;font-size:11px;color:var(--zacht);background:var(--vlak);padding:0 2px}
+.uur.half{border-top-style:dashed;opacity:.5}
+.buiten{position:absolute;left:-52px;right:-8px;background:var(--vlak2);opacity:.7}
+.afs{position:absolute;background:var(--vlak2);border:1px solid var(--lijn);border-left:3px solid var(--zacht);border-radius:6px;padding:2px 6px;font-size:12px;line-height:1.3;overflow:hidden;color:var(--zacht)}
+.afs.vrij{border-left-style:dashed;opacity:.7}
+.tb{position:absolute;left:28%;right:0;background:var(--accent);color:var(--vlak);border-radius:8px;padding:3px 8px;font-size:12px;line-height:1.3;cursor:grab;box-shadow:0 2px 10px rgba(0,0,0,.18);touch-action:none;z-index:2;overflow:hidden}
+.tb:active{cursor:grabbing}
+.tb.botst{background:var(--hoog)}
+.tb b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rek{position:absolute;left:0;right:0;bottom:0;height:12px;cursor:ns-resize;display:grid;place-items:center}
+.rek::after{content:"";width:28px;height:3px;border-radius:2px;background:currentColor;opacity:.6}
+.tl-laden{padding:30px;text-align:center;color:var(--zacht)}
 .stappen-klein{margin:4px 0 0;padding-left:18px;color:var(--zacht);font-size:13px}
 .regels summary{cursor:pointer;color:var(--zacht);font-size:13px;padding:4px}
 
@@ -437,20 +457,98 @@ function momentTekst(iso, minuten){
   return `${b.toLocaleDateString("nl-NL",{weekday:"short",day:"numeric",month:"short"})} · ${tijd(b)}–${tijd(e)}`;
 }
 const vindItem = id => [...D.zelf, ...D.wacht, ...D.info, ...D.overgeslagen].find(i => i.id === id);
-let taak = null;   // {id, item, voorstel, minuten, moment, archiveren}
+let taak = null;   // {id, item, voorstel, minuten, inplannen, start(ms), dag, archiveren}
+const dagen = {};  // datum -> lijst afspraken | "laden" | {fout}
+const PX = 0.8;    // pixels per minuut in het dagoverzicht
+const tweeCijfers = n => String(n).padStart(2, "0");
+const isoDag = d => `${d.getFullYear()}-${tweeCijfers(d.getMonth()+1)}-${tweeCijfers(d.getDate())}`;
+const lokaalIso = ms => { const d = new Date(ms); return `${isoDag(d)}T${tweeCijfers(d.getHours())}:${tweeCijfers(d.getMinutes())}`; };
+const dagBegin = dag => new Date(dag + "T00:00").getTime();
+const uurMin = t => { const [h, m] = t.split(":").map(Number); return h*60 + m; };
+const kortMoment = iso => { const d = new Date(iso);
+  return `${d.toLocaleDateString("nl-NL",{weekday:"short",day:"numeric",month:"short"})} ${tweeCijfers(d.getHours())}:${tweeCijfers(d.getMinutes())}`; };
+
+async function laadDag(dag){
+  if (dagen[dag] !== undefined) return;
+  dagen[dag] = "laden";
+  try {
+    const r = await fetch("/api/dag", {method:"POST", headers:{"Content-Type":"application/json","X-Token":TOKEN}, body:JSON.stringify({datum:dag})});
+    const j = await r.json();
+    dagen[dag] = j.ok ? j.afspraken : {fout: j.melding};
+  } catch(e){ dagen[dag] = {fout: "Agenda niet bereikbaar"}; }
+  if (taak && taak.dag === dag) tekenTaak();
+}
+
+function zetStart(ms){
+  taak.start = ms; taak.dag = isoDag(new Date(ms)); taak.inplannen = true; taak.scrollen = true;
+  laadDag(taak.dag);
+}
+
+function botsingen(){
+  const lijst = Array.isArray(dagen[taak.dag]) ? dagen[taak.dag] : [];
+  const b = taak.start, e = b + taak.minuten*60000;
+  return lijst.filter(a => !a.heledag && !a.vrij && Date.parse(a.start) < e && Date.parse(a.eind) > b);
+}
+
+function tijdlijnBereik(){
+  const w = taak.voorstel.werktijd || {begin:"09:00", eind:"17:00"};
+  const sMin = Math.round((taak.start - dagBegin(taak.dag)) / 60000);
+  const van = Math.max(0, Math.min(uurMin(w.begin) - 60, Math.floor(sMin/60)*60));
+  const tot = Math.min(24*60, Math.max(uurMin(w.eind) + 60, Math.ceil((sMin + taak.minuten)/60)*60));
+  return {van, tot, w};
+}
+
+function tijdlijnHTML(){
+  const lijst = dagen[taak.dag];
+  if (lijst === undefined || lijst === "laden") return `<div class="tijdlijn"><div class="tl-laden">Agenda laden…</div></div>`;
+  if (lijst.fout) return `<div class="melding">${ik("alert")}<div>${esc(lijst.fout)}</div></div>`;
+  const {van, tot, w} = tijdlijnBereik(), d0 = dagBegin(taak.dag);
+  const y = min => (min - van) * PX;
+  let h = "";
+  // buiten werktijd
+  if (uurMin(w.begin) > van) h += `<div class="buiten" style="top:0;height:${y(uurMin(w.begin))}px"></div>`;
+  if (uurMin(w.eind) < tot) h += `<div class="buiten" style="top:${y(uurMin(w.eind))}px;height:${y(tot)-y(uurMin(w.eind))}px"></div>`;
+  for (let m = van; m < tot; m += 30)
+    h += `<div class="uur${m % 60 ? " half" : ""}" style="top:${y(m)}px">${m % 60 ? "" : `<span>${tweeCijfers(m/60)}:00</span>`}</div>`;
+  // afspraken naast elkaar als ze overlappen
+  const blokken = lijst.filter(a => !a.heledag).map(a => ({...a, b: Math.max(van, (Date.parse(a.start)-d0)/60000), e: Math.min(tot, (Date.parse(a.eind)-d0)/60000)}))
+                       .filter(a => a.e > a.b).sort((p, q) => p.b - q.b);
+  const kolEind = [];
+  blokken.forEach(a => { let k = kolEind.findIndex(e => e <= a.b); if (k < 0){ k = kolEind.length; kolEind.push(0); } kolEind[k] = a.e; a.kol = k; });
+  const n = Math.max(1, kolEind.length);
+  blokken.forEach(a => {
+    h += `<div class="afs${a.vrij ? " vrij" : ""}" style="top:${y(a.b)}px;height:${Math.max(16, (a.e-a.b)*PX - 2)}px;left:${a.kol*100/n}%;width:calc(${100/n}% - 3px)" title="${esc(a.titel)} · ${esc(a.kalender)}">${esc(a.titel)}</div>`;
+  });
+  // de nieuwe taak
+  const sMin = (taak.start - d0)/60000, bots = botsingen();
+  h += `<div class="tb${bots.length ? " botst" : ""}" id="tb" style="top:${y(sMin)}px;height:${taak.minuten*PX - 2}px">
+          <b>${esc(document.getElementById("t-titel")?.value || taak.voorstel.titel)}</b><span id="tb-tijd">${blokTijd()}</span><div class="rek"></div></div>`;
+  const heledag = lijst.filter(a => a.heledag);
+  return (heledag.length ? `<div class="heledag">${heledag.map(a => `<span>${esc(a.titel)}</span>`).join("")}</div>` : "") +
+    `<div class="tijdlijn" id="tijdlijn"><div class="tl-binnen" id="tl-binnen" data-van="${van}" style="height:${(tot-van)*PX}px">${h}</div></div>` +
+    (bots.length ? `<div class="melding fout">${ik("alert")}<div>Overlapt met ${esc(bots.map(a => a.titel).join(", "))}</div></div>` : "");
+}
+
+function blokTijd(){
+  const b = new Date(taak.start), e = new Date(taak.start + taak.minuten*60000);
+  return ` ${tweeCijfers(b.getHours())}:${tweeCijfers(b.getMinutes())}–${tweeCijfers(e.getHours())}:${tweeCijfers(e.getMinutes())} · ${duurTekst(taak.minuten)}`;
+}
 
 async function openTaak(id){
   const it = vindItem(id);
   if (!it) return;
   staat.open = null;
-  taak = {id, item: it, voorstel: null, minuten: 30, moment: null, archiveren: it.status !== "wacht" && it.status !== "fout" && it.status !== "handmatig"};
+  taak = {id, item: it, voorstel: null, minuten: 30, inplannen: false, start: null, dag: null,
+          archiveren: it.status !== "wacht" && it.status !== "fout" && it.status !== "handmatig"};
   tekenTaak();
   try {
     const r = await fetch("/api/taak-voorstel", {method:"POST", headers:{"Content-Type":"application/json","X-Token":TOKEN}, body:JSON.stringify({id})});
     const j = await r.json();
     if (!taak || taak.id !== id) return;
     if (!j.ok){ toast(j.melding, true); return sluitPaneel(); }
-    taak.voorstel = j.voorstel; taak.minuten = j.voorstel.minuten; taak.moment = j.voorstel.momenten[0] || null;
+    taak.voorstel = j.voorstel; taak.minuten = j.voorstel.minuten;
+    if (j.voorstel.momenten.length) zetStart(Date.parse(j.voorstel.momenten[0]));
+    else if (!j.voorstel.agenda_fout){ const m = new Date(); m.setDate(m.getDate()+1); m.setHours(9,0,0,0); taak.start = m.getTime(); taak.dag = isoDag(m); }
     tekenTaak();
   } catch(e){ toast("Geen verbinding met mailagent", true); sluitPaneel(); }
 }
@@ -466,7 +564,11 @@ function tekenTaak(){
   } else {
     const duren = [15,30,45,60,90,120,180,240];
     if (!duren.includes(taak.minuten)) duren.push(taak.minuten), duren.sort((x,y)=>x-y);
-    const momenten = v.momenten.map(m => `<button class="moment${taak.moment===m?" aan":""}" data-moment="${m}">${ik("calendar")}<span><b>${momentTekst(m, taak.minuten)}</b></span></button>`).join("");
+    const inhoudOud = p.querySelector(".p-inhoud"), tlOud = document.getElementById("tijdlijn");
+    const scrollInhoud = inhoudOud ? inhoudOud.scrollTop : 0, scrollTl = tlOud ? tlOud.scrollTop : null;
+    const chips = v.momenten.map(m => `<button class="keuze${taak.inplannen && taak.start===Date.parse(m)?" aan":""}" data-moment="${m}">${esc(kortMoment(m))}</button>`).join("")
+      + `<button class="keuze${!taak.inplannen?" aan":""}" data-moment="">Niet inplannen</button>`;
+    const dagLabel = taak.dag ? new Date(taak.dag + "T12:00").toLocaleDateString("nl-NL",{weekday:"long",day:"numeric",month:"long"}) : "";
     p.innerHTML = kop + `<div class="p-inhoud">
       <div class="melding info">${ik("sparkle")}<div>${esc(v.toelichting)}</div></div>
       <div class="veld"><div class="label">Taak</div><input type="text" id="t-titel" value="${esc(document.getElementById("t-titel")?.value ?? v.titel)}"></div>
@@ -477,24 +579,31 @@ function tekenTaak(){
       <div class="veld"><div class="label">Deadline</div><input type="date" id="t-deadline" value="${esc(document.getElementById("t-deadline")?.value ?? (v.deadline || ""))}"></div>
       <div class="veld"><div class="label">${ik("calendar")}Inplannen in je agenda</div>
         ${v.agenda_fout ? `<div class="melding">${ik("alert")}<div>${esc(v.agenda_fout)}</div></div>` : ""}
-        ${momenten}
-        ${v.agenda_fout ? "" : `<button class="moment${taak.moment==="anders"?" aan":""}" data-moment="anders">${ik("clock")}<span>Ander moment</span></button>
-        ${taak.moment==="anders" ? `<input type="datetime-local" id="t-anders" step="900" value="${esc(document.getElementById("t-anders")?.value || "")}">` : ""}`}
-        <button class="moment${taak.moment===null?" aan":""}" data-moment="">${ik("x")}<span>Niet inplannen</span></button>
+        ${v.agenda_fout ? "" : `<div class="keuzes">${chips}</div>`}
+        ${!v.agenda_fout && taak.inplannen ? `
+          <div class="dagnav"><button class="ikoon" data-dagstap="-1" title="Vorige dag">${ik("chevron").replace("<path", '<path transform="rotate(180 12 12)"')}</button>
+            <b>${esc(dagLabel)}</b><button class="ikoon" data-dagstap="1" title="Volgende dag">${ik("chevron")}</button>
+            <span class="meta">Versleep het blok, rek de onderkant, of klik op een tijd</span></div>
+          ${tijdlijnHTML()}` : ""}
       </div>
       ${it.status === "ter_info" || it.status === "genegeerd" ? `<label class="vinkregel"><input type="checkbox" class="vink" id="t-archief" ${taak.archiveren?"checked":""}> Mail daarna archiveren</label>` : ""}
     </div>
-    <div class="p-voet"><span class="uitleg">${taak.moment ? "Maakt een afspraak in je agenda, die naar Outlook synchroniseert." : "Komt in je takenlijst."}</span>
+    <div class="p-voet"><span class="uitleg">${taak.inplannen ? "Maakt een afspraak in je agenda, die naar Outlook synchroniseert." : "Komt in je takenlijst."}</span>
       <button class="knop" id="sluit2">Annuleren</button>
-      <button class="knop goed" id="taakmaak">${ik("check")}${taak.moment ? "Maken en inplannen" : "Taak maken"}</button></div>`;
+      <button class="knop goed" id="taakmaak">${ik("check")}${taak.inplannen ? "Maken en inplannen" : "Taak maken"}</button></div>`;
+    const inhoudNieuw = p.querySelector(".p-inhoud"), tl = document.getElementById("tijdlijn");
+    if (inhoudNieuw) inhoudNieuw.scrollTop = scrollInhoud;
+    if (tl){
+      if (taak.scrollen){ const tb = document.getElementById("tb"); tl.scrollTop = Math.max(0, tb.offsetTop - 70); taak.scrollen = false; }
+      else if (scrollTl !== null) tl.scrollTop = scrollTl;
+    }
   }
   p.classList.add("open"); p.setAttribute("aria-hidden","false");
   document.getElementById("dek").classList.add("open");
 }
 
 async function bevestigTaak(){
-  const v = taak, start = v.moment === "anders" ? (document.getElementById("t-anders")?.value || "") : v.moment;
-  if (v.moment === "anders" && !start) return toast("Kies een datum en tijd, of kies Niet inplannen", true);
+  const v = taak, start = v.inplannen && v.start ? lokaalIso(v.start) : null;
   const data = {id: v.id, titel: document.getElementById("t-titel").value, stappen: document.getElementById("t-stappen").value.split("\n"),
                 minuten: v.minuten, deadline: document.getElementById("t-deadline").value || null, start: start || null,
                 archiveren: !!document.getElementById("t-archief")?.checked};
@@ -529,7 +638,17 @@ document.addEventListener("click", async ev => {
   const d = t.dataset;
   if (d.maaktaak){ ev.stopPropagation(); return openTaak(Number(d.maaktaak)); }
   if (taak && d.duur){ taak.minuten = Number(d.duur); return tekenTaak(); }
-  if (taak && d.moment !== undefined){ taak.moment = d.moment || null; return tekenTaak(); }
+  if (taak && d.moment !== undefined){
+    if (d.moment) zetStart(Date.parse(d.moment));
+    else if (taak.inplannen) taak.inplannen = false;
+    else { taak.inplannen = true; taak.scrollen = true; laadDag(taak.dag); }
+    return tekenTaak();
+  }
+  if (taak && d.dagstap){
+    const ms = taak.start + Number(d.dagstap) * 86400000;
+    taak.start = ms; taak.dag = isoDag(new Date(ms)); taak.scrollen = true; laadDag(taak.dag);
+    return tekenTaak();
+  }
   if (t.id === "taakmaak") return bevestigTaak();
   if (taak && t.id === "t-archief"){ taak.archiveren = t.checked; return; }
   if (t.id === "sluit2") return sluitPaneel();
@@ -557,6 +676,44 @@ document.addEventListener("click", async ev => {
     const ok = await meteen([id], goed ? "goedkeuren" : "afwijzen", data);
     if (!ok){ staat.open = id; teken(); }   // mislukt: paneel met je tekst weer openen
   }
+});
+// Slepen en rekken in het dagoverzicht, in stappen van een kwartier
+let sleep = null;
+document.addEventListener("pointerdown", ev => {
+  const tl = ev.target.closest("#tijdlijn");
+  if (!tl || !taak) return;
+  const tb = ev.target.closest("#tb");
+  sleep = {modus: ev.target.closest(".rek") ? "rek" : tb ? "schuif" : "klik", y0: ev.clientY, start0: taak.start, duur0: taak.minuten, bewogen: false, tl};
+  if (tb){ tb.setPointerCapture(ev.pointerId); ev.preventDefault(); }
+});
+document.addEventListener("pointermove", ev => {
+  if (!sleep || sleep.modus === "klik") return;
+  const dy = ev.clientY - sleep.y0;
+  if (Math.abs(dy) > 3) sleep.bewogen = true;
+  const stap = Math.round(dy / PX / 15) * 15;
+  const d0 = dagBegin(taak.dag);
+  if (sleep.modus === "schuif"){
+    const min = Math.min(24*60 - taak.minuten, Math.max(0, (sleep.start0 - d0)/60000 + stap));
+    taak.start = d0 + min*60000;
+  } else {
+    taak.minuten = Math.max(15, Math.min(24*60 - (taak.start - d0)/60000, sleep.duur0 + stap));
+  }
+  const tb = document.getElementById("tb"), van = Number(document.getElementById("tl-binnen").dataset.van);
+  tb.style.top = ((taak.start - d0)/60000 - van) * PX + "px";
+  tb.style.height = taak.minuten * PX - 2 + "px";
+  tb.classList.toggle("botst", botsingen().length > 0);
+  document.getElementById("tb-tijd").textContent = blokTijd();
+});
+document.addEventListener("pointerup", ev => {
+  if (!sleep) return;
+  const s = sleep; sleep = null;
+  if (s.modus === "klik"){
+    if (Math.abs(ev.clientY - s.y0) > 4) return;          // dat was scrollen, geen klik
+    const binnen = document.getElementById("tl-binnen"), van = Number(binnen.dataset.van);
+    const min = Math.round(((ev.clientY - binnen.getBoundingClientRect().top) / PX + van) / 15) * 15;
+    taak.start = dagBegin(taak.dag) + Math.max(0, Math.min(24*60 - taak.minuten, min)) * 60000;
+  }
+  tekenTaak();
 });
 document.getElementById("dek").addEventListener("click", sluitPaneel);
 document.addEventListener("keydown", ev => {

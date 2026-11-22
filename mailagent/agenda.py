@@ -138,7 +138,8 @@ class AppleAgenda:
     def _dt(self, d) -> datetime:
         return datetime.fromtimestamp(d.timeIntervalSince1970()).astimezone()
 
-    def bezet(self, van: datetime, tot: datetime) -> list[tuple[datetime, datetime]]:
+    def afspraken(self, van: datetime, tot: datetime) -> list[dict]:
+        """Afspraken uit de agenda's die als bezet tellen, met titel, voor het dagoverzicht."""
         kalenders = None
         if self.bezet_agendas:
             kalenders = [k for k in self.store.calendarsForEntityType_(self.EK.EKEntityTypeEvent)
@@ -148,10 +149,17 @@ class AppleAgenda:
         pred = self.store.predicateForEventsWithStartDate_endDate_calendars_(self._nsdate(van), self._nsdate(tot), kalenders)
         uit = []
         for ev in self.store.eventsMatchingPredicate_(pred) or []:
-            if ev.isAllDay() or ev.availability() == self.EK.EKEventAvailabilityFree:
-                continue
-            uit.append((self._dt(ev.startDate()), self._dt(ev.endDate())))
+            uit.append({
+                "titel": str(ev.title() or "Bezet"),
+                "start": self._dt(ev.startDate()), "eind": self._dt(ev.endDate()),
+                "heledag": bool(ev.isAllDay()),
+                "vrij": ev.availability() == self.EK.EKEventAvailabilityFree,
+                "kalender": str(ev.calendar().title()),
+            })
         return uit
+
+    def bezet(self, van: datetime, tot: datetime) -> list[tuple[datetime, datetime]]:
+        return [(a["start"], a["eind"]) for a in self.afspraken(van, tot) if not a["heledag"] and not a["vrij"]]
 
     def maak_afspraak(self, titel: str, start: datetime, eind: datetime, notities: str) -> str:
         ev = self.EK.EKEvent.eventWithEventStore_(self.store)
