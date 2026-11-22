@@ -72,7 +72,14 @@ on run argv
     set uitvoer to ""
     tell application "Mail"
         set mb to mailbox mailboxNaam of account accountNaam
-        set doel to mailbox doelNaam of account accountNaam
+        try
+            set doel to mailbox doelNaam of account accountNaam
+        on error
+            -- submappen, zoals "[Gmail]/All Mail": zoek op naam in alle mappen van het account
+            set kandidaten to (every mailbox of account accountNaam whose name is doelNaam)
+            if (count of kandidaten) is 0 then error "map '" & doelNaam & "' niet gevonden in account " & accountNaam
+            set doel to item 1 of kandidaten
+        end try
         repeat with i from 4 to count of argv
             set berichtId to (item i of argv) as integer
             try
