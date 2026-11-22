@@ -528,3 +528,18 @@ def test_ongedaan_maken_tijdfactor_en_eerste_stap(omgeving):
     factor, n = store.tijdfactor("onderwijs")
     assert n == 4 and abs(factor - (1.4 * 3 + 1.0) / 4) < 1e-9
     assert store.tijdfactor("istte") == (1.0, 0)
+
+
+def test_opgemaakte_weergave_veilig():
+    from mailagent.opmaak import html_uit_bron, veilig
+
+    bron = ("From: a@b.nl\nSubject: x\nMIME-Version: 1.0\nContent-Type: multipart/alternative; boundary=XX\n\n"
+            "--XX\nContent-Type: text/plain; charset=utf-8\n\nHoi Rob,\n--XX\nContent-Type: text/html; charset=utf-8\n\n"
+            "<html><head><script>alert(1)</script></head><body onload=\"steel()\"><p>Hoi Rob,</p>"
+            "<p style=\"color:#c00\">Antwoord tussen de regels</p><img src=\"https://tracker.example/p.gif\">"
+            "<a href=\"javascript:alert(2)\">x</a><iframe src=\"https://x\"></iframe><form action=\"/\"><input></form></body></html>\n--XX--\n")
+    h = veilig(html_uit_bron(bron))
+    assert "Antwoord tussen de regels" in h and "color:#c00" in h
+    assert "<script" not in h.lower() and "alert(1)" not in h and "onload" not in h
+    assert "javascript:" not in h and "<iframe" not in h and "<form" not in h
+    assert "default-src 'none'" in h and "tracker.example" not in h   # externe afbeelding komt niet eens in de pagina

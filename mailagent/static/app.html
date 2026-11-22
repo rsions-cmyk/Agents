@@ -387,6 +387,15 @@ textarea#concept::placeholder,#a-tekst::placeholder{color:#8a929b}
 @media (min-width:1100px){ .app.drie .lijst .rij.leest{background:var(--vlak);box-shadow:inset 3px 0 0 var(--accent),var(--schaduw)}
   .app.drie .rij.leest .snel{display:none} }
 
+/* opgemaakte mail */
+.mailweergave{display:flex;flex-direction:column;gap:8px}
+.weergavekeuze{display:flex;align-items:center;gap:8px}
+.segment{display:inline-flex;background:var(--vlak3);border-radius:8px;padding:2px}
+.segment button{padding:4px 10px;border-radius:6px;font-size:12.5px;font-weight:550;color:var(--zacht)}
+.segment button.aan{background:var(--vlak);color:var(--tekst);box-shadow:var(--schaduw)}
+.mailframe{width:100%;height:min(62vh,720px);border:1px solid #dde1dc;border-radius:var(--r1);background:#fdfdfc;color-scheme:light}
+.weergavekeuze .meta{font-size:12px}
+
 /* sneltoetsen-overzicht */
 .overlay{position:fixed;inset:0;background:rgba(10,14,18,.35);display:grid;place-items:center;z-index:50;animation:inkomen var(--snel) ease}
 .overlay .vel{background:var(--vlak);border-radius:16px;box-shadow:var(--schaduw-hoog);padding:22px 24px;width:min(520px,calc(100vw - 32px))}
@@ -634,6 +643,38 @@ function tekenVoortgang(){
   return `<div class="voortgang${rest ? "" : " klaar"}"><div class="voortgang-tekst">${tekst}</div><div class="voortgang-balk"><i style="width:${rest ? pct : 100}%"></i></div></div>`;
 }
 
+// ---------------- mail tonen: opgemaakt (HTML, veilig) of als tekst ----------------
+const htmlCache = {};          // id -> veilige html | {fout}
+let weergave = "opgemaakt";
+try { weergave = localStorage.getItem("mailagent-weergave") || "opgemaakt"; } catch(e){}
+const attr = s => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+
+function mailWeergave(id, tekst){
+  const h = htmlCache[id];
+  if (weergave === "opgemaakt" && h === undefined){
+    htmlCache[id] = "laden";
+    stil("mail-html", {id}).then(j => { htmlCache[id] = j.ok ? j.html : {fout: j.melding}; ververs(id); });
+  }
+  const opgemaakt = weergave === "opgemaakt" && typeof h === "string" && h !== "laden";
+  const status = weergave !== "opgemaakt" ? "" : h === "laden" || h === undefined ? "opmaak laden…" : h && h.fout ? esc(h.fout) : "";
+  return `<div class="mailweergave" id="mw-${id}">
+    <div class="weergavekeuze"><div class="segment">
+      <button class="${weergave === "opgemaakt" ? "aan" : ""}" data-weergave="opgemaakt">Opgemaakt</button>
+      <button class="${weergave === "tekst" ? "aan" : ""}" data-weergave="tekst">Tekst</button></div>
+      <span class="meta">${status}</span>
+      <button class="knop klein" data-mailopen="${id}" style="margin-left:auto" title="Deze mail openen in Apple Mail">${ik("mail")}Open in Mail</button></div>
+    ${opgemaakt ? `<iframe class="mailframe" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" srcdoc="${attr(h)}" title="Mail"></iframe>`
+                : `<div class="leesvlak">${tekst === null ? `<span class="meta">Mail laden…</span>` : esc(tekst || "(geen tekst)")}</div>`}
+  </div>`;
+}
+function ververs(id){
+  // alleen het weergaveblok vervangen, zodat de rest van het paneel (en wat je typt) blijft staan
+  const el = document.getElementById("mw-" + id);
+  if (!el) return;
+  const tekst = (leesCache[id] && leesCache[id].tekst) ?? ([...D.zelf, ...D.wacht].find(i => i.id === id)?.tekst ?? null);
+  el.outerHTML = mailWeergave(id, tekst);
+}
+
 async function openLees(id){
   staat.lees = id; staat.geenAuto = false; taak = null; antwoord = null; teken();
   document.querySelector(`.rij[data-kies="${id}"]`)?.scrollIntoView({block:"nearest"});
@@ -647,7 +688,9 @@ function tekenLees(id){
     stil("mail", {id}).then(j => { if (j.ok){ leesCache[id] = j.mail; if (staat.lees === id) tekenLees(id); } });
   }
   const zelfde = p.dataset.lees === String(id);
-  p.dataset.id = ""; p.dataset.lees = id;
+  const sleutel = `${id}|${m ? 1 : 0}|${weergave}|${basis.status}`;
+  if (zelfde && p.dataset.sleutel === sleutel && p.classList.contains("open")) return;   // niets veranderd: iframe niet herladen
+  p.dataset.id = ""; p.dataset.lees = id; p.dataset.sleutel = sleutel;
   p.innerHTML = `
     <div class="p-kop">${avatar(basis)}
       <div style="min-width:0"><h2>${esc(basis.onderwerp)}</h2><div class="van">${esc(a.naam)} · ${esc(a.adres)} · ${datum(basis.datum)}</div>
@@ -657,7 +700,7 @@ function tekenLees(id){
     <div class="p-inhoud"${zelfde ? ' style="animation:none"' : ""}>
       ${basis.samenvatting && basis.samenvatting !== basis.onderwerp ? `<div class="melding info">${ik("sparkle")}<div>${esc(basis.samenvatting)}</div></div>` : ""}
       ${m && m.reden && basis.status === "genegeerd" ? `<div class="meta">${esc(m.reden)}</div>` : ""}
-      <div class="leesvlak">${m ? esc(m.tekst || "(geen tekst)") : `<span class="meta">Mail laden…</span>`}</div>
+      ${mailWeergave(id, m ? m.tekst : null)}
     </div>
     <div class="p-voet">
       <button class="knop" data-maaktaak="${id}" title="Taak maken (T)">${ik("calendar")}Taak<kbd>T</kbd></button>
@@ -673,7 +716,7 @@ function tekenLees(id){
 
 function tekenLeegPaneel(){
   const p = document.getElementById("paneel");
-  p.dataset.id = "";
+  p.dataset.id = ""; p.dataset.sleutel = ""; p.dataset.lees = "";
   const klaar = staat.tab === "te_doen" && !teDoen().length;
   p.innerHTML = `<div class="leegpaneel">
       ${klaar ? `<div class="rond">${ik("check")}</div><b style="color:var(--tekst)">Alles bijgewerkt</b>Er wacht niets op je.` :
@@ -859,7 +902,7 @@ function tekenPaneel(it){
   const scroll = zelfdeMail ? (p.querySelector(".p-inhoud")?.scrollTop || 0) : 0;
   const origOpen = zelfdeMail && p.querySelector("details.origineel")?.open;
   const focusId = zelfdeMail && p.contains(document.activeElement) ? document.activeElement.id : null;
-  p.dataset.id = it.id;
+  p.dataset.id = it.id; p.dataset.sleutel = ""; p.dataset.lees = "";
   p.innerHTML = `
     <div class="p-kop">${avatar(it)}
       <div style="min-width:0"><h2>${esc(it.onderwerp)}</h2><div class="van">${esc(a.naam)} · ${esc(a.adres)} · ${datum(it.datum)}</div>
@@ -881,7 +924,7 @@ function tekenPaneel(it){
             <button class="ikoon rood" data-tkweg="${i}" title="Taak weghalen">${ik("x")}</button></div>`).join("")}
           <div class="tk-erbij"><button class="knop klein" data-tkerbij="1">+ Taak toevoegen</button></div></div></div>
       ${it.agenda ? `<div class="melding info">${ik("calendar")}<div><b>Agendavoorstel</b><br>${esc(it.agenda)}</div></div>` : ""}
-      <details class="origineel"><summary>${ik("mail")}Oorspronkelijke mail</summary><pre>${esc(it.tekst)}</pre></details>
+      <details class="origineel" data-orig="${it.id}"><summary>${ik("mail")}Oorspronkelijke mail</summary>${p.querySelector(`details[data-orig="${it.id}"]`)?.open ? mailWeergave(it.id, it.tekst) : ""}</details>
     </div>
     <div class="p-voet">
       <span class="uitleg">Opent een antwoord in Apple Mail. Je verstuurt zelf.</span>
@@ -1584,6 +1627,20 @@ document.addEventListener("mousedown", ev => {
   if (ev.target.closest("#kiezer-vernieuw")){ ev.preventDefault(); const id = kiezer.id; kiezer.el.querySelector(".opties").innerHTML = `<div class="leeg2">Mappen laden…</div>`;
     stil("mappen", {id, vernieuw: true}).then(j => { if (kiezer && j.ok){ kiezer.mappen = j.mappen; kiezer.voorstellen = j.voorstellen; tekenKiezer(); } }); return; }
   if (!ev.target.closest(".kiezer")) sluitKiezer();
+}, true);
+document.addEventListener("click", ev => {
+  const b = ev.target.closest("[data-weergave]");
+  if (!b) return;
+  weergave = b.dataset.weergave;
+  try { localStorage.setItem("mailagent-weergave", weergave); } catch(e){}
+  const blok = b.closest(".mailweergave");
+  if (blok) ververs(Number(blok.id.slice(3)));
+});
+document.addEventListener("toggle", ev => {
+  const d = ev.target;
+  if (!(d instanceof HTMLDetailsElement) || !d.dataset.orig || !d.open || d.querySelector(".mailweergave")) return;
+  const id = Number(d.dataset.orig), it = [...D.zelf, ...D.wacht].find(i => i.id === id);
+  d.insertAdjacentHTML("beforeend", mailWeergave(id, it ? it.tekst : ""));
 }, true);
 document.querySelectorAll("[data-ikoon]").forEach(el => el.innerHTML = ik(el.dataset.ikoon));
 laad();

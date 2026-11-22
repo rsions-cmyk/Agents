@@ -229,6 +229,36 @@ end run
 '''
 
 
+SCRIPT_BRON = HULP + r'''
+on run argv
+    set accountNaam to item 1 of argv
+    set mailboxNaam to item 2 of argv
+    set berichtId to (item 3 of argv) as integer
+    set berichtMid to item 4 of argv
+    set archiefNaam to item 5 of argv
+    set m to missing value
+    tell application "Mail"
+        try
+            set m to first message of mailbox mailboxNaam of account accountNaam whose id is berichtId
+        end try
+        if m is missing value and berichtMid is not "" then
+            try
+                set m to first message of mailbox mailboxNaam of account accountNaam whose message id is berichtMid
+            end try
+        end if
+    end tell
+    if m is missing value and berichtMid is not "" then
+        try
+            set arch to my zoekMap(accountNaam, archiefNaam)
+            tell application "Mail" to set m to first message of arch whose message id is berichtMid
+        end try
+    end if
+    if m is missing value then error "mail niet gevonden"
+    tell application "Mail" to return source of m
+end run
+'''
+
+
 SCRIPT_MAPPEN = r'''
 on run argv
     set accountNaam to item 1 of argv
@@ -366,6 +396,10 @@ class AppleMailBron:
             if mid:
                 res[mid] = nieuw.strip()
         return res
+
+    def bron(self, bron_id: str, message_id: str | None) -> str:
+        """De volledige mail (MIME-bron), voor de opgemaakte weergave."""
+        return _osascript(SCRIPT_BRON, self.account, self.mailbox, bron_id, message_id or "", self.mappen["archief"])
 
     def mappenlijst(self) -> list[str]:
         """Mappen in dit account waar je mail in kunt opbergen, als pad (bijv. 'Projecten/ENTER÷IFITT')."""

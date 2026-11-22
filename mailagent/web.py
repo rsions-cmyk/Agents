@@ -22,6 +22,7 @@ from .agenda import lees_werktijd, maak_agenda, vrije_momenten
 from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
+from .opmaak import html_uit_bron, veilig
 from .pipeline import afzender_adres, map_voorstellen, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
 from .store import Store
 
@@ -111,6 +112,7 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
     mail_slot = threading.Lock()  # Apple Mail krijgt één opdracht tegelijk
     agenda_cache: dict = {}
     mappen_cache: dict = {}   # bron -> lijst mappen; eenmaal per sessie opgehaald
+    html_cache: dict = {}     # item-id -> veilige HTML
 
     def agenda():
         """Agenda pas koppelen als hij nodig is; een fout wordt onthouden tot de volgende poging."""
@@ -310,6 +312,20 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                     if it is None:
                         return self._json({"ok": False, "melding": "Mail niet gevonden"})
                     return self._json({"ok": True, "mail": item_dict(it, True)})
+                elif actie == "mail-html":
+                    i = int(v["id"])
+                    if i not in html_cache:
+                        it = store.item(i)
+                        bron = bronnen.get(it["bron"]) if it else None
+                        if bron is None or not hasattr(bron, "bron"):
+                            return self._json({"ok": False, "melding": "Geen opgemaakte versie beschikbaar"})
+                        with mail_slot:
+                            ruw = bron.bron(it["bron_id"], it["thread_id"])
+                        h = html_uit_bron(ruw)
+                        if h is None:
+                            return self._json({"ok": False, "melding": "Geen opgemaakte versie gevonden"})
+                        html_cache[i] = veilig(h)
+                    return self._json({"ok": True, "html": html_cache[i]})
                 elif actie == "mappen":
                     it = store.item(int(v["id"]))
                     if it is None:

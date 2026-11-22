@@ -86,3 +86,9 @@ class MapBron:
                 f.rename(self.pad / f.name)
                 res[mid] = f.name
         return {m: res.get(m, "FOUT:niet gevonden") for m in message_ids}
+
+    def bron(self, bron_id: str, message_id: str | None) -> str:
+        for f in [self.pad / bron_id, *self.pad.glob(f"_*/{bron_id}")]:
+            if f.exists():
+                return f.read_text(errors="replace")
+        raise FileNotFoundError(bron_id)
