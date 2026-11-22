@@ -15,6 +15,27 @@ from .store import Store
 log = logging.getLogger("mailagent")
 
 
+def stijlvoorbeelden(cfg: Config, store: Store, mail: Email, project: str, aantal: int = 3) -> list[dict]:
+    """Eerdere antwoorden van de eigenaar: eerst aan dezelfde afzender, dan binnen hetzelfde project.
+
+    Antwoorden aan afzenders op de lijst 'nooit naar Claude' gaan nooit mee.
+    """
+    adres = afzender_adres(mail.van)
+    zelfde, project_ = [], []
+    for r in store.eigen_antwoorden():
+        voorbeeld_mail = Email(bron="", bron_id="", van=r["van"] or "", aan="", onderwerp=r["onderwerp"] or "",
+                               datum=mail.datum, tekst="")
+        if not mag_naar_claude(cfg, voorbeeld_mail):
+            continue
+        v = {"van": afzender_adres(r["van"] or ""), "onderwerp": r["onderwerp"] or "",
+             "antwoord": anonimiseer(cfg, r["eigen_antwoord"])}
+        if afzender_adres(r["van"] or "") == adres:
+            zelfde.append(v)
+        elif r["project"] == project:
+            project_.append(v)
+    return (zelfde + project_)[:aantal]
+
+
 def verwerk_mail(cfg: Config, store: Store, llm: LLM, mail: Email) -> int:
     """Verwerkt één mail en geeft het id van het item in de wachtrij terug."""
     store.bewaar_mail(mail)
@@ -42,7 +63,7 @@ def verwerk_mail(cfg: Config, store: Store, llm: LLM, mail: Email) -> int:
         if sortering is None:
             sortering = llm.sorteer(mail, tekst, vast_project)
         if sortering.actie in UITWERK_ACTIES:
-            uitwerking = llm.werk_uit(mail, tekst, sortering)
+            uitwerking = llm.werk_uit(mail, tekst, sortering, stijlvoorbeelden(cfg, store, mail, sortering.project))
             return store.nieuw_item(mail, sortering, uitwerking, "wacht")
         status = "genegeerd" if sortering.actie == "negeren" else "ter_info"
         return store.nieuw_item(mail, sortering, None, status)
@@ -150,6 +171,8 @@ def open_antwoord(store: Store, bronnen: dict, item_id: int, tekst: str) -> str:
     if bron is None:
         raise ValueError(f"Bron '{item['bron']}' staat niet meer in de configuratie")
     store.zet_concept(item_id, tekst)
+    if tekst.strip():
+        store.zet_eigen_antwoord(item_id, tekst)
     melding = bron.maak_concept(item["bron_id"], tekst, item["onderwerp"], item["van"], message_id=item["thread_id"])
     store.log(item_id, "antwoord geopend vanuit taak")
     return melding
@@ -221,6 +244,8 @@ def keur_goed(store: Store, bronnen: dict, item_id: int, concept: str | None) ->
         meldingen.append(f"{len(taken)} taak/taken toegevoegd")
     melding = "; ".join(meldingen) or "goedgekeurd zonder concept of taken"
     store.zet_status(item_id, "goedgekeurd", concept=concept, opmerking=melding)
+    if concept:
+        store.zet_eigen_antwoord(item_id, concept)
     return melding
 
 

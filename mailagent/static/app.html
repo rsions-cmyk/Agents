@@ -178,6 +178,11 @@ details.origineel pre{white-space:pre-wrap;font:13px/1.5 -apple-system,sans-seri
 .taakmail .knop{padding:4px 9px;font-size:12px}
 .toast .knop{margin-left:auto;padding:3px 10px;font-size:13px}
 .afgerond .midden{color:var(--zacht);text-decoration:line-through}
+.ikoon.voorkeur{color:var(--accent);background:var(--accent-zacht)}
+.ikoon.voorkeur.rood{color:var(--hoog);background:color-mix(in srgb,var(--hoog) 12%,transparent)}
+.gewoonte{font-size:12px;color:var(--zacht);white-space:nowrap}
+.voorstel{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px;margin-bottom:16px;border-radius:12px;background:var(--accent-zacht)}
+.voorstel .namen{flex:1;min-width:200px}
 .stappen-klein{margin:4px 0 0;padding-left:18px;color:var(--zacht);font-size:13px}
 .regels summary{cursor:pointer;color:var(--zacht);font-size:13px;padding:4px}
 
@@ -193,6 +198,7 @@ details.origineel pre{white-space:pre-wrap;font:13px/1.5 -apple-system,sans-seri
   .tabs{margin-left:0;width:100%}.tab{flex:1;justify-content:center;padding:6px 4px;font-size:13px;gap:5px;min-width:0}
   .balk{width:calc(100vw - 32px);flex-wrap:wrap;justify-content:center}
   .rij{padding:12px}
+  .gewoonte{display:none}
 }
 </style>
 </head>
@@ -465,6 +471,15 @@ async function openAntwoord(){
   laad();
 }
 
+// wat je eerder met mail van deze afzender deed
+function gewoonte(it){
+  const g = (D.gedrag || {})[afzender(it.van).adres.toLowerCase()];
+  if (!g) return null;
+  const opties = [["prullenbak", g.prullenbak||0, "weggegooid"], ["archief", g.archief||0, "gearchiveerd"], ["taak", g.taak||0, "taak van gemaakt"]]
+    .filter(o => o[1] >= 2).sort((a, b) => b[1] - a[1]);
+  return opties.length ? {actie: opties[0][0], tekst: `meestal ${opties[0][2]} (${opties[0][1]}×)`} : null;
+}
+
 function opruimGroep(titel, items, hoofd){
   if (!items.length) return "";
   const ids = items.map(i => i.id).join(",");
@@ -472,7 +487,7 @@ function opruimGroep(titel, items, hoofd){
     ? `<button class="knop klein" data-groep="archief" data-ids="${ids}">${ik("archive")}Alles archiveren</button>`
     : `<button class="knop klein" data-groep="prullenbak" data-ids="${ids}">${ik("trash")}Alles naar prullenbak</button>`;
   return `<div class="groep"><div class="groep-kop"><h2>${titel} · ${items.length}</h2><div class="acties">${groot}</div></div>
-    <div class="lijst">${items.map(it => { const a = afzender(it.van);
+    <div class="lijst">${items.map(it => { const a = afzender(it.van), gw = gewoonte(it);
       return `<div class="rij${staat.gekozen.has(it.id)?" gekozen":""}" data-kies="${it.id}">
         <input type="checkbox" class="vink" data-vink="${it.id}" ${staat.gekozen.has(it.id)?"checked":""} aria-label="Selecteren">
         ${avatar(it, true)}
@@ -480,10 +495,11 @@ function opruimGroep(titel, items, hoofd){
           <div class="regel1"><span class="van">${esc(a.naam)}</span><span class="datum">${datum(it.datum)}</span></div>
           <div class="samenvatting">${esc(it.samenvatting || it.onderwerp)}</div>
         </div>
-        <div class="snel">
-          <button class="ikoon" data-maaktaak="${it.id}" title="Taak maken en inplannen">${ik("task")}</button>
-          <button class="ikoon" data-een="archief" data-id="${it.id}" title="Archiveren">${ik("archive")}</button>
-          <button class="ikoon rood" data-een="prullenbak" data-id="${it.id}" title="Naar prullenbak">${ik("trash")}</button>
+        ${gw ? `<span class="gewoonte">${esc(gw.tekst)}</span>` : ""}
+        <div class="snel"${gw ? ' style="opacity:1"' : ""}>
+          <button class="ikoon${gw && gw.actie==="taak" ? " voorkeur" : ""}" data-maaktaak="${it.id}" title="Taak maken en inplannen">${ik("task")}</button>
+          <button class="ikoon${gw && gw.actie==="archief" ? " voorkeur" : ""}" data-een="archief" data-id="${it.id}" title="Archiveren">${ik("archive")}</button>
+          <button class="ikoon rood${gw && gw.actie==="prullenbak" ? " voorkeur" : ""}" data-een="prullenbak" data-id="${it.id}" title="Naar prullenbak">${ik("trash")}</button>
           <button class="ikoon" data-een="overslaan" data-id="${it.id}" title="Afzender voortaan overslaan">${ik("ban")}</button>
         </div>
       </div>`; }).join("")}</div></div>`;
@@ -491,8 +507,12 @@ function opruimGroep(titel, items, hoofd){
 
 function tekenOpruimen(){
   const info = filter(D.info), over = filter(D.overgeslagen);
-  let html = opruimGroep("Ter info", info, "archief") + opruimGroep("Overgeslagen", over, "prullenbak");
-  if (!info.length && !over.length) html = leeg("Niets op te ruimen", "Ter-info-mail en nieuwsbrieven verschijnen hier.");
+  const vs = D.voorstellen || [];
+  let html = vs.length ? `<div class="voorstel">${ik("sparkle")}<div class="namen"><b>Deze afzenders gooi je steeds weg.</b> Voortaan overslaan, zonder Claude?<br>
+      <span class="meta">${vs.map(v => `${esc(afzender(v.van).naam)} (${v.weg}×)`).join(" · ")}</span></div>
+      <button class="knop klein" data-overslaanalle="${esc(vs.map(v => v.adres).join(","))}">${ik("ban")}Allemaal overslaan</button></div>` : "";
+  html += opruimGroep("Ter info", info, "archief") + opruimGroep("Overgeslagen", over, "prullenbak");
+  if (!info.length && !over.length) html = (vs.length ? html : "") + leeg("Niets op te ruimen", "Ter-info-mail en nieuwsbrieven verschijnen hier.");
   if (D.regels.length) html += `<details class="regels"><summary>${D.regels.length} afzender(s) worden voortaan overgeslagen</summary>
     <div class="lijst">${D.regels.map(r => `<div class="rij" style="cursor:default"><span class="ikoon">${ik("ban")}</span>
       <div class="midden">${esc(r.adres)}</div><button class="knop klein" data-regelweg="${esc(r.adres)}">Niet meer overslaan</button></div>`).join("")}</div></details>`;
@@ -762,6 +782,7 @@ document.addEventListener("click", async ev => {
   if (d.een){ ev.stopPropagation(); return verplaats([Number(d.id)], d.een); }
   if (d.groep){ return verplaats(d.ids.split(",").map(Number), d.groep); }
   if (d.bulk){ if (d.bulk === "leeg"){ staat.gekozen.clear(); return teken(); } return verplaats([...staat.gekozen], d.bulk); }
+  if (d.overslaanalle){ const j = await stil("regels-toevoegen", {adressen: d.overslaanalle.split(",")}); toast(j.melding, !j.ok); return laad(); }
   if (d.regelweg){ return actie("regel-weg", {adres:d.regelweg}).then(laad); }
   if (d.vink || d.kies){
     const id = Number(d.vink || d.kies);

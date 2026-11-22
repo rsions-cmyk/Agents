@@ -36,8 +36,9 @@ class NepLLM:
         return Sortering(project="overig", actie="ter_info", prioriteit="laag",
                          deadline=None, samenvatting=mail.onderwerp, reden="test")
 
-    def werk_uit(self, mail, tekst, sortering):
+    def werk_uit(self, mail, tekst, sortering, voorbeelden=None):
         self.gezien.append(tekst)
+        self.voorbeelden = voorbeelden
         return Uitwerking(concept_antwoord=f"Concept voor: {mail.onderwerp}",
                           taken=[Taak(omschrijving="Opvolgen", deadline=sortering.deadline)],
                           agenda_voorstel=None, vragen_aan_jou="Akkoord?")
@@ -399,3 +400,49 @@ def test_nieuwsbrief_niet_naar_claude(omgeving):
     assert items["Black Friday Sale"]["status"] == "genegeerd"
     assert not any("korting" in t for t in llm.gezien)                 # niet naar Claude
     assert items["ISTTE newsletter"]["status"] == "wacht"              # eigen regel: wel door
+
+
+def test_stijlvoorbeelden_en_afzendergedrag(omgeving):
+    from datetime import datetime
+    from mailagent.models import Email
+    from mailagent.pipeline import keur_goed, stijlvoorbeelden, verplaats_items
+    from mailagent.web import afzender_voorstellen
+
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    wacht = {r["onderwerp"]: r["id"] for r in store.items(status="wacht")}
+    keur_goed(store, bronnen, wacht["Agenda board meeting December"], "Dear Chair,\n\nWill do.\n\nWarm regards,\nRob")
+
+    nieuwe = Email(bron="test", bron_id="x", van="Board Chair <chair@istte.org>", aan="", onderwerp="Budget",
+                   datum=datetime.now().astimezone(), tekst="Please review the budget.")
+    vb = stijlvoorbeelden(cfg, store, nieuwe, "istte")
+    assert len(vb) == 1 and "Warm regards" in vb[0]["antwoord"]
+
+    # het voorbeeld gaat mee naar Claude bij een volgende mail van dezelfde afzender
+    llm = NepLLM()
+    (bronnen["test"].pad / "10-chair.eml").write_text(
+        "From: Board Chair <chair@istte.org>\nTo: x@buas.nl\nSubject: Budget 2027\n"
+        "Date: Fri, 20 Nov 2026 15:00:00 +0100\nMessage-ID: <a10@istte.org>\n\nPlease review.\n")
+    run(cfg, store, bronnen, llm)
+    assert llm.voorbeelden and "Warm regards" in llm.voorbeelden[0]["antwoord"]
+
+    # nooit-naar-Claude-afzenders gaan niet mee als voorbeeld
+    bank = store.items(status="handmatig")[0]
+    keur_goed(store, bronnen, bank["id"], "Geheim antwoord aan de bank")
+    bank_mail = Email(bron="test", bron_id="y", van="Mijn Bank <service@mijnbank.example>", aan="",
+                      onderwerp="x", datum=datetime.now().astimezone(), tekst="")
+    assert all("Geheim" not in v["antwoord"] for v in stijlvoorbeelden(cfg, store, bank_mail, "overig"))
+
+    # afzendergedrag en voorstel na drie keer weggooien
+    for i in range(3):
+        (bronnen["test"].pad / f"2{i}-promo.eml").write_text(
+            f"From: Winkel <promo@winkel.example>\nTo: x@buas.nl\nSubject: Aanbieding {i}\n"
+            f"Date: Fri, 20 Nov 2026 0{i+1}:00:00 +0100\nMessage-ID: <p{i}@winkel.example>\n\nKoop nu.\n")
+    run(cfg, store, bronnen, NepLLM())
+    promo = [r["id"] for r in store.items(status="ter_info") if "Aanbieding" in r["onderwerp"]]
+    verplaats_items(store, bronnen, promo[:2], "prullenbak")
+    assert store.afzender_gedrag()["promo@winkel.example"]["prullenbak"] == 2
+    assert afzender_voorstellen(store)["voorstellen"] == []
+    assert afzender_voorstellen(store)["gedrag"]["promo@winkel.example"]["prullenbak"] == 2
+    verplaats_items(store, bronnen, promo[2:], "prullenbak")
+    assert afzender_voorstellen(store)["voorstellen"][0]["adres"] == "promo@winkel.example"

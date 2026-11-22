@@ -22,7 +22,7 @@ from .agenda import lees_werktijd, maak_agenda, vrije_momenten
 from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
-from .pipeline import afzender_adres, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
+from .pipeline import afzender_adres, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
 from .store import Store
 
 APP_HTML = Path(__file__).with_name("static") / "app.html"
@@ -51,6 +51,20 @@ def taak_dict(store: Store, t, mail: bool = True) -> dict:
     return d
 
 
+def afzender_voorstellen(store: Store) -> dict:
+    """Wat de eigenaar eerder met mail van elke afzender deed, en welke afzenders hij steeds weggooit."""
+    gedrag = store.afzender_gedrag()
+    overgeslagen = {r["adres"] for r in store.afzender_regels()}
+    namen = {}
+    for r in store.items(status="ter_info") + store.items(status="genegeerd"):
+        namen.setdefault(afzender_adres(r["van"] or ""), r["van"])
+    voorstellen = [{"adres": a, "van": namen.get(a, a), "weg": g.get("prullenbak", 0)}
+                   for a, g in gedrag.items()
+                   if g.get("prullenbak", 0) >= 3 and not g.get("antwoord") and not g.get("taak") and a not in overgeslagen]
+    voorstellen.sort(key=lambda v: -v["weg"])
+    return {"gedrag": {a: g for a, g in gedrag.items() if a in namen}, "voorstellen": voorstellen[:8]}
+
+
 def verzamel(cfg: Config, store: Store, ophalen: dict) -> dict:
     tellingen = {p: len(store.items(status="wacht", project=p)) for p in cfg.projecten}
     zelf = store.items(status="fout") + store.items(status="handmatig")
@@ -63,6 +77,7 @@ def verzamel(cfg: Config, store: Store, ophalen: dict) -> dict:
         "taken": [taak_dict(store, t) for t in store.open_taken()],
         "afgerond": [taak_dict(store, t, mail=False) for t in store.afgeronde_taken()],
         "regels": [dict(r) for r in store.afzender_regels()],
+        **afzender_voorstellen(store),
         "ophalen": {"bezig": ophalen["bezig"], "laatste": ophalen["laatste"]},
     }
 
@@ -200,7 +215,8 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                         return self._json({"ok": False, "melding": "Deze afzender gaat niet naar Claude; schrijf het antwoord zelf"})
                     s = Sortering(project=it["project"], actie="antwoorden", prioriteit=it["prioriteit"],
                                   deadline=it["deadline"], samenvatting=it["samenvatting"] or it["onderwerp"], reden="")
-                    u = llm_factory().werk_uit(mail, anonimiseer(cfg, mail.tekst), s)
+                    u = llm_factory().werk_uit(mail, anonimiseer(cfg, mail.tekst), s,
+                                               stijlvoorbeelden(cfg, store, mail, it["project"]))
                     return self._json({"ok": True, "concept": u.concept_antwoord or "", "vragen": u.vragen_aan_jou})
                 elif actie == "antwoord-openen":
                     with mail_slot:
@@ -249,6 +265,11 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                                             stappen, int(v.get("minuten") or 30), v.get("deadline") or None,
                                             start, bool(v.get("archiveren")),
                                             vlag=cfg.vlag_kleur if cfg.vlag_aan else None)
+                elif actie == "regels-toevoegen":
+                    adressen = [a.strip().lower() for a in v.get("adressen", []) if a.strip()]
+                    for a in adressen:
+                        store.zet_afzender_regel(a, "negeren", None)
+                    melding = f"{len(adressen)} afzender(s) worden voortaan overgeslagen"
                 elif actie == "regel-weg":
                     store.verwijder_afzender_regel(v["adres"])
                     melding = f"{v['adres']} wordt niet meer overgeslagen"

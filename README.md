@@ -25,6 +25,8 @@ Na elke run staat er een overzicht per project in `data/overzicht.md`.
 
 **Per ongeluk afgevinkt?** Na afvinken verschijnt een melding met "Ongedaan maken". Later terugzetten kan via "Afgerond" onderaan Taken.
 
+**De app leert van wat je doet.** Bij nieuwe concepten krijgt Claude tot drie antwoorden mee die jij eerder goedkeurde of in Mail opende (eerst aan dezelfde afzender, dan binnen hetzelfde project), zodat aanhef, toon, lengte en afsluiting op de jouwe gaan lijken. Antwoorden aan afzenders op de lijst `nooit_naar_claude` gaan nooit mee. Bij Opruimen licht de knop op die je meestal kiest voor een afzender ("meestal weggegooid (3×)"), en afzenders die je drie keer of vaker weggooit stelt de app voor om voortaan over te slaan. Er gebeurt niets vanzelf.
+
 **Ter info en overgeslagen mail opruimen.** Onderaan de pagina staan twee lijsten. Bij "Ter info" is alles aangevinkt voor archiveren, bij "Overgeslagen" (nieuwsbrieven, meldingen, reclame) voor de prullenbak. Vink uit wat je wilt houden en klik op de knop. Verwijderen verplaatst naar de prullenbak van dat account, dus je haalt het in Apple Mail terug als het nodig is. Met "Afzender voortaan overslaan" gaat mail van die afzender niet meer naar Claude en komt hij meteen bij "Overgeslagen". Die lijst beheer je onderaan de pagina. De mapnamen stel je per bron in met `archief:` en `prullenbak:` in `config.yaml`.
 
 ## Hoe het veilig blijft

@@ -35,7 +35,8 @@ CREATE TABLE IF NOT EXISTS items (
     status TEXT NOT NULL,       -- wacht | goedgekeurd | afgewezen | ter_info | genegeerd | handmatig | fout | gearchiveerd | verwijderd | taak
     opmerking TEXT,
     aangemaakt TEXT NOT NULL,
-    afgehandeld TEXT
+    afgehandeld TEXT,
+    eigen_antwoord TEXT          -- de tekst die de eigenaar uiteindelijk goedkeurde of in Mail opende
 );
 CREATE TABLE IF NOT EXISTS taken (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -86,6 +87,8 @@ class Store:
         for kolom, soort in (("minuten", "INTEGER"), ("stappen", "TEXT"), ("gepland", "TEXT"), ("afgerond", "TEXT")):
             if kolom not in kolommen:
                 self.db.execute(f"ALTER TABLE taken ADD COLUMN {kolom} {soort}")
+        if "eigen_antwoord" not in {r["name"] for r in self.db.execute("PRAGMA table_info(items)")}:
+            self.db.execute("ALTER TABLE items ADD COLUMN eigen_antwoord TEXT")
         # mail met een open taak hoort niet meer in Beoordelen (oudere versies lieten hem staan)
         self.db.execute("UPDATE items SET status='taak' WHERE status IN ('wacht','fout','handmatig') "
                         "AND id IN (SELECT item_id FROM taken WHERE klaar=0 AND item_id IS NOT NULL)")
@@ -211,6 +214,30 @@ class Store:
     def afgeronde_taken(self, limiet: int = 30) -> list[sqlite3.Row]:
         return self.db.execute("SELECT * FROM taken WHERE klaar=1 ORDER BY afgerond IS NULL, afgerond DESC, id DESC LIMIT ?",
                                (limiet,)).fetchall()
+
+    def zet_eigen_antwoord(self, item_id: int, tekst: str) -> None:
+        self.db.execute("UPDATE items SET eigen_antwoord=? WHERE id=?", (tekst, item_id))
+        self.db.commit()
+
+    def eigen_antwoorden(self, limiet: int = 200) -> list[sqlite3.Row]:
+        """Antwoorden van de eigenaar, nieuwste eerst, met de mail erbij."""
+        return self.db.execute(
+            "SELECT i.id, i.project, i.eigen_antwoord, m.van, m.onderwerp FROM items i JOIN mails m USING(sleutel) "
+            "WHERE i.eigen_antwoord IS NOT NULL AND TRIM(i.eigen_antwoord) != '' "
+            "ORDER BY COALESCE(i.afgehandeld, i.aangemaakt) DESC LIMIT ?", (limiet,)).fetchall()
+
+    def afzender_gedrag(self) -> dict[str, dict[str, int]]:
+        """Per afzenderadres: hoe vaak gearchiveerd, weggegooid, taak van gemaakt, beantwoord, afgewezen."""
+        from email.utils import parseaddr
+        soorten = {"gearchiveerd": "archief", "verwijderd": "prullenbak", "taak": "taak",
+                   "goedgekeurd": "antwoord", "afgewezen": "afgewezen"}
+        uit: dict[str, dict[str, int]] = {}
+        for r in self.db.execute("SELECT i.status, m.van FROM items i JOIN mails m USING(sleutel) WHERE i.status IN "
+                                 "('gearchiveerd','verwijderd','taak','goedgekeurd','afgewezen')"):
+            adres = (parseaddr(r["van"] or "")[1] or (r["van"] or "")).lower()
+            teller = uit.setdefault(adres, {})
+            teller[soorten[r["status"]]] = teller.get(soorten[r["status"]], 0) + 1
+        return uit
 
     def zet_concept(self, item_id: int, concept: str) -> None:
         self.db.execute("UPDATE items SET concept=? WHERE id=?", (concept, item_id))

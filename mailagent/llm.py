@@ -31,7 +31,7 @@ class LLMFout(Exception):
 
 class LLM(Protocol):
     def sorteer(self, mail: Email, tekst: str, vast_project: str | None) -> Sortering: ...
-    def werk_uit(self, mail: Email, tekst: str, sortering: Sortering) -> Uitwerking: ...
+    def werk_uit(self, mail: Email, tekst: str, sortering: Sortering, voorbeelden: list[dict] | None = None) -> Uitwerking: ...
     def plan_taak(self, mail: Email, tekst: str, project: str) -> Taakplan: ...
 
 
@@ -111,21 +111,28 @@ class ClaudeLLM:
                            schema_sortering(projecten), self.cfg.sorteren_effort)
         return Sortering.model_validate(data)
 
-    def werk_uit(self, mail: Email, tekst: str, sortering: Sortering) -> Uitwerking:
+    def werk_uit(self, mail: Email, tekst: str, sortering: Sortering, voorbeelden: list[dict] | None = None) -> Uitwerking:
         system = (
             f"Je bent de projectagent voor '{sortering.project}'. Je bereidt werk voor; de eigenaar keurt alles "
             "goed voordat er iets gebeurt. Je verstuurt niets en zegt niets toe wat volgens de projectinstructies "
             "eerst langs de eigenaar moet.\n\n"
             "Schrijf een concept_antwoord als de actie 'antwoorden' of 'delegeren' is (bij delegeren: een korte "
-            "doorstuurtekst). Antwoord in de taal van de mail. Onderteken niet; de eigenaar voegt een handtekening toe. "
+            "doorstuurtekst). Antwoord in de taal van de mail. "
+            "Staan er eerdere antwoorden van de eigenaar bij, neem dan zijn aanhef, toon, lengte en afsluiting over, "
+            "maar nooit de inhoud. Staan ze er niet bij, onderteken dan niet; de eigenaar voegt een handtekening toe. "
             "Verzin geen feiten, data of afspraken die niet in de mail of de instructies staan. Ontbreekt informatie, "
             "zet dan [AANVULLEN: ...] in het concept.\n"
             "Zet concrete vervolgstappen in 'taken', een afspraakvoorstel in 'agenda_voorstel', en beslissingen die "
             "alleen de eigenaar kan nemen in 'vragen_aan_jou'.\n\n"
             f"{VEILIGHEID}\n\n<projectinstructies>\n{self.cfg.project_instructies[sortering.project]}\n</projectinstructies>"
         )
+        stijl = ""
+        if voorbeelden:
+            stijl = "<eerdere_antwoorden_van_de_eigenaar>\n" + "\n\n".join(
+                f"<voorbeeld>\nOp: {v['onderwerp']} (van {v['van']})\nZijn antwoord:\n{v['antwoord'][:1500]}\n</voorbeeld>"
+                for v in voorbeelden) + "\n</eerdere_antwoorden_van_de_eigenaar>\n\n"
         gebruiker = (
-            f"{mail_blok(mail, tekst)}\n\nSortering door de chief of staff: actie={sortering.actie}, "
+            f"{stijl}{mail_blok(mail, tekst)}\n\nSortering door de chief of staff: actie={sortering.actie}, "
             f"prioriteit={sortering.prioriteit}, deadline={sortering.deadline}. Samenvatting: {sortering.samenvatting}"
         )
         data = self._vraag(system, gebruiker, SCHEMA_UITWERKING, self.cfg.uitwerken_effort)
