@@ -305,6 +305,11 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                         return self._json({"ok": False, "melding": "Onbekend project"})
                     store.zet_project(int(v["id"]), v["project"])
                     melding = f"Verplaatst naar {v['project']}"
+                elif actie == "mail":
+                    it = store.item(int(v["id"]))
+                    if it is None:
+                        return self._json({"ok": False, "melding": "Mail niet gevonden"})
+                    return self._json({"ok": True, "mail": item_dict(it, True)})
                 elif actie == "mappen":
                     it = store.item(int(v["id"]))
                     if it is None:

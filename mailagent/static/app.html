@@ -381,6 +381,12 @@ textarea#concept::placeholder,#a-tekst::placeholder{color:#8a929b}
 .afsluiten .r .titel{flex:1;min-width:0;font-weight:500}
 .afsluiten{max-width:760px}
 
+/* lezen in Opruimen: licht vlak, zoals het schrijfvak */
+.leesvlak{white-space:pre-wrap;background:#fdfdfc;color:#151b21;border:1px solid #dde1dc;border-radius:var(--r1);padding:16px 18px;font-size:15px;line-height:1.6;max-width:72ch;color-scheme:light}
+.rij.leest{background:var(--accent-zacht);box-shadow:inset 3px 0 0 var(--accent)}
+@media (min-width:1100px){ .app.drie .lijst .rij.leest{background:var(--vlak);box-shadow:inset 3px 0 0 var(--accent),var(--schaduw)}
+  .app.drie .rij.leest .snel{display:none} }
+
 /* sneltoetsen-overzicht */
 .overlay{position:fixed;inset:0;background:rgba(10,14,18,.35);display:grid;place-items:center;z-index:50;animation:inkomen var(--snel) ease}
 .overlay .vel{background:var(--vlak);border-radius:16px;box-shadow:var(--schaduw-hoog);padding:22px 24px;width:min(520px,calc(100vw - 32px))}
@@ -464,12 +470,14 @@ const pletter = p => (p in PLETTER) ? PLETTER[p] : (p || "?")[0].toUpperCase();
 const avatar = (it, klein) => { const a = afzender(it.van);
   return `<div class="avatar${klein?" klein":""}" style="background:${kleur(it.project)}" title="${esc(naamProject(it.project || "overig"))}">${esc(initialen(a.naam))}${pletter(it.project) ? `<span class="pl">${esc(pletter(it.project))}</span>` : ""}</div>`; };
 
-let D = null, staat = {project:"alles", tab:"te_doen", open:null, gekozen:new Set(), geenAuto:false, planDag:null};
+let D = null, staat = {project:"alles", tab:"te_doen", open:null, lees:null, gekozen:new Set(), geenAuto:false, planDag:null};
+const leesCache = {};   // id -> volledige mail (met tekst) voor Opruimen
 try { const o = JSON.parse(localStorage.getItem("mailagent-ui")||"{}"); Object.assign(staat, {project:o.project||"alles", tab:o.tab||"te_doen"}); } catch(e){}
 if (!["te_doen","planning","opruimen"].includes(staat.tab)) staat.tab = "te_doen";
 const breed = () => window.matchMedia("(min-width:1100px)").matches;
 const drieKolommen = () => breed() && staat.tab !== "planning";
 const teDoen = () => filter([...D.zelf, ...D.wacht]);
+const opruimLijst = () => [...filter(D.info), ...filter(D.overgeslagen)];
 const bewaar = () => { try { localStorage.setItem("mailagent-ui", JSON.stringify({project:staat.project, tab:staat.tab})); } catch(e){} };
 // Items waarvoor een actie onderweg is: meteen van het scherm, terug als de actie mislukt.
 const verborgen = new Set(), takenVerborgen = new Set();
@@ -596,6 +604,13 @@ function teken(){
 
   // derde kolom / paneel
   if (taak || antwoord) return;
+  if (staat.tab === "opruimen"){
+    const lijst = opruimLijst();
+    if (staat.lees !== null && !lijst.some(i => i.id === staat.lees)) staat.lees = null;
+    if (staat.lees === null && drieKolommen() && lijst.length && !staat.geenAuto) staat.lees = lijst[0].id;
+    if (staat.lees !== null) return tekenLees(staat.lees);
+    return drieKolommen() ? tekenLeegPaneel() : sluitPaneel();
+  }
   if (staat.open !== null){
     const it = [...D.zelf, ...D.wacht].find(i => i.id === staat.open);
     if (it) return tekenPaneel(it);
@@ -619,13 +634,50 @@ function tekenVoortgang(){
   return `<div class="voortgang${rest ? "" : " klaar"}"><div class="voortgang-tekst">${tekst}</div><div class="voortgang-balk"><i style="width:${rest ? pct : 100}%"></i></div></div>`;
 }
 
+async function openLees(id){
+  staat.lees = id; staat.geenAuto = false; taak = null; antwoord = null; teken();
+  document.querySelector(`.rij[data-kies="${id}"]`)?.scrollIntoView({block:"nearest"});
+}
+
+function tekenLees(id){
+  const p = document.getElementById("paneel"), basis = opruimLijst().find(i => i.id === id);
+  if (!basis) return;
+  const m = leesCache[id], a = afzender(basis.van), gw = gewoonte(basis);
+  if (!m){
+    stil("mail", {id}).then(j => { if (j.ok){ leesCache[id] = j.mail; if (staat.lees === id) tekenLees(id); } });
+  }
+  const zelfde = p.dataset.lees === String(id);
+  p.dataset.id = ""; p.dataset.lees = id;
+  p.innerHTML = `
+    <div class="p-kop">${avatar(basis)}
+      <div style="min-width:0"><h2>${esc(basis.onderwerp)}</h2><div class="van">${esc(a.naam)} · ${esc(a.adres)} · ${datum(basis.datum)}</div>
+        <div class="chips"><span class="chip">${ik(basis.status === "genegeerd" ? "ban" : "eye")}${basis.status === "genegeerd" ? "Overgeslagen" : "Ter info"}</span>
+          ${gw ? `<span class="chip">${esc(gw.tekst)}</span>` : ""}</div></div>
+      <button class="ikoon sluit-mail" id="sluit" title="Sluiten (Esc)">${ik("x")}</button></div>
+    <div class="p-inhoud"${zelfde ? ' style="animation:none"' : ""}>
+      ${basis.samenvatting && basis.samenvatting !== basis.onderwerp ? `<div class="melding info">${ik("sparkle")}<div>${esc(basis.samenvatting)}</div></div>` : ""}
+      ${m && m.reden && basis.status === "genegeerd" ? `<div class="meta">${esc(m.reden)}</div>` : ""}
+      <div class="leesvlak">${m ? esc(m.tekst || "(geen tekst)") : `<span class="meta">Mail laden…</span>`}</div>
+    </div>
+    <div class="p-voet">
+      <button class="knop" data-maaktaak="${id}" title="Taak maken (T)">${ik("calendar")}Taak<kbd>T</kbd></button>
+      <button class="knop" data-opbergen="${id}" title="Opbergen in een map (V)">${ik("folder")}Opbergen<kbd>V</kbd></button>
+      <button class="knop" data-een="overslaan" data-id="${id}" title="Afzender voortaan overslaan">${ik("ban")}</button>
+      <span style="flex:1"></span>
+      <button class="knop" data-een="prullenbak" data-id="${id}" title="Naar prullenbak (#)">${ik("trash")}<kbd>#</kbd></button>
+      <button class="knop goed" data-een="archief" data-id="${id}" title="Archiveren (E)">${ik("archive")}Archiveren<kbd>E</kbd></button>
+    </div>`;
+  p.classList.add("open"); p.setAttribute("aria-hidden","false");
+  if (!drieKolommen()) document.getElementById("dek").classList.add("open");
+}
+
 function tekenLeegPaneel(){
   const p = document.getElementById("paneel");
   p.dataset.id = "";
   const klaar = staat.tab === "te_doen" && !teDoen().length;
   p.innerHTML = `<div class="leegpaneel">
       ${klaar ? `<div class="rond">${ik("check")}</div><b style="color:var(--tekst)">Alles bijgewerkt</b>Er wacht niets op je.` :
-        staat.tab === "opruimen" ? `${ik("sparkle")}<b style="color:var(--tekst)">Opruimen</b><p>Berg op in een map, archiveer, gooi weg of maak een taak. Beweeg over een mail voor de knoppen.</p>` :
+        staat.tab === "opruimen" ? `${ik("sparkle")}<b style="color:var(--tekst)">Opruimen</b><p>Klik op een mail om hem te lezen. Vink mails aan om er meerdere tegelijk af te handelen.</p>` :
         `${ik("mail")}<b style="color:var(--tekst)">Kies een mail</b>`}
       <div class="sneltoetsen"><span><kbd>J</kbd> <kbd>K</kbd> volgende, vorige</span><span><kbd>⌘</kbd><kbd>↵</kbd> goedkeuren</span>
         <span><kbd>V</kbd> opbergen</span><span><kbd>E</kbd> archiveren</span><span><kbd>#</kbd> prullenbak</span><span><kbd>T</kbd> taak</span><span><kbd>X</kbd> afwijzen</span>
@@ -756,7 +808,7 @@ function opruimGroep(titel, items, hoofd){
     : `<button class="knop klein" data-groep="prullenbak" data-ids="${ids}">${ik("trash")}Alles naar prullenbak</button>`;
   return `<div class="groep"><div class="groep-kop"><h2>${titel} · ${items.length}</h2><div class="acties">${groot}</div></div>
     <div class="lijst">${items.map(it => { const a = afzender(it.van), gw = gewoonte(it);
-      return `<div class="rij${staat.gekozen.has(it.id)?" gekozen":""}" data-kies="${it.id}">
+      return `<div class="rij${staat.gekozen.has(it.id)?" gekozen":""}${staat.lees===it.id?" leest":""}" data-kies="${it.id}" tabindex="0">
         <input type="checkbox" class="vink" data-vink="${it.id}" ${staat.gekozen.has(it.id)?"checked":""} aria-label="Selecteren">
         ${avatar(it, true)}
         <div class="midden">
@@ -1036,6 +1088,7 @@ function openPaneel(id){ staat.open = id; staat.geenAuto = false; taak = null; a
   document.querySelector(`.rij[data-open="${id}"]`)?.scrollIntoView({block:"nearest"}); }
 function sluitPaneel(){
   staat.open = null; taak = null; antwoord = null;
+  if (staat.tab === "opruimen") staat.lees = null;
   document.querySelectorAll(".rij.gekozen[data-open]").forEach(r => r.classList.remove("gekozen"));
   document.getElementById("dek").classList.remove("open");
   if (drieKolommen() && D){ return tekenLeegPaneel(); }
@@ -1047,6 +1100,11 @@ function verplaats(ids, doel){
   if (!ids.length) return;
   ids.forEach(i => staat.gekozen.delete(i));
   if (staat.tab === "te_doen" && ids.includes(staat.open)){ const v = volgendeNa(staat.open); staat.open = v; staat.geenAuto = v === null; }
+  if (staat.tab === "opruimen" && ids.includes(staat.lees)){
+    const l = opruimLijst().map(i => i.id), k = l.indexOf(staat.lees);
+    const v = l.slice(k + 1).find(i => !ids.includes(i)) ?? l.slice(0, k).reverse().find(i => !ids.includes(i)) ?? null;
+    staat.lees = v; staat.geenAuto = v === null;
+  }
   if (doel === "overslaan") return actie("verplaats", {ids, doel}).then(laad);
   return verplaatsMetUndo(ids, doel);
 }
@@ -1103,11 +1161,12 @@ document.addEventListener("click", async ev => {
   if (d.bulk){ if (d.bulk === "leeg"){ staat.gekozen.clear(); return teken(); } return verplaats([...staat.gekozen], d.bulk); }
   if (d.overslaanalle){ const j = await stil("regels-toevoegen", {adressen: d.overslaanalle.split(",")}); toast(j.melding, !j.ok); return laad(); }
   if (d.regelweg){ return actie("regel-weg", {adres:d.regelweg}).then(laad); }
-  if (d.vink || d.kies){
-    const id = Number(d.vink || d.kies);
+  if (d.vink){
+    const id = Number(d.vink);
     staat.gekozen.has(id) ? staat.gekozen.delete(id) : staat.gekozen.add(id);
     return teken();
   }
+  if (d.kies){ return openLees(Number(d.kies)); }
   if (t.id === "sluit") return sluitPaneel();
   if (t.id === "ophalen"){ D.ophalen.bezig = true; teken(); return actie("ophalen").then(laad); }
   if (t.id === "goedkeuren" || t.id === "afwijzen"){
@@ -1204,6 +1263,19 @@ document.addEventListener("keydown", ev => {
   if (ev.key === "Escape" && document.querySelector(".overlay")) return document.querySelector(".overlay").remove();
   if (ev.key === "Escape"){ if (inVeld) return ev.target.blur(); if (plaatsing){ plaatsing = null; return teken(); } return (staat.geenAuto = true, sluitPaneel()); }
   if (ev.key === "Enter" && ev.target.dataset && ev.target.dataset.open) return openPaneel(Number(ev.target.dataset.open));
+  if (ev.key === "Enter" && ev.target.dataset && ev.target.dataset.kies) return openLees(Number(ev.target.dataset.kies));
+  if (staat.tab === "opruimen" && !taak && !antwoord && !inVeld && !ev.metaKey && !ev.ctrlKey && !ev.altKey){
+    const lijst = opruimLijst().map(i => i.id), i = lijst.indexOf(staat.lees), id = staat.lees;
+    if (ev.key === "j" || ev.key === "ArrowDown"){ ev.preventDefault(); if (lijst.length) openLees(lijst[Math.min(lijst.length-1, i+1)]); return; }
+    if (ev.key === "k" || ev.key === "ArrowUp"){ ev.preventDefault(); if (lijst.length) openLees(lijst[Math.max(0, i-1)]); return; }
+    if (id === null) return;
+    if (ev.key === "e") return verplaats([id], "archief");
+    if (ev.key === "v"){ ev.preventDefault(); return openKiezer(id, document.querySelector('#paneel [data-opbergen]')); }
+    if (ev.key === "#" || ev.key === "Delete" || ev.key === "Backspace"){ ev.preventDefault(); return verplaats([id], "prullenbak"); }
+    if (ev.key === "t") return openTaak(id);
+    if (ev.key === " "){ ev.preventDefault(); staat.gekozen.has(id) ? staat.gekozen.delete(id) : staat.gekozen.add(id); return teken(); }
+    return;
+  }
   if (staat.tab !== "te_doen" || taak || antwoord) return;
   const id = staat.open;
   if ((ev.metaKey || ev.ctrlKey) && ev.key === "Enter" && id !== null){ ev.preventDefault(); return document.getElementById("goedkeuren")?.click(); }
