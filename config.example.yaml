@@ -40,6 +40,10 @@ bronnen:
 terugkijken_dagen: 14
 max_mails_per_run: 30
 
+# Nieuwsbrieven en reclame (mail met een afmeldlink of de markering 'bulk') niet naar Claude
+# sturen, maar meteen bij Overgeslagen zetten. Afzenders met een eigen regel gaan wel door.
+nieuwsbrieven_overslaan: true
+
 # Claude-instellingen. effort: low | medium | high
 #   backend: claude-code  gebruikt Claude Code op je Mac met je gewone Claude-login (geen API-sleutel)
 #   backend: api          gebruikt de Claude API met een sleutel uit de macOS-sleutelhanger

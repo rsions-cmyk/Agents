@@ -380,3 +380,22 @@ def test_vlag_bij_taak(omgeving):
     # zonder vlag-instelling geen markering
     maak_taak(store, bronnen, None, info["id"], "Nog eens", [], 15, None, None, False, vlag=None)
     assert bron.vlaggen == {}
+
+
+def test_nieuwsbrief_niet_naar_claude(omgeving):
+    cfg, store, bronnen = omgeving
+    pad = bronnen["test"].pad
+    (pad / "08-reclame.eml").write_text(
+        "From: Mantel <nieuws@email.mantel.example>\nTo: prive@example.nl\nSubject: Black Friday Sale\n"
+        "Date: Fri, 20 Nov 2026 06:30:00 +0100\nMessage-ID: <a8@mantel.example>\n"
+        "List-Unsubscribe: <https://mantel.example/afmelden>\n\n50% korting.\n")
+    (pad / "09-istte-nieuws.eml").write_text(
+        "From: ISTTE <news@istte.org>\nTo: x@buas.nl\nSubject: ISTTE newsletter\n"
+        "Date: Fri, 20 Nov 2026 06:40:00 +0100\nMessage-ID: <a9@istte.org>\n"
+        "List-Unsubscribe: <https://istte.org/afmelden>\n\nConference news.\n")
+    llm = NepLLM()
+    run(cfg, store, bronnen, llm)
+    items = {r["onderwerp"]: r for r in store.items()}
+    assert items["Black Friday Sale"]["status"] == "genegeerd"
+    assert not any("korting" in t for t in llm.gezien)                 # niet naar Claude
+    assert items["ISTTE newsletter"]["status"] == "wacht"              # eigen regel: wel door

@@ -31,6 +31,7 @@ class Config:
     uitwerken_effort: str = "medium"
     eerste_run_dagen_terug: int = 2
     terugkijken_dagen: int = 14
+    bulk_overslaan: bool = True
     max_mails_per_run: int = 60
     agenda: dict = field(default_factory=dict)
     vlag_aan: bool = True
@@ -87,6 +88,7 @@ def laad(pad: str | Path = "config.yaml") -> Config:
         uitwerken_effort=claude.get("uitwerken_effort", "medium"),
         eerste_run_dagen_terug=int(ruw.get("eerste_run_dagen_terug", 2)),
         terugkijken_dagen=int(ruw.get("terugkijken_dagen", 14)),
+        bulk_overslaan=bool(ruw.get("nieuwsbrieven_overslaan", True)),
         max_mails_per_run=int(ruw.get("max_mails_per_run", 60)),
         agenda=ruw.get("agenda") or {},
         vlag_aan=bool((ruw.get("markeren") or {}).get("aan", True)),

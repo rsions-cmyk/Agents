@@ -32,6 +32,11 @@ def verwerk_mail(cfg: Config, store: Store, llm: LLM, mail: Email) -> int:
                       deadline=None, samenvatting=mail.onderwerp, reden="staat op de lijst 'nooit naar Claude'")
         return store.nieuw_item(mail, s, None, "handmatig")
 
+    if cfg.bulk_overslaan and mail.extra.get("bulk") and vast_project is None and sortering is None:
+        s = Sortering(project="overig", actie="negeren", prioriteit="laag", deadline=None,
+                      samenvatting=mail.onderwerp, reden="nieuwsbrief of reclame (afmeldlink); niet naar Claude")
+        return store.nieuw_item(mail, s, None, "genegeerd")
+
     tekst = anonimiseer(cfg, mail.tekst)
     try:
         if sortering is None:

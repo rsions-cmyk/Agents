@@ -37,7 +37,9 @@ class MapBron:
                 tekst = re.sub(r"<[^>]+>", " ", tekst)
             mails.append(Email(bron=self.naam, bron_id=f.name, van=str(msg["From"] or ""),
                                aan=str(msg["To"] or ""), onderwerp=str(msg["Subject"] or ""),
-                               datum=datum, tekst=tekst.strip(), thread_id=msg["Message-ID"]))
+                               datum=datum, tekst=tekst.strip(), thread_id=msg["Message-ID"],
+                               extra={"bulk": bool(msg["List-Unsubscribe"])
+                                      or str(msg["Precedence"] or "").lower() in ("bulk", "list")}))
         mails.sort(key=lambda m: m.datum)
         self.laatste_totaal = len(mails)
         return mails[:maximum]

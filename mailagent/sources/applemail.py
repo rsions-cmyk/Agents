@@ -66,7 +66,15 @@ on run argv
                     end repeat
                 end try
                 set geleden to ((current date) - (date received of m)) as integer
-                set uitvoer to uitvoer & (mid as string) & US & (message id of m) & US & (sender of m) & US & ontvangers & US & (subject of m) & US & (geleden as string) & US & (content of m) & RS
+                set bulk to "0"
+                try
+                    if (count of (headers of m whose name is "List-Unsubscribe")) > 0 then set bulk to "1"
+                end try
+                try
+                    set prec to content of (first header of m whose name is "Precedence")
+                    if prec contains "bulk" or prec contains "list" then set bulk to "1"
+                end try
+                set uitvoer to uitvoer & (mid as string) & US & (message id of m) & US & (sender of m) & US & ontvangers & US & (subject of m) & US & (geleden as string) & US & bulk & US & (content of m) & RS
             end if
         end repeat
     end tell
@@ -261,12 +269,12 @@ class AppleMailBron:
         mails = []
         for rec in uit.split(RS):
             velden = rec.split(US)
-            if len(velden) < 7:
+            if len(velden) < 8:
                 continue
-            mid, message_id, van, aan, onderwerp, geleden, inhoud = velden[:6] + [US.join(velden[6:])]
+            mid, message_id, van, aan, onderwerp, geleden, bulk, inhoud = velden[:7] + [US.join(velden[7:])]
             mails.append(Email(bron=self.naam, bron_id=mid.strip(), van=van, aan=aan.rstrip(", "),
                                onderwerp=onderwerp, datum=nu - timedelta(seconds=int(geleden or 0)),
-                               tekst=inhoud.strip(), thread_id=message_id))
+                               tekst=inhoud.strip(), thread_id=message_id, extra={"bulk": bulk == "1"}))
         return sorted(mails, key=lambda m: m.datum)
 
     def maak_concept(self, bron_id: str, tekst: str, onderwerp: str, aan: str, message_id: str | None = None) -> str:
