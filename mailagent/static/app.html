@@ -183,6 +183,13 @@ details.origineel pre{white-space:pre-wrap;font:13px/1.5 -apple-system,sans-seri
 .gewoonte{font-size:12px;color:var(--zacht);white-space:nowrap}
 .voorstel{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px;margin-bottom:16px;border-radius:12px;background:var(--accent-zacht)}
 .voorstel .namen{flex:1;min-width:200px}
+.takenlijst .tk-rij{display:flex;gap:6px;align-items:center;padding:0;background:none}
+.takenlijst .tk-erbij{padding:0;background:none}
+.takenlijst .tk-rij svg{color:var(--zacht)}
+.takenlijst .tk-rij .ikoon:hover svg{color:var(--hoog)}
+.tk-rij input{font:inherit;padding:7px 10px;border:1px solid var(--lijn);border-radius:9px;background:var(--vlak2);color:var(--tekst);min-width:0}
+.tk-rij input[type=text]{flex:1}
+.tk-rij input[type=date]{width:150px}
 .stappen-klein{margin:4px 0 0;padding-left:18px;color:var(--zacht);font-size:13px}
 .regels summary{cursor:pointer;color:var(--zacht);font-size:13px;padding:4px}
 
@@ -548,8 +555,12 @@ function tekenPaneel(it){
       ${it.vragen ? `<div class="melding">${ik("alert")}<div><b>Beslissing voor jou</b><br>${esc(it.vragen)}</div></div>` : ""}
       <div><div class="label">${ik("reply")}Concept-antwoord</div>
         <textarea id="concept" placeholder="Geen concept. Typ hier zelf een antwoord, of laat leeg.">${esc(concept)}</textarea></div>
-      ${it.taken.length ? `<div><div class="label">${ik("task")}Taken bij goedkeuren</div><div class="takenlijst">${it.taken.map(t =>
-          `<div>${ik("check")}<span>${esc(t.omschrijving)}</span>${t.deadline?`<span class="chip" style="margin-left:auto">${esc(t.deadline)}</span>`:""}</div>`).join("")}</div></div>` : ""}
+      <div><div class="label">${ik("task")}Taken bij goedkeuren</div>
+        <div class="takenlijst" style="gap:6px">${bewerkTaken(it).map((t, i) => `
+          <div class="tk-rij"><input type="text" data-tk="${i}" data-veld="omschrijving" value="${esc(t.omschrijving)}" placeholder="Wat moet er gebeuren?">
+            <input type="date" data-tk="${i}" data-veld="deadline" value="${esc(t.deadline || "")}" aria-label="Deadline">
+            <button class="ikoon rood" data-tkweg="${i}" title="Taak weghalen">${ik("x")}</button></div>`).join("")}
+          <div class="tk-erbij"><button class="knop klein" data-tkerbij="1">+ Taak toevoegen</button></div></div></div>
       ${it.agenda ? `<div class="melding info">${ik("calendar")}<div><b>Agendavoorstel</b><br>${esc(it.agenda)}</div></div>` : ""}
       <details class="origineel"><summary>${ik("mail")}Oorspronkelijke mail</summary><pre>${esc(it.tekst)}</pre></details>
     </div>
@@ -734,6 +745,18 @@ async function bevestigTaak(){
   laad();
 }
 
+// taken bij goedkeuren: bewerkbare kopie per mail, blijft bewaard als de lijst ververst
+const bewerkt = {};
+function bewerkTaken(it){
+  if (!bewerkt[it.id]) bewerkt[it.id] = it.taken.map(t => ({omschrijving: t.omschrijving, deadline: t.deadline || ""}));
+  return bewerkt[it.id];
+}
+document.addEventListener("input", ev => {
+  const d = ev.target.dataset;
+  if (d.tk === undefined || staat.open === null) return;
+  bewerkt[staat.open][Number(d.tk)][d.veld] = ev.target.value;
+});
+
 function openPaneel(id){ staat.open = id; teken(); }
 function sluitPaneel(){
   staat.open = null; taak = null; antwoord = null;
@@ -754,6 +777,12 @@ document.addEventListener("click", async ev => {
   const t = ev.target.closest("button, .rij, input");
   if (!t) return;
   const d = t.dataset;
+  if (d.tkweg !== undefined && staat.open !== null){ bewerkt[staat.open].splice(Number(d.tkweg), 1); return teken(); }
+  if (d.tkerbij && staat.open !== null){
+    bewerkt[staat.open].push({omschrijving: "", deadline: ""}); teken();
+    const velden = document.querySelectorAll('#paneel input[data-veld="omschrijving"]');
+    return velden[velden.length - 1]?.focus();
+  }
   if (d.maaktaak){ ev.stopPropagation(); return openTaak(Number(d.maaktaak)); }
   if (taak && d.duur){ taak.minuten = Number(d.duur); return tekenTaak(); }
   if (taak && d.moment !== undefined){
@@ -794,7 +823,8 @@ document.addEventListener("click", async ev => {
   if (t.id === "goedkeuren" || t.id === "afwijzen"){
     const id = Number(document.getElementById("paneel").dataset.id);
     const goed = t.id === "goedkeuren";
-    const data = goed ? {id, concept: document.getElementById("concept").value} : {id};
+    const data = goed ? {id, concept: document.getElementById("concept").value,
+                         taken: (bewerkt[id] || null)} : {id};
     sluitPaneel();
     if (goed && data.concept.trim()) toast("Concept gaat naar Apple Mail…");
     const ok = await meteen([id], goed ? "goedkeuren" : "afwijzen", data);

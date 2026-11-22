@@ -446,3 +446,17 @@ def test_stijlvoorbeelden_en_afzendergedrag(omgeving):
     assert afzender_voorstellen(store)["gedrag"]["promo@winkel.example"]["prullenbak"] == 2
     verplaats_items(store, bronnen, promo[2:], "prullenbak")
     assert afzender_voorstellen(store)["voorstellen"][0]["adres"] == "promo@winkel.example"
+
+
+def test_taken_aanpassen_bij_goedkeuren(omgeving):
+    from mailagent.pipeline import keur_goed
+
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    a, b = [r["id"] for r in store.items(status="wacht")][:2]
+    keur_goed(store, bronnen, a, "", taken=[{"omschrijving": "Eigen taak", "deadline": "2026-12-01"},
+                                           {"omschrijving": "   ", "deadline": ""}])
+    taken = store.open_taken()
+    assert [(t["omschrijving"], t["deadline"]) for t in taken] == [("Eigen taak", "2026-12-01")]
+    keur_goed(store, bronnen, b, "", taken=[])                  # alles weggehaald: geen taken
+    assert len(store.open_taken()) == 1

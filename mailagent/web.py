@@ -186,7 +186,7 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
             try:
                 if actie == "goedkeuren":
                     with mail_slot:
-                        melding = keur_goed(store, bronnen, int(v["id"]), v.get("concept"))
+                        melding = keur_goed(store, bronnen, int(v["id"]), v.get("concept"), v.get("taken"))
                 elif actie == "afwijzen":
                     wijs_af(store, int(v["id"]))
                     melding = "Afgewezen"

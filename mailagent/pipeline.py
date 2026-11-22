@@ -222,7 +222,8 @@ def run(cfg: Config, store: Store, bronnen: dict, llm: LLM, dagen: int | None = 
     return resultaat
 
 
-def keur_goed(store: Store, bronnen: dict, item_id: int, concept: str | None) -> str:
+def keur_goed(store: Store, bronnen: dict, item_id: int, concept: str | None,
+              taken: list[dict] | None = None) -> str:
     """Goedkeuren: concept klaarzetten in de mailbox (niet versturen) en taken opslaan."""
     item = store.item(item_id)
     if item is None:
@@ -238,7 +239,10 @@ def keur_goed(store: Store, bronnen: dict, item_id: int, concept: str | None) ->
             raise ValueError(f"Bron '{item['bron']}' staat niet meer in de configuratie")
         meldingen.append(bron.maak_concept(item["bron_id"], concept, item["onderwerp"], item["van"],
                                            message_id=item["thread_id"]))
-    taken = json.loads(item["taken"] or "[]")
+    if taken is None:   # niet aangepast: de taken zoals Claude ze voorstelde
+        taken = json.loads(item["taken"] or "[]")
+    taken = [{"omschrijving": t["omschrijving"].strip(), "deadline": (t.get("deadline") or None)}
+             for t in taken if (t.get("omschrijving") or "").strip()]
     if taken:
         store.voeg_taken_toe(item_id, item["project"], taken)
         meldingen.append(f"{len(taken)} taak/taken toegevoegd")
