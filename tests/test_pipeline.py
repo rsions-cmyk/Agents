@@ -68,7 +68,7 @@ def omgeving(tmp_path):
     eind = cfg_tekst.index("  # - type: outlook")
     cfg_tekst = cfg_tekst[:begin] + cfg_tekst[eind:]
     cfg_tekst = cfg_tekst.replace('    # - "@mijnbank.nl"', '    - "@mijnbank.example"')
-    cfg_tekst = cfg_tekst.replace("eerste_run_dagen_terug: 2", "eerste_run_dagen_terug: 100000")
+    cfg_tekst = cfg_tekst.replace("terugkijken_dagen: 14", "terugkijken_dagen: 100000")
     (tmp_path / "config.yaml").write_text(cfg_tekst)
     cfg = config_mod.laad(tmp_path / "config.yaml")
     return cfg, Store(cfg.db_pad), maak_bronnen(cfg)
@@ -317,7 +317,8 @@ def test_taak_maken_en_inplannen(omgeving):
         maak_taak(store, bronnen, None, wacht["id"], "x", [], 30, None, start, False)
     # zonder moment wel; een wachtend item blijft wachten
     maak_taak(store, bronnen, None, wacht["id"], "Reageren", [], 30, None, None, False)
-    assert store.item(wacht["id"])["status"] == "wacht"
+    assert store.item(wacht["id"])["status"] == "taak"           # weg uit Beoordelen
+    assert store.item(wacht["id"])["concept"]                    # concept bewaard voor Beantwoorden
 
 
 def test_taak_terugzetten_en_antwoord_vanuit_taak(omgeving):

@@ -130,9 +130,9 @@ def maak_taak(store: Store, bronnen: dict, agenda, item_id: int, titel: str, sta
         meldingen.append(fout or "gemarkeerd als ingepland in Mail")
     if archiveren and item["status"] in ("ter_info", "genegeerd"):
         meldingen.append(verplaats_items(store, bronnen, [item_id], "archief"))
-    elif item["status"] in ("ter_info", "genegeerd"):
+    elif item["status"] in ("ter_info", "genegeerd", "wacht", "fout", "handmatig"):
+        # weg uit Beoordelen en Opruimen; het concept-antwoord blijft bewaard en staat klaar bij Beantwoorden
         store.zet_status(item_id, "taak", opmerking="omgezet in taak; mail blijft in de inbox")
-    # een item dat op beoordeling wacht, blijft staan: het concept-antwoord kan nog nodig zijn
     return "; ".join(meldingen)
 
 
@@ -151,21 +151,18 @@ def open_antwoord(store: Store, bronnen: dict, item_id: int, tekst: str) -> str:
 
 
 def run(cfg: Config, store: Store, bronnen: dict, llm: LLM, dagen: int | None = None,
-        maximum: int | None = None) -> dict[str, int]:
-    """Haalt per bron nieuwe mail op en verwerkt die, oudste eerst. Geeft per bron het aantal nieuwe items.
+        maximum: int | None = None, voortgang: dict | None = None) -> dict[str, int]:
+    """Verwerkt per bron de mail van de afgelopen `terugkijken_dagen` die nog niet verwerkt is, oudste eerst.
 
-    Met `dagen` kijkt deze ronde zoveel dagen terug, ook als die mail eerder is overgeslagen.
+    Elke ronde neemt hoogstens `maximum` mails per bron; de volgende ronde gaat verder.
     Al verwerkte mail wordt herkend en niet opnieuw naar Claude gestuurd.
+    `voortgang` krijgt per bron het aantal mails dat daarna nog te gaan is.
     """
     resultaat: dict[str, int] = {}
     maximum = maximum or cfg.max_mails_per_run
     nu = datetime.now().astimezone()
+    sinds = nu - timedelta(days=dagen or cfg.terugkijken_dagen)
     for naam, bron in bronnen.items():
-        laatst = store.laatst_opgehaald(naam)
-        if dagen:
-            sinds = nu - timedelta(days=dagen)
-        else:
-            sinds = laatst or (nu - timedelta(days=cfg.eerste_run_dagen_terug))
         try:
             mails = bron.haal_op(sinds, maximum, overslaan=lambda bid, n=naam: store.is_bekend_sleutel(f"{n}:{bid}"))
         except Exception as e:  # een kapotte bron mag de andere niet tegenhouden
@@ -176,8 +173,7 @@ def run(cfg: Config, store: Store, bronnen: dict, llm: LLM, dagen: int | None = 
 
         totaal = getattr(bron, "laatste_totaal", len(mails))
         te_doen = [m for m in sorted(mails, key=lambda m: m.datum) if not store.is_bekend(m)]
-        log.info("%s: %d mail(s) sinds %s, deze ronde %d opgehaald, %d nieuw te verwerken",
-                 naam, totaal, f"{sinds:%d-%m %H:%M}", len(mails), len(te_doen))
+        log.info("%s: %d onverwerkte mail(s) sinds %s, deze ronde %d", naam, totaal, f"{sinds:%d-%m}", len(te_doen))
         nieuw = 0
         for i, mail in enumerate(te_doen, 1):
             log.info("%s %d/%d: %s", naam, i, len(te_doen), mail.onderwerp[:70])
@@ -186,16 +182,13 @@ def run(cfg: Config, store: Store, bronnen: dict, llm: LLM, dagen: int | None = 
             log.info("   -> %s, %s (%s)", item["project"], item["actie"], item["status"])
             nieuw += 1
         if mails:
-            nieuwste = max(m.datum for m in mails)
-            # nooit terug in de tijd: een inhaalronde verplaatst het ophaalpunt niet naar achteren
-            if laatst is None or nieuwste > laatst:
-                if not dagen or len(mails) >= totaal:
-                    store.zet_laatst_opgehaald(naam, nieuwste)
-        elif laatst is None:
-            store.zet_laatst_opgehaald(naam, nu)
-        if totaal > len(mails):
-            log.info("%s: nog %d mail(s) te gaan; draai opnieuw om verder te gaan", naam, totaal - len(mails))
-        store.log(None, f"run {naam}: {len(mails)} van {totaal} opgehaald, {nieuw} nieuw")
+            store.zet_laatst_opgehaald(naam, max(m.datum for m in mails))
+        rest = max(0, totaal - len(mails))
+        if voortgang is not None:
+            voortgang[naam] = rest
+        if rest:
+            log.info("%s: nog %d mail(s) te gaan; de volgende ronde gaat verder", naam, rest)
+        store.log(None, f"run {naam}: {len(mails)} van {totaal} verwerkt, nog {rest}")
         resultaat[naam] = nieuw
     return resultaat
 

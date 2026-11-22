@@ -30,6 +30,7 @@ class Config:
     sorteren_effort: str = "low"
     uitwerken_effort: str = "medium"
     eerste_run_dagen_terug: int = 2
+    terugkijken_dagen: int = 14
     max_mails_per_run: int = 60
     agenda: dict = field(default_factory=dict)
     vlag_aan: bool = True
@@ -85,6 +86,7 @@ def laad(pad: str | Path = "config.yaml") -> Config:
         sorteren_effort=claude.get("sorteren_effort", "low"),
         uitwerken_effort=claude.get("uitwerken_effort", "medium"),
         eerste_run_dagen_terug=int(ruw.get("eerste_run_dagen_terug", 2)),
+        terugkijken_dagen=int(ruw.get("terugkijken_dagen", 14)),
         max_mails_per_run=int(ruw.get("max_mails_per_run", 60)),
         agenda=ruw.get("agenda") or {},
         vlag_aan=bool((ruw.get("markeren") or {}).get("aan", True)),

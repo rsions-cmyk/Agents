@@ -15,7 +15,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("-c", "--config", default="config.yaml", help="pad naar config.yaml")
     sub = ap.add_subparsers(dest="opdracht", required=True)
     rp = sub.add_parser("run", help="nieuwe mail ophalen, sorteren en concepten voorbereiden")
-    rp.add_argument("--dagen", type=int, help="eenmalig zoveel dagen terugkijken (inhaalronde)")
+    rp.add_argument("--dagen", type=int, help="deze ronde zoveel dagen terugkijken in plaats van terugkijken_dagen")
     rp.add_argument("--max", type=int, help="maximaal aantal mails per account in deze ronde")
     rp.add_argument("--model", help="ander Claude-model voor deze ronde, bijvoorbeeld sonnet")
     sub.add_parser("inbox", help="goedkeuringspagina starten op je eigen Mac")
@@ -86,9 +86,11 @@ def main(argv: list[str] | None = None) -> int:
         from .pipeline import overzicht, run
         if args.model:
             cfg.claude_code_model = cfg.model = args.model
-        res = run(cfg, store, bronnen, maak_llm(cfg), dagen=args.dagen, maximum=args.max)
+        rest: dict = {}
+        res = run(cfg, store, bronnen, maak_llm(cfg), dagen=args.dagen, maximum=args.max, voortgang=rest)
         for naam, n in res.items():
-            print(f"{naam}: {'ophalen mislukt (zie log)' if n < 0 else f'{n} nieuwe mail(s) verwerkt'}")
+            print(f"{naam}: " + ("ophalen mislukt (zie log)" if n < 0 else f"{n} nieuwe mail(s) verwerkt"
+                                 + (f", nog {rest[naam]} te gaan" if rest.get(naam) else "")))
         (cfg.data_dir / "overzicht.md").write_text(overzicht(cfg, store), encoding="utf-8")
         return 1 if any(n < 0 for n in res.values()) else 0
 

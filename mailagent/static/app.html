@@ -202,7 +202,7 @@ details.origineel pre{white-space:pre-wrap;font:13px/1.5 -apple-system,sans-seri
     <div class="logo"><span class="blok" data-ikoon="inbox"></span>Mail-inbox</div>
     <div id="nav" style="display:contents"></div>
     <div class="onder">
-      <button class="knop-ophalen" id="ophalen"><span data-ikoon="refresh"></span><span>Nieuwe mail ophalen</span></button>
+      <button class="knop-ophalen" id="ophalen"><span data-ikoon="refresh"></span><span>Mail ophalen</span></button>
       <div class="status" id="status"></div>
     </div>
   </aside>
@@ -346,7 +346,7 @@ function teken(){
     </button>`).join("");
   const knop = document.getElementById("ophalen");
   knop.classList.toggle("bezig", D.ophalen.bezig);
-  knop.lastElementChild.textContent = D.ophalen.bezig ? "Bezig met ophalen…" : "Nieuwe mail ophalen";
+  knop.lastElementChild.textContent = D.ophalen.bezig ? "Bezig met ophalen…" : "Mail ophalen";
   document.getElementById("status").textContent = D.ophalen.bezig ? "Claude sorteert en schrijft concepten" : (D.ophalen.laatste || "");
   document.getElementById("titel").textContent = naamProject(staat.project);
 
@@ -706,7 +706,7 @@ async function bevestigTaak(){
                 minuten: v.minuten, deadline: document.getElementById("t-deadline").value || null, start: start || null,
                 archiveren: !!document.getElementById("t-archief")?.checked};
   sluitPaneel();
-  const weg = v.item.status === "ter_info" || v.item.status === "genegeerd" ? [v.id] : [];
+  const weg = [v.id];   // verdwijnt uit Beoordelen of Opruimen; de mail staat daarna bij de taak
   weg.forEach(i => verborgen.add(i)); teken();
   const ok = await actie("taak-maak", data);
   weg.forEach(i => verborgen.delete(i));

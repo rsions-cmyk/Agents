@@ -86,6 +86,9 @@ class Store:
         for kolom, soort in (("minuten", "INTEGER"), ("stappen", "TEXT"), ("gepland", "TEXT"), ("afgerond", "TEXT")):
             if kolom not in kolommen:
                 self.db.execute(f"ALTER TABLE taken ADD COLUMN {kolom} {soort}")
+        # mail met een open taak hoort niet meer in Beoordelen (oudere versies lieten hem staan)
+        self.db.execute("UPDATE items SET status='taak' WHERE status IN ('wacht','fout','handmatig') "
+                        "AND id IN (SELECT item_id FROM taken WHERE klaar=0 AND item_id IS NOT NULL)")
         self.db.commit()
 
     # --- bronnen -------------------------------------------------------------

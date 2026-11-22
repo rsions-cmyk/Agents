@@ -35,9 +35,10 @@ bronnen:
   #   naam: test
   #   pad: tests/fixtures
 
-# Hoe ver terug de eerste keer (daarna haalt hij alleen nieuwe mail op).
-eerste_run_dagen_terug: 2
-max_mails_per_run: 60
+# Elke ronde kijkt zoveel dagen terug naar mail in je inbox die nog niet verwerkt is,
+# oudste eerst, hoogstens max_mails_per_run per account. Al verwerkte mail wordt overgeslagen.
+terugkijken_dagen: 14
+max_mails_per_run: 30
 
 # Claude-instellingen. effort: low | medium | high
 #   backend: claude-code  gebruikt Claude Code op je Mac met je gewone Claude-login (geen API-sleutel)

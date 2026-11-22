@@ -116,8 +116,11 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
 
     def ophalen_op_achtergrond():
         try:
-            res = run(cfg, Store(db_pad), bronnen, llm_factory())
-            ophalen["laatste"] = ", ".join(f"{k}: {'mislukt' if v < 0 else f'{v} nieuw'}" for k, v in res.items())
+            rest: dict = {}
+            res = run(cfg, Store(db_pad), bronnen, llm_factory(), voortgang=rest)
+            ophalen["laatste"] = ", ".join(
+                f"{k}: mislukt" if v < 0 else f"{k}: {v} nieuw" + (f", nog {rest[k]} te gaan" if rest.get(k) else "")
+                for k, v in res.items())
         except Exception as ex:
             ophalen["laatste"] = f"ophalen mislukt: {ex}"
         finally:
