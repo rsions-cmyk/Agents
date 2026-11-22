@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 import json
 import secrets
+import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, quote, urlparse
 
@@ -39,6 +40,16 @@ def label(project: str) -> str:
 
 def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
     token = secrets.token_urlsafe(24)
+    ophalen = {"bezig": False, "laatste": ""}
+
+    def ophalen_op_achtergrond():
+        try:
+            res = run(cfg, Store(store.pad), bronnen, llm_factory())
+            ophalen["laatste"] = ", ".join(f"{k}: {'mislukt' if v < 0 else f'{v} nieuw'}" for k, v in res.items())
+        except Exception as ex:
+            ophalen["laatste"] = f"ophalen mislukt: {ex}"
+        finally:
+            ophalen["bezig"] = False
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):  # geen mailinhoud in de terminal
@@ -50,14 +61,20 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
             self.send_header("Content-Type", soort)
             self.send_header("Content-Length", str(len(data)))
             self.send_header("Cache-Control", "no-store")
-            self.end_headers()
-            self.wfile.write(data)
+            try:
+                self.end_headers()
+                self.wfile.write(data)
+            except (BrokenPipeError, ConnectionResetError):
+                pass  # browser was al weg; de actie zelf is wel uitgevoerd
 
         def _terug(self, project: str, melding: str = ""):
             self.send_response(303)
             loc = f"/?project={quote(project)}" + (f"&melding={quote(melding)}" if melding else "")
             self.send_header("Location", loc)
-            self.end_headers()
+            try:
+                self.end_headers()
+            except (BrokenPipeError, ConnectionResetError):
+                pass  # browser was al weg; de actie zelf is wel uitgevoerd
 
         # --- pagina's ---------------------------------------------------------
         def do_GET(self):
@@ -69,6 +86,10 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                 return self._stuur("Niet gevonden", 404)
             project = q.get("project", ["alles"])[0]
             melding = q.get("melding", [""])[0]
+            if ophalen["bezig"]:
+                melding = (melding + " · " if melding else "") + "nieuwe mail wordt opgehaald en verwerkt…"
+            elif ophalen["laatste"] and not melding:
+                melding, ophalen["laatste"] = f"laatste ophaalronde: {ophalen['laatste']}", ""
             self._stuur(self._pagina(project, melding))
 
         def _pagina(self, project: str, melding: str) -> str:
@@ -166,8 +187,12 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                     store.taak_klaar(int(velden["id"]))
                     melding = "taak afgevinkt"
                 elif pad == "/ophalen":
-                    res = run(cfg, store, bronnen, llm_factory())
-                    melding = ", ".join(f"{k}: {'mislukt' if v < 0 else f'{v} nieuw'}" for k, v in res.items())
+                    if ophalen["bezig"]:
+                        melding = "ophalen loopt al; ververs de pagina over een paar minuten"
+                    else:
+                        ophalen["bezig"] = True
+                        threading.Thread(target=ophalen_op_achtergrond, daemon=True).start()
+                        melding = "ophalen gestart; dit duurt een paar minuten, ververs daarna de pagina"
                 else:
                     return self._stuur("Niet gevonden", 404)
             except Exception as ex:

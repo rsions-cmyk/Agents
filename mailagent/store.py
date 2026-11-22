@@ -66,7 +66,8 @@ def nu() -> str:
 
 class Store:
     def __init__(self, pad: Path | str):
-        self.db = sqlite3.connect(str(pad), check_same_thread=False)
+        self.pad = str(pad)
+        self.db = sqlite3.connect(self.pad, check_same_thread=False, timeout=30)
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
 
