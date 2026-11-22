@@ -23,14 +23,19 @@ on run argv
     set US to character id 31
     set nu to current date
     set grens to nu - secondenTerug
-    set uitvoer to ""
     tell application "Mail"
         set mb to mailbox mailboxNaam of account accountNaam
-        set berichten to (messages of mb whose date received > grens)
-        repeat with m in berichten
-            set uitvoer to uitvoer & (id of m as string) & US & ((nu - (date received of m)) as integer as string) & RS
+        -- twee vragen voor alle berichten tegelijk; veel sneller dan per bericht
+        repeat 3 times
+            set ids to id of (every message of mb whose date received > grens)
+            set datums to date received of (every message of mb whose date received > grens)
+            if (count of ids) = (count of datums) then exit repeat
         end repeat
     end tell
+    set uitvoer to ""
+    repeat with i from 1 to count of ids
+        set uitvoer to uitvoer & (item i of ids as string) & US & ((nu - (item i of datums)) as integer as string) & RS
+    end repeat
     return uitvoer
 end run
 '''
@@ -39,21 +44,30 @@ SCRIPT_DETAILS = r'''
 on run argv
     set accountNaam to item 1 of argv
     set mailboxNaam to item 2 of argv
+    set secondenTerug to (item 3 of argv) as integer
+    set gezocht to {}
+    repeat with i from 4 to count of argv
+        set end of gezocht to ((item i of argv) as integer)
+    end repeat
     set RS to character id 30
     set US to character id 31
     set uitvoer to ""
     tell application "Mail"
         set mb to mailbox mailboxNaam of account accountNaam
-        repeat with i from 3 to count of argv
-            try
-                set m to first message of mb whose id is ((item i of argv) as integer)
+        -- alleen binnen de berichten van de gekozen periode zoeken, niet in de hele inbox
+        set berichten to (every message of mb whose date received > ((current date) - secondenTerug))
+        repeat with m in berichten
+            set mid to id of m
+            if gezocht contains mid then
                 set ontvangers to ""
-                repeat with r in to recipients of m
-                    set ontvangers to ontvangers & (address of r) & ", "
-                end repeat
+                try
+                    repeat with r in to recipients of m
+                        set ontvangers to ontvangers & (address of r) & ", "
+                    end repeat
+                end try
                 set geleden to ((current date) - (date received of m)) as integer
-                set uitvoer to uitvoer & (id of m as string) & US & (message id of m) & US & (sender of m) & US & ontvangers & US & (subject of m) & US & (geleden as string) & US & (content of m) & RS
-            end try
+                set uitvoer to uitvoer & (mid as string) & US & (message id of m) & US & (sender of m) & US & ontvangers & US & (subject of m) & US & (geleden as string) & US & (content of m) & RS
+            end if
         end repeat
     end tell
     return uitvoer
@@ -205,7 +219,10 @@ end run
 
 
 def _osascript(script: str, *args: str) -> str:
-    r = subprocess.run(["osascript", "-", *args], input=script, capture_output=True, text=True, timeout=180)
+    try:
+        r = subprocess.run(["osascript", "-", *args], input=script, capture_output=True, text=True, timeout=600)
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("Apple Mail reageerde 10 minuten niet. Staat er in Mail een venster of vraag open?")
     if r.returncode != 0:
         raise RuntimeError(f"AppleScript-fout: {r.stderr.strip()}")
     return r.stdout
@@ -231,13 +248,16 @@ class AppleMailBron:
 
     def haal_op(self, sinds, maximum: int, overslaan=None) -> list[Email]:
         """De oudste `maximum` nog niet verwerkte berichten sinds `sinds`."""
-        rijen = [r for r in self.lijst(sinds) if not (overslaan and overslaan(r[0]))]
+        self.laatste_rijen = self.lijst(sinds)
+        rijen = [r for r in self.laatste_rijen if not (overslaan and overslaan(r[0]))]
         self.laatste_totaal = len(rijen)
         kies = [mid for mid, _ in rijen[:maximum]]
         if not kies:
             return []
         nu = datetime.now().astimezone()
-        uit = _osascript(SCRIPT_DETAILS, self.account, self.mailbox, *kies)
+        oudste = min(d for mid, d in rijen[:maximum])
+        seconden = int((nu - oudste).total_seconds()) + 120
+        uit = _osascript(SCRIPT_DETAILS, self.account, self.mailbox, str(seconden), *kies)
         mails = []
         for rec in uit.split(RS):
             velden = rec.split(US)

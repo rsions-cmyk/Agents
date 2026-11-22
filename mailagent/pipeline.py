@@ -163,6 +163,7 @@ def run(cfg: Config, store: Store, bronnen: dict, llm: LLM, dagen: int | None = 
     nu = datetime.now().astimezone()
     sinds = nu - timedelta(days=dagen or cfg.terugkijken_dagen)
     for naam, bron in bronnen.items():
+        log.info("%s: mail van de afgelopen %d dagen doorzoeken…", naam, dagen or cfg.terugkijken_dagen)
         try:
             mails = bron.haal_op(sinds, maximum, overslaan=lambda bid, n=naam: store.is_bekend_sleutel(f"{n}:{bid}"))
         except Exception as e:  # een kapotte bron mag de andere niet tegenhouden

@@ -65,7 +65,10 @@ def main(argv: list[str] | None = None) -> int:
         from datetime import datetime, timedelta
         sinds = datetime.now().astimezone() - timedelta(hours=args.uren)
         fout = False
+        import time
         for naam, bron in bronnen.items():
+            print(f"{naam}: Apple Mail doorzoeken…", flush=True)
+            t0 = time.time()
             try:
                 mails = bron.haal_op(sinds, 10)
             except Exception as ex:
@@ -73,9 +76,11 @@ def main(argv: list[str] | None = None) -> int:
                 fout = True
                 continue
             totaal = getattr(bron, "laatste_totaal", len(mails))
-            nog = sum(1 for r in bron.lijst(sinds) if not store.is_bekend_sleutel(f"{naam}:{r[0]}")) if hasattr(bron, "lijst") else None
+            rijen = getattr(bron, "laatste_rijen", None)
+            nog = sum(1 for r in rijen if not store.is_bekend_sleutel(f"{naam}:{r[0]}")) if rijen is not None else None
             print(f"{naam}: {totaal} mail(s) in de afgelopen {args.uren} uur"
-                  + (f", waarvan {nog} nog niet verwerkt" if nog is not None else "") + " (oudste 10 getoond)")
+                  + (f", waarvan {nog} nog niet verwerkt" if nog is not None else "")
+                  + f" (oudste 10 getoond, {time.time() - t0:.0f} s)")
             for m in mails:
                 print(f"  {m.datum:%d-%m %H:%M}  {m.van[:40]:40}  {m.onderwerp[:60]}")
         return 1 if fout else 0
