@@ -126,6 +126,13 @@ end zoekMap
 '''
 
 
+def controlestuk(tekst: str) -> str:
+    """Een herkenbaar stuk van het concept (begin van de langste regel) om in het antwoord terug te vinden.
+    Niet de aanhef: 'Beste Jan,' staat ook in andere antwoorden."""
+    regels = [r.strip() for r in tekst.splitlines() if r.strip()]
+    return max(regels, key=len)[:60] if regels else ""
+
+
 SCRIPT_CONCEPT = HULP + r'''
 on run argv
     set accountNaam to item 1 of argv
@@ -173,9 +180,11 @@ on run argv
         set onderwerp to subject of m
     end tell
     delay 1
-    -- 2. Alleen plakken als het antwoordvenster echt vooraan staat
+    -- 2. Alleen plakken als het nieuwe antwoordvenster vooraan staat. Zonder onderwerp is dat niet
+    --    te controleren; dan plak je zelf.
     set fragment to onderwerp
     if (length of fragment) > 25 then set fragment to text 1 thru 25 of fragment
+    if fragment is "" then return "klembord"
     try
         tell application "System Events"
             tell process "Mail"
@@ -189,24 +198,22 @@ on run argv
     on error foutTekst
         return "geen-toegang"
     end try
-    delay 0.6
+    delay 0.8
+    -- 3. Controleren in DIT antwoord (het bericht dat reply teruggaf, niet een ander open venster)
+    --    of je tekst erin staat. Lukt dat niet, dan blijft je tekst op het klembord staan.
+    set controle to item 9 of argv
+    set gecontroleerd to false
+    try
+        tell application "Mail" to set gecontroleerd to ((content of antwoord) contains controle)
+    end try
+    if not gecontroleerd then return "niet-gecontroleerd"
     set uitkomst to "geplakt"
     if verzend then
-        -- 3. Alleen versturen als jouw tekst aantoonbaar in dit antwoord staat
         set uitkomst to "niet-verzonden"
-        set eersteRegel to first paragraph of conceptTekst
-        if (length of eersteRegel) > 40 then set eersteRegel to text 1 thru 40 of eersteRegel
-        tell application "Mail"
-            repeat with om in outgoing messages
-                try
-                    if (subject of om) contains fragment and (content of om) contains eersteRegel then
-                        send om
-                        set uitkomst to "verzonden"
-                        exit repeat
-                    end if
-                end try
-            end repeat
-        end tell
+        try
+            tell application "Mail" to send antwoord
+            set uitkomst to "verzonden"
+        end try
     end if
     if oudKlembord is not missing value then
         try
@@ -433,12 +440,17 @@ class AppleMailBron:
     def maak_concept(self, bron_id: str, tekst: str, onderwerp: str, aan: str, message_id: str | None = None,
                      verzenden: bool = False) -> str:
         hoe = _osascript(SCRIPT_CONCEPT, self.account, self.mailbox, bron_id, tekst, message_id or "",
-                         self.mappen["archief"], "1" if self.allen_beantwoorden else "0", "1" if verzenden else "0").strip()
+                         self.mappen["archief"], "1" if self.allen_beantwoorden else "0", "1" if verzenden else "0",
+                         controlestuk(tekst)).strip()
         self.laatste_uitkomst = hoe
         if hoe == "verzonden":
             return "verzonden"
         if hoe == "niet-verzonden":
-            return "niet verzonden: je tekst kon niet in het antwoord worden gecontroleerd; het antwoord staat open in Mail"
+            return "niet verzonden: Mail weigerde te versturen; het antwoord staat open in Mail"
+        if hoe == "niet-gecontroleerd":
+            return ("ik kon niet controleren of je tekst in het nieuwe antwoord staat"
+                    + (", dus er is niets verstuurd" if verzenden else "")
+                    + ". Kijk in Mail; staat hij er niet, plak dan met ⌘V. Je tekst staat op het klembord")
         if hoe == "geplakt":
             return "antwoord staat klaar in Apple Mail, met je tekst boven de oorspronkelijke mail; versturen doe je zelf"
         if hoe == "geen-toegang":

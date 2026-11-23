@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import fcntl
 import json
 import logging
+import re
+from contextlib import contextmanager
 from email.utils import parseaddr
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from .config import Config, anonimiseer, mag_naar_claude, sorteer_met_regels
 from .llm import LLM, LLMFout
@@ -13,6 +17,8 @@ from .models import UITWERK_ACTIES, Email, Sortering
 from .store import Store
 
 log = logging.getLogger("mailagent")
+
+OPEN_PLEK = re.compile(r"\[\s*AANVULLEN", re.IGNORECASE)   # plek die Claude voor jou openliet
 
 
 def stijlvoorbeelden(cfg: Config, store: Store, mail: Email, project: str, aantal: int = 3) -> list[dict]:
@@ -37,8 +43,9 @@ def stijlvoorbeelden(cfg: Config, store: Store, mail: Email, project: str, aanta
 
 
 def verwerk_mail(cfg: Config, store: Store, llm: LLM, mail: Email) -> int:
-    """Verwerkt één mail en geeft het id van het item in de wachtrij terug."""
-    store.bewaar_mail(mail)
+    """Verwerkt één mail en geeft het id van het item in de wachtrij terug.
+
+    De mail wordt pas als verwerkt opgeslagen samen met zijn item (zie Store.nieuw_item)."""
     vast_project, sortering = sorteer_met_regels(cfg, mail)
 
     geleerd = store.afzender_regel(afzender_adres(mail.van))
@@ -59,19 +66,22 @@ def verwerk_mail(cfg: Config, store: Store, llm: LLM, mail: Email) -> int:
         return store.nieuw_item(mail, s, None, "genegeerd")
 
     tekst = anonimiseer(cfg, mail.tekst)
+    uitwerking = None
     try:
         if sortering is None:
             sortering = llm.sorteer(mail, tekst, vast_project)
         if sortering.actie in UITWERK_ACTIES:
             uitwerking = llm.werk_uit(mail, tekst, sortering, stijlvoorbeelden(cfg, store, mail, sortering.project))
-            return store.nieuw_item(mail, sortering, uitwerking, "wacht")
-        status = "genegeerd" if sortering.actie == "negeren" else "ter_info"
-        return store.nieuw_item(mail, sortering, None, status)
-    except LLMFout as e:
-        log.warning("Claude-fout bij %s: %s", mail.sleutel, e)
+    except Exception as e:  # ook een kapot antwoord of een onverwachte fout: de mail komt bij 'zelf doen'
+        soort = "Claude-fout" if isinstance(e, LLMFout) else f"onverwachte fout ({type(e).__name__})"
+        log.warning("%s bij %s: %s", soort, mail.sleutel, e)
         s = sortering or Sortering(project=vast_project or "overig", actie="antwoorden", prioriteit="normaal",
                                    deadline=None, samenvatting=mail.onderwerp, reden="niet gesorteerd")
-        return store.nieuw_item(mail, s, None, "fout", opmerking=str(e))
+        return store.nieuw_item(mail, s, None, "fout", opmerking=f"{soort}: {e}"[:500])
+    if sortering.actie in UITWERK_ACTIES:
+        return store.nieuw_item(mail, sortering, uitwerking, "wacht")
+    status = "genegeerd" if sortering.actie == "negeren" else "ter_info"
+    return store.nieuw_item(mail, sortering, None, status)
 
 
 def afzender_adres(van: str) -> str:
@@ -273,6 +283,29 @@ def afspraak_titel(titel: str, stappen: list[str]) -> str:
     return f"{titel} · begin met: {eerste[0].lower() + eerste[1:]}"
 
 
+class RondeBezig(RuntimeError):
+    """Er loopt al een mailronde (gepland of vanuit de app)."""
+
+
+@contextmanager
+def ronde_slot(store: Store):
+    """Eén mailronde tegelijk, ook tussen de geplande ronde en de knop Mail ophalen."""
+    pad = Path(store.pad)
+    slot = pad.with_name(pad.name + ".ronde.lock") if store.pad != ":memory:" else None
+    if slot is None:
+        yield
+        return
+    with open(slot, "w") as f:
+        try:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise RondeBezig("Er loopt al een mailronde. Probeer het over een paar minuten opnieuw.") from None
+        try:
+            yield
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
+
+
 def run(cfg: Config, store: Store, bronnen: dict, llm: LLM, dagen: int | None = None,
         maximum: int | None = None, voortgang: dict | None = None) -> dict[str, int]:
     """Verwerkt per bron de mail van de afgelopen `terugkijken_dagen` die nog niet verwerkt is, oudste eerst.
@@ -281,40 +314,45 @@ def run(cfg: Config, store: Store, bronnen: dict, llm: LLM, dagen: int | None = 
     Al verwerkte mail wordt herkend en niet opnieuw naar Claude gestuurd.
     `voortgang` krijgt per bron het aantal mails dat daarna nog te gaan is.
     """
-    resultaat: dict[str, int] = {}
-    maximum = maximum or cfg.max_mails_per_run
-    nu = datetime.now().astimezone()
-    sinds = nu - timedelta(days=dagen or cfg.terugkijken_dagen)
-    for naam, bron in bronnen.items():
-        log.info("%s: mail van de afgelopen %d dagen doorzoeken…", naam, dagen or cfg.terugkijken_dagen)
-        try:
-            mails = bron.haal_op(sinds, maximum, overslaan=lambda bid, n=naam: store.is_bekend_sleutel(f"{n}:{bid}"))
-        except Exception as e:  # een kapotte bron mag de andere niet tegenhouden
-            log.error("Ophalen uit %s mislukt: %s", naam, e)
-            store.log(None, f"ophalen {naam} mislukt: {e}")
-            resultaat[naam] = -1
-            continue
+    with ronde_slot(store):
+        resultaat: dict[str, int] = {}
+        maximum = maximum or cfg.max_mails_per_run
+        nu = datetime.now().astimezone()
+        sinds = nu - timedelta(days=dagen or cfg.terugkijken_dagen)
+        for naam, bron in bronnen.items():
+            log.info("%s: mail van de afgelopen %d dagen doorzoeken…", naam, dagen or cfg.terugkijken_dagen)
+            try:
+                mails = bron.haal_op(sinds, maximum, overslaan=lambda bid, n=naam: store.is_bekend_sleutel(f"{n}:{bid}"))
+            except Exception as e:  # een kapotte bron mag de andere niet tegenhouden
+                log.error("Ophalen uit %s mislukt: %s", naam, e)
+                store.log(None, f"ophalen {naam} mislukt: {e}")
+                resultaat[naam] = -1
+                continue
 
-        totaal = getattr(bron, "laatste_totaal", len(mails))
-        te_doen = [m for m in sorted(mails, key=lambda m: m.datum) if not store.is_bekend(m)]
-        log.info("%s: %d onverwerkte mail(s) sinds %s, deze ronde %d", naam, totaal, f"{sinds:%d-%m}", len(te_doen))
-        nieuw = 0
-        for i, mail in enumerate(te_doen, 1):
-            log.info("%s %d/%d: %s", naam, i, len(te_doen), mail.onderwerp[:70])
-            item_id = verwerk_mail(cfg, store, llm, mail)
-            item = store.item(item_id)
-            log.info("   -> %s, %s (%s)", item["project"], item["actie"], item["status"])
-            nieuw += 1
-        if mails:
-            store.zet_laatst_opgehaald(naam, max(m.datum for m in mails))
-        rest = max(0, totaal - len(mails))
-        if voortgang is not None:
-            voortgang[naam] = rest
-        if rest:
-            log.info("%s: nog %d mail(s) te gaan; de volgende ronde gaat verder", naam, rest)
-        store.log(None, f"run {naam}: {len(mails)} van {totaal} verwerkt, nog {rest}")
-        resultaat[naam] = nieuw
-    return resultaat
+            totaal = getattr(bron, "laatste_totaal", len(mails))
+            te_doen = [m for m in sorted(mails, key=lambda m: m.datum) if not store.is_bekend(m)]
+            log.info("%s: %d onverwerkte mail(s) sinds %s, deze ronde %d", naam, totaal, f"{sinds:%d-%m}", len(te_doen))
+            nieuw = 0
+            for i, mail in enumerate(te_doen, 1):
+                log.info("%s %d/%d: %s", naam, i, len(te_doen), mail.onderwerp[:70])
+                try:
+                    item_id = verwerk_mail(cfg, store, llm, mail)
+                except Exception as e:  # deze mail is niet opgeslagen; de volgende ronde probeert hem opnieuw
+                    log.error("%s: %s overgeslagen door een fout, volgende ronde opnieuw: %s", naam, mail.sleutel, e)
+                    continue
+                item = store.item(item_id)
+                log.info("   -> %s, %s (%s)", item["project"], item["actie"], item["status"])
+                nieuw += 1
+            if mails:
+                store.zet_laatst_opgehaald(naam, max(m.datum for m in mails))
+            rest = max(0, totaal - len(mails))
+            if voortgang is not None:
+                voortgang[naam] = rest
+            if rest:
+                log.info("%s: nog %d mail(s) te gaan; de volgende ronde gaat verder", naam, rest)
+            store.log(None, f"run {naam}: {len(mails)} van {totaal} verwerkt, nog {rest}")
+            resultaat[naam] = nieuw
+        return resultaat
 
 
 def keur_goed(store: Store, bronnen: dict, item_id: int, concept: str | None,
@@ -331,16 +369,23 @@ def keur_goed(store: Store, bronnen: dict, item_id: int, concept: str | None,
     concept = (concept or "").strip() or None
     if verzenden and not concept:
         raise ValueError("geen tekst om te versturen")
+    if verzenden and OPEN_PLEK.search(concept):
+        raise ValueError("het concept bevat nog [AANVULLEN: …]; vul dat eerst in")
     verzonden = False
     if concept:
         bron = bronnen.get(item["bron"])
         if bron is None:
             raise ValueError(f"Bron '{item['bron']}' staat niet meer in de configuratie")
+        store.zet_concept(item_id, concept)   # jouw tekst blijft bewaard, ook als Mail hierna faalt
         if verzenden:
             uitkomst = bron.maak_concept(item["bron_id"], concept, item["onderwerp"], item["van"],
                                          message_id=item["thread_id"], verzenden=True)
             verzonden = getattr(bron, "laatste_uitkomst", None) == "verzonden"
-            meldingen.append(f"verzonden aan {item['van']}" if verzonden else uitkomst)
+            if not verzonden:
+                # niet aantoonbaar verstuurd: de mail blijft in Te doen, met jouw tekst bewaard
+                store.log(item_id, f"verzenden niet bevestigd: {uitkomst}")
+                return uitkomst
+            meldingen.append(f"verzonden aan {item['van']}")
         else:
             meldingen.append(bron.maak_concept(item["bron_id"], concept, item["onderwerp"], item["van"],
                                                message_id=item["thread_id"]))

@@ -550,7 +550,7 @@ const filter = (lijst, taken) => lijst.filter(i => !(taken ? takenVerborgen : ve
   && (staat.project === "alles" || i.project === staat.project));
 
 async function laad(){
-  const r = await fetch("/api/data", {cache:"no-store"});
+  const r = await fetch("/api/data", {cache:"no-store", headers:{"X-Token":TOKEN}});
   D = await r.json();
   teken();
   if (D.ophalen.bezig) setTimeout(laad, 4000);
@@ -577,6 +577,10 @@ async function meteen(ids, naam, data, set = verborgen){
   return ok;
 }
 
+function bewaarTekst(id, concept){
+  const it = [...D.zelf, ...D.wacht].find(x => x.id === id);
+  if (it) it.concept = concept;
+}
 function toast(tekst, fout, knop){
   if(!tekst) return;
   const knoppen = !knop ? [] : Array.isArray(knop) ? knop : [knop];
@@ -1340,6 +1344,7 @@ document.addEventListener("click", async ev => {
   if (t.id === "verzenden"){
     const id = Number(document.getElementById("paneel").dataset.id), concept = document.getElementById("concept").value;
     if (!concept.trim()) return toast("Er staat geen tekst om te versturen", true);
+    if (/\[\s*AANVULLEN/i.test(concept)) return toast("Vul eerst de plek met [AANVULLEN: …] in, dan kun je versturen", true);
     if (!t.classList.contains("bevestig")){
       // eerste klik: bevestigen met de ontvanger in beeld; na 5 seconden weer terug
       const it = [...D.zelf, ...D.wacht].find(x => x.id === id), naam = it ? afzender(it.van).naam : "de afzender";
@@ -1352,7 +1357,7 @@ document.addEventListener("click", async ev => {
     sluitPaneel(); if (volgende !== null) staat.open = volgende;
     toast("Versturen via Apple Mail…");
     const ok = await meteen([id], "goedkeuren", data);
-    if (!ok){ staat.open = id; teken(); }
+    if (!ok){ bewaarTekst(id, concept); staat.open = id; teken(); }   // niet verstuurd: jouw tekst blijft staan
     return;
   }
   if (t.id === "goedkeuren" || t.id === "afwijzen"){
@@ -1365,7 +1370,7 @@ document.addEventListener("click", async ev => {
     if (volgende !== null){ staat.open = volgende; }
     if (goed && data.concept.trim()) toast("Concept gaat naar Apple Mail…");
     const ok = await meteen([id], goed ? "goedkeuren" : "afwijzen", data);
-    if (!ok){ staat.open = id; teken(); }   // mislukt: paneel met je tekst weer openen
+    if (!ok){ if (goed) bewaarTekst(id, data.concept); staat.open = id; teken(); }   // mislukt: paneel met je tekst weer openen
   }
 });
 // Slepen en rekken in het dagoverzicht, in stappen van een kwartier

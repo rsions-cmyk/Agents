@@ -106,6 +106,12 @@ class Store:
         # mail met een open taak hoort niet meer in Beoordelen (oudere versies lieten hem staan)
         self.db.execute("UPDATE items SET status='taak' WHERE status IN ('wacht','fout','handmatig') "
                         "AND id IN (SELECT item_id FROM taken WHERE klaar=0 AND item_id IS NOT NULL)")
+        # één item per mail; een oudere database met dubbele items houdt het zonder (de vergrendeling
+        # van de ronde voorkomt dan nieuwe dubbele)
+        try:
+            self.db.execute("CREATE UNIQUE INDEX IF NOT EXISTS items_sleutel_uniek ON items(sleutel)")
+        except sqlite3.IntegrityError:
+            pass
         self.db.commit()
 
     # --- bronnen -------------------------------------------------------------
@@ -125,12 +131,15 @@ class Store:
     def is_bekend(self, mail: Email) -> bool:
         return self.db.execute("SELECT 1 FROM mails WHERE sleutel=?", (mail.sleutel,)).fetchone() is not None
 
-    def bewaar_mail(self, mail: Email) -> None:
+    def _bewaar_mail(self, mail: Email) -> None:
         self.db.execute(
             "INSERT OR IGNORE INTO mails VALUES (?,?,?,?,?,?,?,?,?,?)",
             (mail.sleutel, mail.bron, mail.bron_id, mail.van, mail.aan, mail.onderwerp,
              mail.datum.isoformat(), mail.thread_id, mail.tekst[:20000], nu()),
         )
+
+    def bewaar_mail(self, mail: Email) -> None:
+        self._bewaar_mail(mail)
         self.db.commit()
 
     def mail(self, sleutel: str) -> Optional[sqlite3.Row]:
@@ -139,17 +148,27 @@ class Store:
     # --- items ---------------------------------------------------------------
     def nieuw_item(self, mail: Email, s: Sortering, u: Optional[Uitwerking], status: str,
                    opmerking: Optional[str] = None) -> int:
-        cur = self.db.execute(
-            "INSERT INTO items(sleutel, project, actie, prioriteit, deadline, samenvatting, reden, "
-            "concept, taken, agenda, vragen, status, opmerking, aangemaakt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (mail.sleutel, s.project, s.actie, s.prioriteit, s.deadline, s.samenvatting, s.reden,
-             u.concept_antwoord if u else None,
-             json.dumps([t.model_dump() for t in u.taken], ensure_ascii=False) if u else "[]",
-             u.agenda_voorstel if u else None,
-             u.vragen_aan_jou if u else None,
-             status, opmerking, nu()),
-        )
-        self.db.commit()
+        """Bewaart de mail en zijn item samen: lukt het item niet, dan geldt de mail ook niet als verwerkt
+        en probeert de volgende ronde hem opnieuw."""
+        try:
+            with self.db:
+                self._bewaar_mail(mail)
+                cur = self.db.execute(
+                    "INSERT INTO items(sleutel, project, actie, prioriteit, deadline, samenvatting, reden, "
+                    "concept, taken, agenda, vragen, status, opmerking, aangemaakt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (mail.sleutel, s.project, s.actie, s.prioriteit, s.deadline, s.samenvatting, s.reden,
+                     u.concept_antwoord if u else None,
+                     json.dumps([t.model_dump() for t in u.taken], ensure_ascii=False) if u else "[]",
+                     u.agenda_voorstel if u else None,
+                     u.vragen_aan_jou if u else None,
+                     status, opmerking, nu()),
+                )
+        except sqlite3.IntegrityError:
+            bestaand = self.db.execute("SELECT id FROM items WHERE sleutel=? ORDER BY id LIMIT 1",
+                                       (mail.sleutel,)).fetchone()
+            if bestaand is None:
+                raise
+            return bestaand["id"]   # deze mail had al een item
         self.log(cur.lastrowid, f"aangemaakt ({status})")
         return cur.lastrowid
 

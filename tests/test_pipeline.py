@@ -242,19 +242,35 @@ def test_web_api(omgeving):
     threading.Thread(target=server.serve_forever, daemon=True).start()
     basis = f"http://127.0.0.1:{server.server_port}"
     try:
-        pagina = urllib.request.urlopen(basis + "/").read().decode()
+        antwoord = urllib.request.urlopen(basis + "/")
+        assert antwoord.headers["X-Frame-Options"] == "DENY"                   # niet in een vreemd frame
+        assert "frame-ancestors 'none'" in antwoord.headers["Content-Security-Policy"]
+        pagina = antwoord.read().decode()
         token = pagina.split('const TOKEN = "')[1].split('"')[0]
-        data = json.loads(urllib.request.urlopen(basis + "/api/data").read())
+
+        def get(pad, kop):
+            try:
+                return urllib.request.urlopen(urllib.request.Request(basis + pad, headers=kop)).status
+            except urllib.error.HTTPError as e:
+                return e.code
+
+        assert get("/api/data", {}) == 403                                      # zonder sessiesleutel geen mail
+        assert get("/", {"Host": "kwaadaardig.example:8765"}) == 421            # DNS-rebinding: vreemde Host
+        assert get("/api/data", {"Host": f"evil.test:{server.server_port}", "X-Token": token}) == 421
+        data = json.loads(urllib.request.urlopen(urllib.request.Request(basis + "/api/data", headers={"X-Token": token})).read())
         assert len(data["wacht"]) == 3 and data["wacht"][0]["concept"]
 
-        def post(actie, body, sleutel):
-            req = urllib.request.Request(basis + "/api/" + actie, data=json.dumps(body).encode(), method="POST",
-                                         headers={"Content-Type": "application/json", "X-Token": sleutel})
+        def post(actie, body, sleutel, origin=None):
+            kop = {"Content-Type": "application/json", "X-Token": sleutel}
+            if origin:
+                kop["Origin"] = origin
+            req = urllib.request.Request(basis + "/api/" + actie, data=json.dumps(body).encode(), method="POST", headers=kop)
             try:
                 return json.loads(urllib.request.urlopen(req).read())
             except urllib.error.HTTPError as e:
                 return json.loads(e.read())
 
+        assert post("afwijzen", {"id": data["wacht"][0]["id"]}, token, origin="https://kwaadaardig.example")["ok"] is False
         assert post("afwijzen", {"id": data["wacht"][0]["id"]}, "verkeerd")["ok"] is False
         assert store.item(data["wacht"][0]["id"])["status"] == "wacht"
         assert post("afwijzen", {"id": data["wacht"][0]["id"]}, token)["ok"] is True
@@ -554,7 +570,9 @@ def test_verzenden_alleen_via_bevestigde_klik_en_gedaan(omgeving):
     # bewaking: automatische rondes kunnen niet versturen, en er is precies één verzendopdracht in de code
     assert "verzend" not in inspect.getsource(pipeline.run) and "verzend" not in inspect.getsource(pipeline.verwerk_mail)
     bronnen_code = (ROOT / "mailagent" / "sources" / "applemail.py").read_text()
-    assert bronnen_code.count("send om") == 1
+    assert bronnen_code.count("send antwoord") == 1 and "send om" not in bronnen_code
+    # alleen het antwoord dat net geopend is, en pas nadat je tekst erin is teruggevonden
+    assert bronnen_code.index("(content of antwoord) contains controle") < bronnen_code.index("send antwoord")
     alle_code = "".join(p.read_text() for p in (ROOT / "mailagent").rglob("*.py"))
     assert "smtplib" not in alle_code and "/sendMail" not in alle_code and "Mail.Send\"" not in alle_code
 
@@ -580,3 +598,84 @@ def test_mapvoorstel_op_projectnaam(omgeving):
     it = next(r for r in store.items() if r["project"] == "istte")
     vs = map_voorstellen(store, store.item(it["id"]), bronnen["test"].mappenlijst())
     assert vs[0] == {"map": "ISTTE", "reden": "zelfde naam als het project"}
+
+
+def test_verzenden_geblokkeerd_of_niet_bevestigd(omgeving):
+    from mailagent.pipeline import keur_goed
+    from mailagent.sources.applemail import controlestuk
+
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    a = store.items(status="wacht")[0]["id"]
+    with pytest.raises(ValueError):                                        # open plek: niet versturen
+        keur_goed(store, bronnen, a, "Beste Jan,\n\nDe deadline is [AANVULLEN: datum].", verzenden=True)
+    assert store.item(a)["status"] == "wacht"
+
+    def niet_gecontroleerd(*args, **kw):
+        bronnen["test"].laatste_uitkomst = "niet-gecontroleerd"
+        return "niet verzonden: ik kon niet controleren of je tekst in het nieuwe antwoord staat"
+    bronnen["test"].maak_concept = niet_gecontroleerd
+    melding = keur_goed(store, bronnen, a, "Mijn aangepaste tekst.", verzenden=True)
+    assert "niet verzonden" in melding
+    it = store.item(a)
+    assert it["status"] == "wacht" and it["concept"] == "Mijn aangepaste tekst."   # blijft staan, tekst bewaard
+    assert not store.open_taken()                                          # geen taken bij een mislukte poging
+
+    assert controlestuk("Beste Jan,\n\nDank voor je vraag over de herkansing.\nGroet") == \
+        "Dank voor je vraag over de herkansing."                           # niet de aanhef
+
+
+def test_mail_verdwijnt_niet_bij_een_fout(omgeving):
+    import sqlite3
+
+    cfg, store, bronnen = omgeving
+
+    class KapotLLM(NepLLM):
+        def sorteer(self, mail, tekst, vast_project):
+            if "review" in mail.onderwerp.lower():
+                raise json.JSONDecodeError("kapot antwoord", "", 0)        # geen LLMFout
+            return super().sorteer(mail, tekst, vast_project)
+
+    assert run(cfg, store, bronnen, KapotLLM()) == {"test": 5}
+    fout = store.items(status="fout")
+    assert len(fout) == 1 and "onverwachte fout" in fout[0]["opmerking"]   # zichtbaar, niet weg
+
+    # lukt het opslaan van het item niet, dan geldt de mail ook niet als verwerkt
+    cfg2_store = Store(cfg.db_pad)
+    nieuw = next(iter(bronnen["test"].haal_op(__import__("datetime").datetime(2000, 1, 1).astimezone(), 50)))
+    nieuw.bron_id = "nieuw-1"
+    origineel = cfg2_store.db
+    class Weiger:
+        def __getattr__(self, naam):
+            return getattr(origineel, naam)
+        def execute(self, sql, *a):
+            if sql.startswith("INSERT INTO items"):
+                raise sqlite3.OperationalError("database is locked")
+            return origineel.execute(sql, *a)
+        def __enter__(self):
+            return origineel.__enter__()
+        def __exit__(self, *a):
+            return origineel.__exit__(*a)
+    cfg2_store.db = Weiger()
+    from mailagent.pipeline import verwerk_mail
+    with pytest.raises(sqlite3.OperationalError):
+        verwerk_mail(cfg, cfg2_store, NepLLM(), nieuw)
+    cfg2_store.db = origineel
+    assert not cfg2_store.is_bekend(nieuw)                                  # volgende ronde probeert opnieuw
+
+
+def test_een_ronde_tegelijk_en_een_item_per_mail(omgeving):
+    from mailagent.pipeline import RondeBezig, ronde_slot
+
+    cfg, store, bronnen = omgeving
+    with ronde_slot(Store(cfg.db_pad)):                                    # bijvoorbeeld de geplande ronde
+        with pytest.raises(RondeBezig):
+            run(cfg, store, bronnen, NepLLM())                             # de knop Mail ophalen wacht
+    assert run(cfg, store, bronnen, NepLLM()) == {"test": 5}
+
+    it = store.items()[0]
+    mail = next(m for m in bronnen["test"].haal_op(__import__("datetime").datetime(2000, 1, 1).astimezone(), 50)
+                if m.onderwerp == it["onderwerp"])
+    s = Sortering(project="overig", actie="ter_info", prioriteit="laag", deadline=None, samenvatting="x", reden="x")
+    assert store.nieuw_item(mail, s, None, "ter_info") == it["id"]          # geen tweede item
+    assert len(store.items()) == 5

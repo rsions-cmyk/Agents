@@ -109,11 +109,15 @@ def main(argv: list[str] | None = None) -> int:
     from .llm import maak_llm
 
     if args.opdracht == "run":
-        from .pipeline import overzicht, run
+        from .pipeline import RondeBezig, overzicht, run
         if args.model:
             cfg.claude_code_model = cfg.model = args.model
         rest: dict = {}
-        res = run(cfg, store, bronnen, maak_llm(cfg), dagen=args.dagen, maximum=args.max, voortgang=rest)
+        try:
+            res = run(cfg, store, bronnen, maak_llm(cfg), dagen=args.dagen, maximum=args.max, voortgang=rest)
+        except RondeBezig as e:
+            print(e)
+            return 0
         for naam, n in res.items():
             print(f"{naam}: " + ("ophalen mislukt (zie log)" if n < 0 else f"{n} nieuwe mail(s) verwerkt"
                                  + (f", nog {rest[naam]} te gaan" if rest.get(naam) else "")))

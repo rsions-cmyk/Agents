@@ -1,8 +1,13 @@
 """Lokale goedkeuringsapp op http://127.0.0.1:8765. Alleen bereikbaar vanaf je eigen Mac.
 
 De pagina (static/app.html) haalt haar gegevens op via /api/data en voert acties uit via
-POST /api/<actie>. Elke POST moet de sessiesleutel in de header X-Token meesturen. Een andere
-website kan die header niet meesturen, dus alleen deze pagina kan acties uitvoeren.
+POST /api/<actie>. Elk verzoek naar /api/ moet de sessiesleutel in de header X-Token meesturen.
+
+Bescherming tegen andere websites in je browser:
+- de server antwoordt alleen als de Host-header 127.0.0.1 of localhost is (tegen DNS-rebinding,
+  waarbij een vreemde site zich voordoet als deze pagina en zo de sessiesleutel zou kunnen lezen);
+- een POST met een Origin-header van een andere site wordt geweigerd;
+- de pagina mag niet in een frame van een andere site worden geladen (tegen ongemerkt aanklikken).
 """
 
 from __future__ import annotations
@@ -23,7 +28,7 @@ from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
 from .opmaak import html_uit_bron, veilig
-from .pipeline import afzender_adres, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
+from .pipeline import RondeBezig, afzender_adres, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
 from .store import Store
 
 APP_HTML = Path(__file__).with_name("static") / "app.html"
@@ -166,6 +171,8 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
             ophalen["laatste"] = ", ".join(
                 f"{k}: mislukt" if v < 0 else f"{k}: {v} nieuw" + (f", nog {rest[k]} te gaan" if rest.get(k) else "")
                 for k, v in res.items())
+        except RondeBezig as ex:
+            ophalen["laatste"] = str(ex)
         except Exception as ex:
             ophalen["laatste"] = f"ophalen mislukt: {ex}"
         finally:
@@ -182,6 +189,9 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
             self.send_header("Content-Length", str(len(data)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Frame-Options", "DENY")
+            self.send_header("Content-Security-Policy", "frame-ancestors 'none'")
+            self.send_header("Referrer-Policy", "no-referrer")
             try:
                 self.end_headers()
                 self.wfile.write(data)
@@ -191,21 +201,47 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
         def _json(self, obj: dict, status: int = 200):
             self._stuur(json.dumps(obj, ensure_ascii=False), status, "application/json; charset=utf-8")
 
+        def _eigen_adressen(self) -> set[str]:
+            poort = self.server.server_address[1]
+            namen = {"127.0.0.1", "localhost", "[::1]", cfg.web_host}
+            return {f"{n}:{poort}" for n in namen}
+
+        def _host_ok(self) -> bool:
+            """Alleen verzoeken die echt voor 127.0.0.1/localhost bedoeld zijn (DNS-rebinding)."""
+            return (self.headers.get("Host") or "").strip().lower() in self._eigen_adressen()
+
+        def _origin_ok(self) -> bool:
+            """Een browser stuurt bij POST een Origin mee; die moet deze app zelf zijn."""
+            origin = (self.headers.get("Origin") or "").strip().lower()
+            return not origin or origin in {f"http://{a}" for a in self._eigen_adressen()}
+
+        def _token_ok(self) -> bool:
+            return secrets.compare_digest(self.headers.get("X-Token", ""), token)
+
+        def _weiger(self, status: int = 403):
+            return self._json({"ok": False, "melding": "Ongeldige sessie. Herlaad de pagina."}, status)
+
         def do_GET(self):
-            store = Store(db_pad)  # eigen verbinding per verzoek: verzoeken lopen naast elkaar
+            if not self._host_ok():
+                return self._stuur("Onbekend adres", 421, "text/plain; charset=utf-8")
             pad = urlparse(self.path).path
             if pad == "/":
                 html = APP_HTML.read_text(encoding="utf-8").replace("__TOKEN__", token)
                 return self._stuur(html)
+            if pad.startswith("/api/") and not self._token_ok():
+                return self._weiger()
+            store = Store(db_pad)  # eigen verbinding per verzoek: verzoeken lopen naast elkaar
             if pad == "/api/data":
                 return self._json(verzamel(cfg, store, ophalen))
-            if pad == "/overzicht.md":
+            if pad == "/api/overzicht.md":
                 return self._stuur(overzicht(cfg, store), soort="text/markdown; charset=utf-8")
             self._stuur("Niet gevonden", 404, "text/plain; charset=utf-8")
 
         def do_POST(self):
-            if not secrets.compare_digest(self.headers.get("X-Token", ""), token):
-                return self._json({"ok": False, "melding": "Ongeldige sessie. Herlaad de pagina."}, 403)
+            if not self._host_ok():
+                return self._stuur("Onbekend adres", 421, "text/plain; charset=utf-8")
+            if not self._origin_ok() or not self._token_ok():
+                return self._weiger()
             lengte = int(self.headers.get("Content-Length", 0) or 0)
             try:
                 v = json.loads(self.rfile.read(lengte) or b"{}")
