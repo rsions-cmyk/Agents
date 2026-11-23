@@ -368,7 +368,7 @@ textarea#concept::placeholder,#a-tekst::placeholder{color:#8a929b}
 .toast svg{color:var(--ok)} .toast.fout{background:var(--hoog);color:#fff} .toast.fout svg{color:#fff}
 .toast .knop{background:transparent;color:inherit;border:1px solid color-mix(in srgb,currentColor 35%,transparent);margin-left:6px;padding:3px 10px}
 .toast .knop:hover{background:color-mix(in srgb,currentColor 12%,transparent)}
-.toast .knoppen{display:flex;gap:4px;margin-left:auto}
+.toast .knoppen{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
 @keyframes omhoog{from{opacity:0;transform:translateY(8px)}}
 
 /* focusblokken in de tijdlijn: beschermd */
@@ -785,6 +785,23 @@ function tekenLeegPaneel(){
   p.classList.add("open"); p.setAttribute("aria-hidden","false");
 }
 
+// na Gedaan: de mail meteen een plek geven, of laten staan
+async function gedaanMelding(id){
+  const knoppen = (voorstel) => [
+    {label: "Archiveren", doe: () => verplaatsMetUndo([id], "archief")},
+    ...(voorstel ? [{label: `Naar ${voorstel.split("/").pop()}`, doe: () => verplaatsMetUndo([id], "map:" + voorstel)}] : []),
+    {label: "Map…", doe: () => openKiezer(id, null, [id])},
+    {label: "Ongedaan", doe: async () => { const r = await stil("niet-gedaan", {id}); toast(r.melding, !r.ok); staat.open = id; laad(); }}];
+  // eerst meteen de melding; het mapvoorstel volgt als het er snel is
+  toast("Gedaan. Ook verplaatsen?", false, knoppen(null));
+  const melding = document.getElementById("toasts").lastElementChild;
+  const j = await Promise.race([stil("mappen", {id}), new Promise(r => setTimeout(() => r(null), 2500))]);
+  if (j && j.ok && j.voorstellen.length && melding && melding.isConnected){
+    melding.remove();
+    toast("Gedaan. Ook verplaatsen?", false, knoppen(j.voorstellen[0].map));
+  }
+}
+
 function selecteerReeks(van, tot, aan){
   const lijst = opruimLijst().map(i => i.id), a = lijst.indexOf(van), b = lijst.indexOf(tot);
   if (a < 0 || b < 0) return;
@@ -997,7 +1014,7 @@ function tekenPaneel(it){
         <button class="knop ikoonknop" data-opbergen="${it.id}" title="Opbergen in een map (V)">${ik("folder")}<kbd>V</kbd></button>
         <button class="knop ikoonknop" data-een="archief" data-id="${it.id}" title="Archiveren zonder antwoord (E)">${ik("archive")}<kbd>E</kbd></button>
         <button class="knop ikoonknop" id="afwijzen" title="Afwijzen: het voorstel klopt niet (X)">${ik("x")}<kbd>X</kbd></button>
-        <button class="knop" id="gedaan" title="Gedaan: geen antwoord nodig, mail blijft waar hij staat (D)">${ik("check")}Gedaan<kbd>D</kbd></button>
+        <button class="knop" id="gedaan" title="Gedaan: geen antwoord nodig. Daarna kun je de mail archiveren of opbergen (D; Shift+D kiest meteen een map)">${ik("check")}Gedaan<kbd>D</kbd></button>
       </div>
       <div class="groepje">
         <button class="knop" id="goedkeuren" title="Antwoord met deze tekst klaarzetten in Apple Mail; je verstuurt daar zelf (⌘↵)">${ik("reply")}In Mail zetten<kbd>⌘↵</kbd></button>
@@ -1314,9 +1331,11 @@ document.addEventListener("click", async ev => {
     sluitPaneel(); if (volgende !== null) staat.open = volgende;
     await animeerWeg([id]); verborgen.add(id); teken();
     const j = await stil("gedaan", {id}); verborgen.delete(id);
-    if (!j.ok) toast(j.melding, true);
-    else toast("Gedaan", false, {label: "Ongedaan maken", doe: async () => { const r = await stil("niet-gedaan", {id}); toast(r.melding, !r.ok); staat.open = id; laad(); }});
-    return laad();
+    if (!j.ok){ toast(j.melding, true); return laad(); }
+    laad();
+    if (t.dataset.metmap){ return openKiezer(id, null, [id]); }
+    gedaanMelding(id);
+    return;
   }
   if (t.id === "verzenden"){
     const id = Number(document.getElementById("paneel").dataset.id), concept = document.getElementById("concept").value;
@@ -1414,7 +1433,8 @@ function toonSneltoetsen(){
     <dt><kbd>J</kbd> <kbd>K</kbd></dt><dd>volgende en vorige mail</dd>
     <dt><kbd>⌘</kbd> <kbd>↵</kbd></dt><dd>antwoord klaarzetten in Apple Mail</dd>
     <dt><kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>↵</kbd></dt><dd>meteen verzenden (twee keer: de tweede bevestigt)</dd>
-    <dt><kbd>D</kbd></dt><dd>gedaan, geen antwoord nodig</dd>
+    <dt><kbd>D</kbd></dt><dd>gedaan, geen antwoord nodig (daarna eventueel archiveren of opbergen)</dd>
+    <dt><kbd>⇧</kbd> <kbd>D</kbd></dt><dd>gedaan en meteen een map kiezen</dd>
     <dt><kbd>V</kbd></dt><dd>opbergen in een map</dd>
     <dt><kbd>E</kbd></dt><dd>archiveren</dd>
     <dt><kbd>#</kbd></dt><dd>naar de prullenbak</dd>
@@ -1478,6 +1498,7 @@ document.addEventListener("keydown", ev => {
   if (ev.key === "#" || ev.key === "Delete" || ev.key === "Backspace"){ ev.preventDefault(); return verplaats([id], "prullenbak"); }
   if (ev.key === "x") return document.getElementById("afwijzen")?.click();
   if (ev.key === "d") return document.getElementById("gedaan")?.click();
+  if (ev.key === "D"){ const g = document.getElementById("gedaan"); if (g){ g.dataset.metmap = "1"; g.click(); } return; }
   if (ev.key === "t") return openTaak(id);
   const n = Number(ev.key);
   if (n >= 1 && n <= D.projecten.length) return zetProject(id, D.projecten[n-1].naam);

@@ -571,3 +571,12 @@ def test_verzenden_alleen_via_bevestigde_klik_en_gedaan(omgeving):
     assert store.item(b)["status"] == "gedaan"
     zet_gedaan_terug(store, b)
     assert store.item(b)["status"] == "wacht"
+
+
+def test_mapvoorstel_op_projectnaam(omgeving):
+    from mailagent.pipeline import map_voorstellen
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    it = next(r for r in store.items() if r["project"] == "istte")
+    vs = map_voorstellen(store, store.item(it["id"]), bronnen["test"].mappenlijst())
+    assert vs[0] == {"map": "ISTTE", "reden": "zelfde naam als het project"}

@@ -100,6 +100,11 @@ def map_voorstellen(store: Store, item, mappen: list[str], aantal: int = 3) -> l
         if any(w.startswith(mw) or mw.startswith(w) for w in woorden for mw in mapwoorden):
             score[m] = score.get(m, 0) + 5
             reden.setdefault(m, "naam past bij het onderwerp")
+    project = (item["project"] or "").lower()
+    for m in mappen:
+        if project and project != "overig" and m.split("/")[-1].strip().lower() == project:
+            score[m] = score.get(m, 0) + 3
+            reden.setdefault(m, "zelfde naam als het project")
     beste = sorted(score, key=lambda m: -score[m])[:aantal]
     return [{"map": m, "reden": reden[m]} for m in beste]
 
