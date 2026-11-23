@@ -147,16 +147,37 @@ on run argv
             tell application "Mail" to set m to first message of arch whose message id is berichtMid
         end try
     end if
-    if m is missing value then error "mail niet meer gevonden in " & mailboxNaam & " of " & archiefNaam
-    tell application "Mail"
-        set antwoord to reply m with opening window
+    if m is missing value and berichtMid is not "" then
         try
-            set content of antwoord to conceptTekst & return & return & (content of antwoord)
-            return "venster"
-        on error
-            set the clipboard to conceptTekst
-            return "klembord"
+            tell application "Mail" to set m to first message of mailbox mailboxNaam of account accountNaam whose message id is berichtMid
         end try
+    end if
+    if m is missing value then error "mail niet meer gevonden in " & mailboxNaam & " of " & archiefNaam
+    -- Altijd ook op het klembord, voor het geval Mail de tekst toch niet toont.
+    set the clipboard to conceptTekst
+    tell application "Mail"
+        -- Een antwoord via 'reply' blijft op recente macOS leeg als je de inhoud zet. Een nieuw bericht
+        -- accepteert inhoud bij het aanmaken wel; daarom een nieuw bericht met Re:, ontvanger en citaat.
+        set onderwerp to subject of m
+        if onderwerp does not start with "Re:" and onderwerp does not start with "RE:" then set onderwerp to "Re: " & onderwerp
+        set afzenderTekst to sender of m
+        set adres to extract address from afzenderTekst
+        set citaat to ""
+        try
+            set citaat to return & return & "-----" & return & "Op " & ((date received of m) as string) & " schreef " & afzenderTekst & ":" & return & return & (content of m)
+        end try
+        set nieuw to make new outgoing message with properties {subject:onderwerp, content:conceptTekst & citaat, visible:true}
+        tell nieuw to make new to recipient at end of to recipients with properties {address:adres}
+        try
+            set mijnAdres to item 1 of (email addresses of account accountNaam)
+            try
+                set sender of nieuw to (full name of account accountNaam) & " <" & mijnAdres & ">"
+            on error
+                set sender of nieuw to mijnAdres
+            end try
+        end try
+        activate
+        return "nieuw"
     end tell
 end run
 '''
@@ -376,9 +397,7 @@ class AppleMailBron:
     def maak_concept(self, bron_id: str, tekst: str, onderwerp: str, aan: str, message_id: str | None = None) -> str:
         hoe = _osascript(SCRIPT_CONCEPT, self.account, self.mailbox, bron_id, tekst,
                          message_id or "", self.mappen["archief"]).strip()
-        if hoe == "klembord":
-            return "antwoordvenster geopend in Apple Mail; concepttekst staat op het klembord"
-        return "antwoordvenster geopend in Apple Mail met het concept"
+        return "antwoord staat klaar in Apple Mail (ook op je klembord); versturen doe je zelf"
 
     def markeer(self, bron_id: str, message_id: str | None, aan: bool, kleur: int = 4) -> None:
         """Vlag zetten (aan) of weghalen. Kleur: 0 rood, 1 oranje, 2 geel, 3 groen, 4 blauw, 5 paars, 6 grijs."""
