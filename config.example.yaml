@@ -19,6 +19,7 @@ bronnen:
     mailbox: "Inbox"
     archief: "Archive"           # waar 'Archiveren' de mail heen verplaatst
     prullenbak: "Deleted Items"  # waar 'Naar prullenbak' de mail heen verplaatst
+    allen_beantwoorden: false    # true: antwoord gaat ook naar iedereen in Aan en CC
   # Google-account in Apple Mail. Gmail noemt het postvak meestal "INBOX" (hoofdletters).
   - type: applemail
     naam: google

@@ -153,32 +153,48 @@ on run argv
         end try
     end if
     if m is missing value then error "mail niet meer gevonden in " & mailboxNaam & " of " & archiefNaam
-    -- Altijd ook op het klembord, voor het geval Mail de tekst toch niet toont.
+    set allen to (count of argv) > 6 and (item 7 of argv) is "1"
+    -- 1. Een echt antwoordvenster: Mail zet de oorspronkelijke mail er zelf in, met alle opmaak,
+    --    en het bericht hoort bij het gesprek. De inhoud zetten via AppleScript werkt niet (venster wordt leeg),
+    --    dus plakken we de concepttekst bovenaan.
+    set oudKlembord to missing value
+    try
+        set oudKlembord to the clipboard
+    end try
     set the clipboard to conceptTekst
     tell application "Mail"
-        -- Een antwoord via 'reply' blijft op recente macOS leeg als je de inhoud zet. Een nieuw bericht
-        -- accepteert inhoud bij het aanmaken wel; daarom een nieuw bericht met Re:, ontvanger en citaat.
-        set onderwerp to subject of m
-        if onderwerp does not start with "Re:" and onderwerp does not start with "RE:" then set onderwerp to "Re: " & onderwerp
-        set afzenderTekst to sender of m
-        set adres to extract address from afzenderTekst
-        set citaat to ""
-        try
-            set citaat to return & return & "-----" & return & "Op " & ((date received of m) as string) & " schreef " & afzenderTekst & ":" & return & return & (content of m)
-        end try
-        set nieuw to make new outgoing message with properties {subject:onderwerp, content:conceptTekst & citaat, visible:true}
-        tell nieuw to make new to recipient at end of to recipients with properties {address:adres}
-        try
-            set mijnAdres to item 1 of (email addresses of account accountNaam)
-            try
-                set sender of nieuw to (full name of account accountNaam) & " <" & mijnAdres & ">"
-            on error
-                set sender of nieuw to mijnAdres
-            end try
-        end try
         activate
-        return "nieuw"
+        if allen then
+            set antwoord to reply m with opening window and reply to all
+        else
+            set antwoord to reply m with opening window
+        end if
+        set onderwerp to subject of m
     end tell
+    delay 1
+    -- 2. Alleen plakken als het antwoordvenster echt vooraan staat
+    set fragment to onderwerp
+    if (length of fragment) > 25 then set fragment to text 1 thru 25 of fragment
+    try
+        tell application "System Events"
+            tell process "Mail"
+                set frontmost to true
+                delay 0.2
+                set titel to name of front window
+            end tell
+            if titel does not contain fragment then return "klembord"
+            keystroke "v" using command down
+        end tell
+    on error foutTekst
+        return "geen-toegang"
+    end try
+    delay 0.6
+    if oudKlembord is not missing value then
+        try
+            set the clipboard to oudKlembord
+        end try
+    end if
+    return "geplakt"
 end run
 '''
 
@@ -351,8 +367,9 @@ def _osascript(script: str, *args: str) -> str:
 
 class AppleMailBron:
     def __init__(self, naam: str, account: str, mailbox: str = "Inbox",
-                 archief: str = "Archive", prullenbak: str = "Deleted Items"):
+                 archief: str = "Archive", prullenbak: str = "Deleted Items", allen_beantwoorden: bool = False):
         self.naam, self.account, self.mailbox = naam, account, mailbox
+        self.allen_beantwoorden = allen_beantwoorden
         self.mappen = {"archief": archief, "prullenbak": prullenbak}
 
     def lijst(self, sinds) -> list[tuple[str, datetime]]:
@@ -396,8 +413,13 @@ class AppleMailBron:
 
     def maak_concept(self, bron_id: str, tekst: str, onderwerp: str, aan: str, message_id: str | None = None) -> str:
         hoe = _osascript(SCRIPT_CONCEPT, self.account, self.mailbox, bron_id, tekst,
-                         message_id or "", self.mappen["archief"]).strip()
-        return "antwoord staat klaar in Apple Mail (ook op je klembord); versturen doe je zelf"
+                         message_id or "", self.mappen["archief"], "1" if self.allen_beantwoorden else "0").strip()
+        if hoe == "geplakt":
+            return "antwoord staat klaar in Apple Mail, met je tekst boven de oorspronkelijke mail; versturen doe je zelf"
+        if hoe == "geen-toegang":
+            return ("antwoordvenster geopend; druk in Mail op ⌘V om je tekst te plakken. Zelf plakken lukt na "
+                    "toestemming in Systeeminstellingen, Privacy en beveiliging, Toegankelijkheid")
+        return "antwoordvenster geopend; druk in Mail op ⌘V om je tekst te plakken"
 
     def markeer(self, bron_id: str, message_id: str | None, aan: bool, kleur: int = 4) -> None:
         """Vlag zetten (aan) of weghalen. Kleur: 0 rood, 1 oranje, 2 geel, 3 groen, 4 blauw, 5 paars, 6 grijs."""

@@ -83,6 +83,10 @@ Daarvoor heb je een app-registratie in Microsoft Entra nodig.
 
 Veel universiteiten staan niet toe dat medewerkers zelf apps registreren of toestemming geven. Lukt een van deze stappen niet, dan zijn er twee mogelijkheden. Je kunt het IT-servicedesk vragen om de registratie te maken (noem het recht `Mail.ReadWrite` en dat `Mail.Send` niet nodig is). Of je zet je BUas-account in Apple Mail en gebruikt de bron `applemail`, die zonder app-registratie werkt.
 
+### Antwoorden in Apple Mail
+
+Goedkeuren en Beantwoorden openen een echt antwoordvenster: Mail zet de oorspronkelijke mail er met alle opmaak in en het bericht hoort bij het gesprek. De app plakt je tekst bovenaan met ⌘V. Daarvoor vraagt macOS de eerste keer toestemming voor **Toegankelijkheid** (Systeeminstellingen, Privacy en beveiliging, Toegankelijkheid) voor Terminal, of voor Python als de app via launchd draait. Zonder die toestemming opent het antwoordvenster wel, staat je tekst op het klembord en druk je zelf op ⌘V. Wil je standaard allen beantwoorden (Aan en CC), zet dan `allen_beantwoorden: true` bij de bron.
+
 ### Apple Mail koppelen
 
 Zet het account in Apple Mail en voeg een bron toe met `type: applemail` en de accountnaam zoals Mail die toont. De eerste keer vraagt macOS of Terminal Mail mag besturen. Sta dat toe onder Systeeminstellingen, Privacy en beveiliging, Automatisering.
