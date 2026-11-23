@@ -97,7 +97,10 @@ class OutlookBron:
             ))
         return mails
 
-    def maak_concept(self, bron_id: str, tekst: str, onderwerp: str, aan: str, message_id: str | None = None) -> str:
+    def maak_concept(self, bron_id: str, tekst: str, onderwerp: str, aan: str, message_id: str | None = None,
+                     verzenden: bool = False) -> str:
+        if verzenden:
+            raise ValueError("meteen verzenden kan niet via de Outlook-koppeling (bewust geen verzendrecht)")
         with self._client() as c:
             r = c.post(f"/me/messages/{bron_id}/createReply", json={"comment": html.escape(tekst).replace("\n", "<br>")})
             r.raise_for_status()

@@ -44,15 +44,19 @@ class MapBron:
         self.laatste_totaal = len(mails)
         return mails[:maximum]
 
-    def maak_concept(self, bron_id: str, tekst: str, onderwerp: str, aan: str, message_id: str | None = None) -> str:
+    def maak_concept(self, bron_id: str, tekst: str, onderwerp: str, aan: str, message_id: str | None = None,
+                     verzenden: bool = False) -> str:
         self.uit.mkdir(parents=True, exist_ok=True)
         msg = email.message.EmailMessage()
         msg["To"] = aan
         msg["Subject"] = onderwerp if onderwerp.lower().startswith("re:") else f"Re: {onderwerp}"
         msg.set_content(tekst)
-        doel = self.uit / f"concept-{Path(bron_id).stem}.eml"
+        map_ = self.uit.parent / "verzonden" if verzenden else self.uit
+        map_.mkdir(parents=True, exist_ok=True)
+        doel = map_ / f"{'verzonden' if verzenden else 'concept'}-{Path(bron_id).stem}.eml"
         doel.write_bytes(bytes(msg))
-        return f"opgeslagen als {doel}"
+        self.laatste_uitkomst = "verzonden" if verzenden else "geplakt"
+        return "verzonden" if verzenden else f"opgeslagen als {doel}"
 
     def verplaats(self, bron_ids: list[str], doel: str) -> dict[str, str | None]:
         doelmap = self.pad / (f"_map_{doel[4:].replace('/', '_')}" if doel.startswith("map:") else f"_{doel}")

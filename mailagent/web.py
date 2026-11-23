@@ -23,7 +23,7 @@ from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
 from .opmaak import html_uit_bron, veilig
-from .pipeline import afzender_adres, map_voorstellen, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
+from .pipeline import afzender_adres, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
 from .store import Store
 
 APP_HTML = Path(__file__).with_name("static") / "app.html"
@@ -216,7 +216,14 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
             try:
                 if actie == "goedkeuren":
                     with mail_slot:
-                        melding = keur_goed(store, bronnen, int(v["id"]), v.get("concept"), v.get("taken"))
+                        melding = keur_goed(store, bronnen, int(v["id"]), v.get("concept"), v.get("taken"),
+                                            verzenden=bool(v.get("verzenden")))
+                    if v.get("verzenden") and store.item(int(v["id"]))["status"] != "verzonden":
+                        return self._json({"ok": False, "melding": melding})
+                elif actie == "gedaan":
+                    melding = markeer_gedaan(store, int(v["id"]))
+                elif actie == "niet-gedaan":
+                    melding = zet_gedaan_terug(store, int(v["id"]))
                 elif actie == "afwijzen":
                     wijs_af(store, int(v["id"]))
                     melding = "Afgewezen"

@@ -313,8 +313,9 @@ def run(cfg: Config, store: Store, bronnen: dict, llm: LLM, dagen: int | None = 
 
 
 def keur_goed(store: Store, bronnen: dict, item_id: int, concept: str | None,
-              taken: list[dict] | None = None) -> str:
-    """Goedkeuren: concept klaarzetten in de mailbox (niet versturen) en taken opslaan."""
+              taken: list[dict] | None = None, verzenden: bool = False) -> str:
+    """Goedkeuren: concept in Mail zetten (of na jouw bevestigde klik meteen versturen) en taken opslaan.
+    Versturen gebeurt alleen vanuit de app na een klik van de gebruiker, nooit tijdens een ronde."""
     item = store.item(item_id)
     if item is None:
         raise ValueError(f"Item {item_id} bestaat niet")
@@ -323,12 +324,21 @@ def keur_goed(store: Store, bronnen: dict, item_id: int, concept: str | None,
 
     meldingen = []
     concept = (concept or "").strip() or None
+    if verzenden and not concept:
+        raise ValueError("geen tekst om te versturen")
+    verzonden = False
     if concept:
         bron = bronnen.get(item["bron"])
         if bron is None:
             raise ValueError(f"Bron '{item['bron']}' staat niet meer in de configuratie")
-        meldingen.append(bron.maak_concept(item["bron_id"], concept, item["onderwerp"], item["van"],
-                                           message_id=item["thread_id"]))
+        if verzenden:
+            uitkomst = bron.maak_concept(item["bron_id"], concept, item["onderwerp"], item["van"],
+                                         message_id=item["thread_id"], verzenden=True)
+            verzonden = getattr(bron, "laatste_uitkomst", None) == "verzonden"
+            meldingen.append(f"verzonden aan {item['van']}" if verzonden else uitkomst)
+        else:
+            meldingen.append(bron.maak_concept(item["bron_id"], concept, item["onderwerp"], item["van"],
+                                               message_id=item["thread_id"]))
     if taken is None:   # niet aangepast: de taken zoals Claude ze voorstelde
         taken = json.loads(item["taken"] or "[]")
     taken = [{"omschrijving": t["omschrijving"].strip(), "deadline": (t.get("deadline") or None)}
@@ -337,10 +347,29 @@ def keur_goed(store: Store, bronnen: dict, item_id: int, concept: str | None,
         store.voeg_taken_toe(item_id, item["project"], taken)
         meldingen.append(f"{len(taken)} taak/taken toegevoegd")
     melding = "; ".join(meldingen) or "goedgekeurd zonder concept of taken"
-    store.zet_status(item_id, "goedgekeurd", concept=concept, opmerking=melding)
+    store.zet_status(item_id, "verzonden" if verzonden else "goedgekeurd", concept=concept, opmerking=melding)
     if concept:
         store.zet_eigen_antwoord(item_id, concept)
+    store.log(item_id, "VERZONDEN na bevestigde klik" if verzonden else "concept in Mail gezet")
     return melding
+
+
+def markeer_gedaan(store: Store, item_id: int) -> str:
+    """Geen antwoord nodig: uit Te doen, de mail blijft waar hij staat."""
+    item = store.item(item_id)
+    if item is None:
+        raise ValueError("mail niet gevonden")
+    store.bewaar_vorige_status(item_id, item["status"])
+    store.zet_status(item_id, "gedaan")
+    return "Gedaan"
+
+
+def zet_gedaan_terug(store: Store, item_id: int) -> str:
+    item = store.item(item_id)
+    if item is None or item["status"] != "gedaan":
+        raise ValueError("niet als gedaan gemarkeerd")
+    store.zet_status(item_id, item["vorige_status"] or "wacht")
+    return "Terug in Te doen"
 
 
 def wijs_af(store: Store, item_id: int, reden: str | None = None) -> None:

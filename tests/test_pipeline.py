@@ -543,3 +543,31 @@ def test_opgemaakte_weergave_veilig():
     assert "<script" not in h.lower() and "alert(1)" not in h and "onload" not in h
     assert "javascript:" not in h and "<iframe" not in h and "<form" not in h
     assert "default-src 'none'" in h and "tracker.example" not in h   # externe afbeelding komt niet eens in de pagina
+
+
+def test_verzenden_alleen_via_bevestigde_klik_en_gedaan(omgeving):
+    import inspect
+    from pathlib import Path
+    from mailagent import pipeline
+    from mailagent.pipeline import keur_goed, markeer_gedaan, zet_gedaan_terug
+
+    # bewaking: automatische rondes kunnen niet versturen, en er is precies één verzendopdracht in de code
+    assert "verzend" not in inspect.getsource(pipeline.run) and "verzend" not in inspect.getsource(pipeline.verwerk_mail)
+    bronnen_code = (ROOT / "mailagent" / "sources" / "applemail.py").read_text()
+    assert bronnen_code.count("send om") == 1
+    alle_code = "".join(p.read_text() for p in (ROOT / "mailagent").rglob("*.py"))
+    assert "smtplib" not in alle_code and "/sendMail" not in alle_code and "Mail.Send\"" not in alle_code
+
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    a, b = [r["id"] for r in store.items(status="wacht")][:2]
+    with pytest.raises(ValueError):
+        keur_goed(store, bronnen, a, "  ", verzenden=True)          # geen tekst, niets versturen
+    assert "verzonden aan" in keur_goed(store, bronnen, a, "Dank, akkoord.", verzenden=True)
+    assert store.item(a)["status"] == "verzonden"
+    assert (cfg.data_dir / "verzonden").exists()
+
+    markeer_gedaan(store, b)
+    assert store.item(b)["status"] == "gedaan"
+    zet_gedaan_terug(store, b)
+    assert store.item(b)["status"] == "wacht"

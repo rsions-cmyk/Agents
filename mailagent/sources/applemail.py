@@ -154,6 +154,7 @@ on run argv
     end if
     if m is missing value then error "mail niet meer gevonden in " & mailboxNaam & " of " & archiefNaam
     set allen to (count of argv) > 6 and (item 7 of argv) is "1"
+    set verzend to (count of argv) > 7 and (item 8 of argv) is "1"
     -- 1. Een echt antwoordvenster: Mail zet de oorspronkelijke mail er zelf in, met alle opmaak,
     --    en het bericht hoort bij het gesprek. De inhoud zetten via AppleScript werkt niet (venster wordt leeg),
     --    dus plakken we de concepttekst bovenaan.
@@ -189,12 +190,30 @@ on run argv
         return "geen-toegang"
     end try
     delay 0.6
+    set uitkomst to "geplakt"
+    if verzend then
+        -- 3. Alleen versturen als jouw tekst aantoonbaar in dit antwoord staat
+        set uitkomst to "niet-verzonden"
+        set eersteRegel to first paragraph of conceptTekst
+        if (length of eersteRegel) > 40 then set eersteRegel to text 1 thru 40 of eersteRegel
+        tell application "Mail"
+            repeat with om in outgoing messages
+                try
+                    if (subject of om) contains fragment and (content of om) contains eersteRegel then
+                        send om
+                        set uitkomst to "verzonden"
+                        exit repeat
+                    end if
+                end try
+            end repeat
+        end tell
+    end if
     if oudKlembord is not missing value then
         try
             set the clipboard to oudKlembord
         end try
     end if
-    return "geplakt"
+    return uitkomst
 end run
 '''
 
@@ -411,9 +430,15 @@ class AppleMailBron:
                                    tekst=inhoud.strip(), thread_id=message_id, extra={"bulk": bulk == "1"}))
         return sorted(mails, key=lambda m: m.datum)
 
-    def maak_concept(self, bron_id: str, tekst: str, onderwerp: str, aan: str, message_id: str | None = None) -> str:
-        hoe = _osascript(SCRIPT_CONCEPT, self.account, self.mailbox, bron_id, tekst,
-                         message_id or "", self.mappen["archief"], "1" if self.allen_beantwoorden else "0").strip()
+    def maak_concept(self, bron_id: str, tekst: str, onderwerp: str, aan: str, message_id: str | None = None,
+                     verzenden: bool = False) -> str:
+        hoe = _osascript(SCRIPT_CONCEPT, self.account, self.mailbox, bron_id, tekst, message_id or "",
+                         self.mappen["archief"], "1" if self.allen_beantwoorden else "0", "1" if verzenden else "0").strip()
+        self.laatste_uitkomst = hoe
+        if hoe == "verzonden":
+            return "verzonden"
+        if hoe == "niet-verzonden":
+            return "niet verzonden: je tekst kon niet in het antwoord worden gecontroleerd; het antwoord staat open in Mail"
         if hoe == "geplakt":
             return "antwoord staat klaar in Apple Mail, met je tekst boven de oorspronkelijke mail; versturen doe je zelf"
         if hoe == "geen-toegang":

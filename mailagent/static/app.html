@@ -363,7 +363,7 @@ textarea#concept::placeholder,#a-tekst::placeholder{color:#8a929b}
 .projectkies{border-radius:6px}
 
 /* toasts: onderin, dicht bij waar je klikte, met ongedaan maken */
-.toasts{top:auto;bottom:22px;right:auto;left:50%;transform:translateX(-50%);align-items:center}
+.toasts{top:auto;bottom:96px;right:auto;left:50%;transform:translateX(-50%);align-items:center}
 .toast{background:var(--tekst);color:var(--bg);border:0;border-left:0;border-radius:10px;padding:10px 12px 10px 14px;box-shadow:var(--schaduw-hoog);align-items:center;animation:omhoog var(--gewoon) ease}
 .toast svg{color:var(--ok)} .toast.fout{background:var(--hoog);color:#fff} .toast.fout svg{color:#fff}
 .toast .knop{background:transparent;color:inherit;border:1px solid color-mix(in srgb,currentColor 35%,transparent);margin-left:6px;padding:3px 10px}
@@ -439,6 +439,14 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
 .afsluiten .r .titel{overflow-wrap:anywhere}
 
 .groep-kop .groepvink{margin-left:4px}
+
+/* voet met acties: links afhandelen, rechts antwoorden */
+.voet-acties{justify-content:space-between;flex-wrap:wrap;gap:8px}
+.voet-acties .groepje{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.voet-acties .groepje:last-child{margin-left:auto}
+.knop.ikoonknop{padding:8px 10px}
+.knop.bevestig{background:var(--hoog)!important;border-color:var(--hoog)!important;color:#fff!important;animation:pulseer 1s ease infinite alternate}
+@keyframes pulseer{to{filter:brightness(1.12)}}
 
 /* sneltoetsen-overzicht */
 .overlay{position:fixed;inset:0;background:rgba(10,14,18,.35);display:grid;place-items:center;z-index:50;animation:inkomen var(--snel) ease}
@@ -771,7 +779,7 @@ function tekenLeegPaneel(){
       ${klaar ? `<div class="rond">${ik("check")}</div><b style="color:var(--tekst)">Alles bijgewerkt</b>Er wacht niets op je.` :
         staat.tab === "opruimen" ? `${ik("sparkle")}<b style="color:var(--tekst)">Opruimen</b><p>Klik op een mail om hem te lezen. Vink mails aan om er meerdere tegelijk af te handelen.</p>` :
         `${ik("mail")}<b style="color:var(--tekst)">Kies een mail</b>`}
-      <div class="sneltoetsen"><span><kbd>J</kbd> <kbd>K</kbd> volgende, vorige</span><span><kbd>⌘</kbd><kbd>↵</kbd> goedkeuren</span>
+      <div class="sneltoetsen"><span><kbd>J</kbd> <kbd>K</kbd> volgende, vorige</span><span><kbd>⌘</kbd><kbd>↵</kbd> in Mail</span><span><kbd>⇧⌘↵</kbd> verzenden</span><span><kbd>D</kbd> gedaan</span>
         <span><kbd>V</kbd> opbergen</span><span><kbd>E</kbd> archiveren</span><span><kbd>#</kbd> prullenbak</span><span><kbd>T</kbd> taak</span><span><kbd>X</kbd> afwijzen</span>
         <span><kbd>1</kbd>–<kbd>${D.projecten.length}</kbd> project</span><span><kbd>?</kbd> alle sneltoetsen</span></div></div>`;
   p.classList.add("open"); p.setAttribute("aria-hidden","false");
@@ -983,13 +991,18 @@ function tekenPaneel(it){
       ${it.agenda ? `<div class="melding info">${ik("calendar")}<div><b>Agendavoorstel</b><br>${esc(it.agenda)}</div></div>` : ""}
       <details class="origineel" data-orig="${it.id}"><summary>${ik("mail")}Oorspronkelijke mail</summary>${p.querySelector(`details[data-orig="${it.id}"]`)?.open ? mailWeergave(it.id, it.tekst) : ""}</details>
     </div>
-    <div class="p-voet">
-      <span class="uitleg">Opent een antwoord in Apple Mail. Je verstuurt zelf.</span>
-      <button class="knop" data-maaktaak="${it.id}" title="Taak maken en inplannen (T)">${ik("calendar")}Taak<kbd>T</kbd></button>
-      <button class="knop" data-opbergen="${it.id}" title="Opbergen in een map (V)">${ik("folder")}<kbd>V</kbd></button>
-      <button class="knop" data-een="archief" data-id="${it.id}" title="Archiveren zonder antwoord (E)">${ik("archive")}<kbd>E</kbd></button>
-      <button class="knop" id="afwijzen" title="Afwijzen (X)">${ik("x")}Afwijzen<kbd>X</kbd></button>
-      <button class="knop goed" id="goedkeuren" title="Goedkeuren (⌘↵)">${ik("check")}${zelf ? "Afgehandeld" : "Goedkeuren"}<kbd>⌘↵</kbd></button>
+    <div class="p-voet voet-acties">
+      <div class="groepje">
+        <button class="knop ikoonknop" data-maaktaak="${it.id}" title="Taak maken en inplannen (T)">${ik("calendar")}<kbd>T</kbd></button>
+        <button class="knop ikoonknop" data-opbergen="${it.id}" title="Opbergen in een map (V)">${ik("folder")}<kbd>V</kbd></button>
+        <button class="knop ikoonknop" data-een="archief" data-id="${it.id}" title="Archiveren zonder antwoord (E)">${ik("archive")}<kbd>E</kbd></button>
+        <button class="knop ikoonknop" id="afwijzen" title="Afwijzen: het voorstel klopt niet (X)">${ik("x")}<kbd>X</kbd></button>
+        <button class="knop" id="gedaan" title="Gedaan: geen antwoord nodig, mail blijft waar hij staat (D)">${ik("check")}Gedaan<kbd>D</kbd></button>
+      </div>
+      <div class="groepje">
+        <button class="knop" id="goedkeuren" title="Antwoord met deze tekst klaarzetten in Apple Mail; je verstuurt daar zelf (⌘↵)">${ik("reply")}In Mail zetten<kbd>⌘↵</kbd></button>
+        <button class="knop goed" id="verzenden" title="Meteen versturen; tweede klik bevestigt (⇧⌘↵)">${ik("forward")}Verzenden<kbd>⇧⌘↵</kbd></button>
+      </div>
     </div>`;
   p.classList.add("open"); p.setAttribute("aria-hidden","false");
   if (!drieKolommen()) document.getElementById("dek").classList.add("open");
@@ -1295,6 +1308,34 @@ document.addEventListener("click", async ev => {
   }
   if (t.id === "sluit") return sluitPaneel();
   if (t.id === "ophalen"){ D.ophalen.bezig = true; teken(); return actie("ophalen").then(laad); }
+  if (t.id === "gedaan"){
+    const id = Number(document.getElementById("paneel").dataset.id);
+    const volgende = drieKolommen() ? volgendeNa(id) : null;
+    sluitPaneel(); if (volgende !== null) staat.open = volgende;
+    await animeerWeg([id]); verborgen.add(id); teken();
+    const j = await stil("gedaan", {id}); verborgen.delete(id);
+    if (!j.ok) toast(j.melding, true);
+    else toast("Gedaan", false, {label: "Ongedaan maken", doe: async () => { const r = await stil("niet-gedaan", {id}); toast(r.melding, !r.ok); staat.open = id; laad(); }});
+    return laad();
+  }
+  if (t.id === "verzenden"){
+    const id = Number(document.getElementById("paneel").dataset.id), concept = document.getElementById("concept").value;
+    if (!concept.trim()) return toast("Er staat geen tekst om te versturen", true);
+    if (!t.classList.contains("bevestig")){
+      // eerste klik: bevestigen met de ontvanger in beeld; na 5 seconden weer terug
+      const it = [...D.zelf, ...D.wacht].find(x => x.id === id), naam = it ? afzender(it.van).naam : "de afzender";
+      t.classList.add("bevestig"); t.innerHTML = `${ik("forward")}Klik nogmaals: verzenden aan ${esc(naam)}`;
+      clearTimeout(t._terug); t._terug = setTimeout(() => { if (t.isConnected){ t.classList.remove("bevestig"); t.innerHTML = `${ik("forward")}Verzenden<kbd>⇧⌘↵</kbd>`; } }, 5000);
+      return;
+    }
+    const data = {id, concept, taken: (bewerkt[id] || null), verzenden: true};
+    const volgende = drieKolommen() ? volgendeNa(id) : null;
+    sluitPaneel(); if (volgende !== null) staat.open = volgende;
+    toast("Versturen via Apple Mail…");
+    const ok = await meteen([id], "goedkeuren", data);
+    if (!ok){ staat.open = id; teken(); }
+    return;
+  }
   if (t.id === "goedkeuren" || t.id === "afwijzen"){
     const id = Number(document.getElementById("paneel").dataset.id);
     const goed = t.id === "goedkeuren";
@@ -1371,7 +1412,9 @@ function toonSneltoetsen(){
   o.className = "overlay";
   o.innerHTML = `<div class="vel"><h3>Sneltoetsen</h3><dl>
     <dt><kbd>J</kbd> <kbd>K</kbd></dt><dd>volgende en vorige mail</dd>
-    <dt><kbd>⌘</kbd> <kbd>↵</kbd></dt><dd>goedkeuren (concept naar Apple Mail)</dd>
+    <dt><kbd>⌘</kbd> <kbd>↵</kbd></dt><dd>antwoord klaarzetten in Apple Mail</dd>
+    <dt><kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>↵</kbd></dt><dd>meteen verzenden (twee keer: de tweede bevestigt)</dd>
+    <dt><kbd>D</kbd></dt><dd>gedaan, geen antwoord nodig</dd>
     <dt><kbd>V</kbd></dt><dd>opbergen in een map</dd>
     <dt><kbd>E</kbd></dt><dd>archiveren</dd>
     <dt><kbd>#</kbd></dt><dd>naar de prullenbak</dd>
@@ -1423,6 +1466,7 @@ document.addEventListener("keydown", ev => {
   }
   if (staat.tab !== "te_doen" || taak || antwoord) return;
   const id = staat.open;
+  if ((ev.metaKey || ev.ctrlKey) && ev.shiftKey && ev.key === "Enter" && id !== null){ ev.preventDefault(); return document.getElementById("verzenden")?.click(); }
   if ((ev.metaKey || ev.ctrlKey) && ev.key === "Enter" && id !== null){ ev.preventDefault(); return document.getElementById("goedkeuren")?.click(); }
   if (inVeld || ev.metaKey || ev.ctrlKey || ev.altKey) return;
   const lijst = teDoen().map(i => i.id), i = lijst.indexOf(id);
@@ -1433,6 +1477,7 @@ document.addEventListener("keydown", ev => {
   if (ev.key === "v"){ ev.preventDefault(); return openKiezer(id, document.querySelector('#paneel [data-opbergen]')); }
   if (ev.key === "#" || ev.key === "Delete" || ev.key === "Backspace"){ ev.preventDefault(); return verplaats([id], "prullenbak"); }
   if (ev.key === "x") return document.getElementById("afwijzen")?.click();
+  if (ev.key === "d") return document.getElementById("gedaan")?.click();
   if (ev.key === "t") return openTaak(id);
   const n = Number(ev.key);
   if (n >= 1 && n <= D.projecten.length) return zetProject(id, D.projecten[n-1].naam);

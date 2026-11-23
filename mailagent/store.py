@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS items (
     taken TEXT,
     agenda TEXT,
     vragen TEXT,
-    status TEXT NOT NULL,       -- wacht | goedgekeurd | afgewezen | ter_info | genegeerd | handmatig | fout | gearchiveerd | verwijderd | taak | opgeborgen
+    status TEXT NOT NULL,       -- wacht | goedgekeurd | afgewezen | ter_info | genegeerd | handmatig | fout | gearchiveerd | verwijderd | taak | opgeborgen | gedaan | verzonden
     opmerking TEXT,
     aangemaakt TEXT NOT NULL,
     afgehandeld TEXT,
@@ -251,7 +251,7 @@ class Store:
     def vandaag_afgehandeld(self) -> int:
         begin = datetime.now().astimezone().replace(hour=0, minute=0, second=0, microsecond=0).isoformat(timespec="seconds")
         return self.db.execute("SELECT COUNT(*) FROM items WHERE afgehandeld >= ? AND status IN "
-                               "('goedgekeurd','afgewezen','gearchiveerd','verwijderd','opgeborgen','taak')",
+                               "('goedgekeurd','afgewezen','gearchiveerd','verwijderd','opgeborgen','taak','gedaan','verzonden')",
                                (begin,)).fetchone()[0]
 
     def bewaar_vorige_status(self, item_id: int, status: str) -> None:
@@ -290,10 +290,10 @@ class Store:
         """Per afzenderadres: hoe vaak gearchiveerd, weggegooid, taak van gemaakt, beantwoord, afgewezen."""
         from email.utils import parseaddr
         soorten = {"gearchiveerd": "archief", "verwijderd": "prullenbak", "taak": "taak",
-                   "goedgekeurd": "antwoord", "afgewezen": "afgewezen"}
+                   "goedgekeurd": "antwoord", "verzonden": "antwoord", "afgewezen": "afgewezen", "gedaan": "gedaan"}
         uit: dict[str, dict[str, int]] = {}
         for r in self.db.execute("SELECT i.status, m.van FROM items i JOIN mails m USING(sleutel) WHERE i.status IN "
-                                 "('gearchiveerd','verwijderd','taak','goedgekeurd','afgewezen')"):
+                                 "('gearchiveerd','verwijderd','taak','goedgekeurd','verzonden','afgewezen','gedaan')"):
             adres = (parseaddr(r["van"] or "")[1] or (r["van"] or "")).lower()
             teller = uit.setdefault(adres, {})
             teller[soorten[r["status"]]] = teller.get(soorten[r["status"]], 0) + 1
