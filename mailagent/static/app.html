@@ -438,6 +438,8 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
 .kaart[data-kaart]{cursor:grab}
 .afsluiten .r .titel{overflow-wrap:anywhere}
 
+.groep-kop .groepvink{margin-left:4px}
+
 /* sneltoetsen-overzicht */
 .overlay{position:fixed;inset:0;background:rgba(10,14,18,.35);display:grid;place-items:center;z-index:50;animation:inkomen var(--snel) ease}
 .overlay .vel{background:var(--vlak);border-radius:16px;box-shadow:var(--schaduw-hoog);padding:22px 24px;width:min(520px,calc(100vw - 32px))}
@@ -525,7 +527,7 @@ const pletter = p => (p in PLETTER) ? PLETTER[p] : (p || "?")[0].toUpperCase();
 const avatar = (it, klein) => { const a = afzender(it.van);
   return `<div class="avatar${klein?" klein":""}" style="background:${kleur(it.project)}" title="${esc(naamProject(it.project || "overig"))}">${esc(initialen(a.naam))}${pletter(it.project) ? `<span class="pl">${esc(pletter(it.project))}</span>` : ""}</div>`; };
 
-let D = null, staat = {project:"alles", tab:"te_doen", open:null, lees:null, gekozen:new Set(), geenAuto:false, planDag:null};
+let D = null, staat = {project:"alles", tab:"te_doen", open:null, lees:null, anker:null, gekozen:new Set(), geenAuto:false, planDag:null};
 const leesCache = {};   // id -> volledige mail (met tekst) voor Opruimen
 try { const o = JSON.parse(localStorage.getItem("mailagent-ui")||"{}"); Object.assign(staat, {project:o.project||"alles", tab:o.tab||"te_doen"}); } catch(e){}
 if (!["te_doen","planning","opruimen"].includes(staat.tab)) staat.tab = "te_doen";
@@ -656,6 +658,7 @@ function teken(){
   else if (staat.tab === "planning") inhoud.innerHTML = tekenPlanning();
   else inhoud.innerHTML = tekenOpruimen();
   tekenBalk();
+  document.querySelectorAll('input.groepvink[data-deels="1"]').forEach(v => { v.indeterminate = true; });
 
   // derde kolom / paneel
   if (taak || antwoord) return;
@@ -772,6 +775,12 @@ function tekenLeegPaneel(){
         <span><kbd>V</kbd> opbergen</span><span><kbd>E</kbd> archiveren</span><span><kbd>#</kbd> prullenbak</span><span><kbd>T</kbd> taak</span><span><kbd>X</kbd> afwijzen</span>
         <span><kbd>1</kbd>–<kbd>${D.projecten.length}</kbd> project</span><span><kbd>?</kbd> alle sneltoetsen</span></div></div>`;
   p.classList.add("open"); p.setAttribute("aria-hidden","false");
+}
+
+function selecteerReeks(van, tot, aan){
+  const lijst = opruimLijst().map(i => i.id), a = lijst.indexOf(van), b = lijst.indexOf(tot);
+  if (a < 0 || b < 0) return;
+  for (const i of lijst.slice(Math.min(a, b), Math.max(a, b) + 1)) aan ? staat.gekozen.add(i) : staat.gekozen.delete(i);
 }
 
 // volgende mail in Te doen na een actie, zodat je door kunt werken
@@ -895,7 +904,8 @@ function opruimGroep(titel, items, hoofd){
   const groot = hoofd === "archief"
     ? `<button class="knop klein" data-groep="archief" data-ids="${ids}">${ik("archive")}Alles archiveren</button>`
     : `<button class="knop klein" data-groep="prullenbak" data-ids="${ids}">${ik("trash")}Alles naar prullenbak</button>`;
-  return `<div class="groep"><div class="groep-kop"><h2>${titel} · ${items.length}</h2><div class="acties">${groot}</div></div>
+  const nGekozen = items.filter(i => staat.gekozen.has(i.id)).length;
+  return `<div class="groep"><div class="groep-kop"><input type="checkbox" class="vink groepvink" data-groepvink="${ids}" ${nGekozen === items.length ? "checked" : ""} data-deels="${nGekozen > 0 && nGekozen < items.length ? 1 : 0}" title="Hele groep selecteren" aria-label="Hele groep ${titel} selecteren"><h2>${titel} · ${items.length}</h2><div class="acties">${groot}</div></div>
     <div class="lijst">${items.map(it => { const a = afzender(it.van), gw = gewoonte(it);
       return `<div class="rij${staat.gekozen.has(it.id)?" gekozen":""}${staat.lees===it.id?" leest":""}" data-kies="${it.id}" tabindex="0">
         <input type="checkbox" class="vink" data-vink="${it.id}" ${staat.gekozen.has(it.id)?"checked":""} aria-label="Selecteren">
@@ -933,6 +943,7 @@ function tekenBalk(){
   const b = document.getElementById("balk"), n = staat.gekozen.size;
   b.classList.toggle("open", n > 0 && staat.tab === "opruimen");
   b.innerHTML = `<span>${n} geselecteerd</span>
+    <button class="knop klein" data-bulkmap="1">${ik("folder")}Opbergen</button>
     <button class="knop klein" data-bulk="archief">${ik("archive")}Archiveren</button>
     <button class="knop klein" data-bulk="prullenbak">${ik("trash")}Prullenbak</button>
     <button class="knop klein" data-bulk="overslaan">${ik("ban")}Overslaan</button>
@@ -1231,6 +1242,7 @@ document.addEventListener("click", async ev => {
     return velden[velden.length - 1]?.focus();
   }
   if (d.opbergen){ ev.stopPropagation(); return openKiezer(Number(d.opbergen), t); }
+  if (d.bulkmap){ const ids = [...staat.gekozen]; if (ids.length) return openKiezer(ids[0], t, ids); return; }
   if (d.maaktaak){ ev.stopPropagation(); return openTaak(Number(d.maaktaak)); }
   if (taak && d.duur){ taak.minuten = Number(d.duur); return tekenTaak(); }
   if (taak && d.moment !== undefined){
@@ -1261,12 +1273,26 @@ document.addEventListener("click", async ev => {
   if (d.bulk){ if (d.bulk === "leeg"){ staat.gekozen.clear(); return teken(); } return verplaats([...staat.gekozen], d.bulk); }
   if (d.overslaanalle){ const j = await stil("regels-toevoegen", {adressen: d.overslaanalle.split(",")}); toast(j.melding, !j.ok); return laad(); }
   if (d.regelweg){ return actie("regel-weg", {adres:d.regelweg}).then(laad); }
-  if (d.vink){
-    const id = Number(d.vink);
-    staat.gekozen.has(id) ? staat.gekozen.delete(id) : staat.gekozen.add(id);
+  if (d.vink || d.kies){
+    const id = Number(d.vink || d.kies);
+    if (ev.shiftKey && staat.anker !== null && staat.anker !== undefined){
+      // reeks: alles tussen het anker en deze mail krijgt dezelfde stand (bij een vinkje: de nieuwe stand ervan)
+      selecteerReeks(staat.anker, id, d.vink ? !staat.gekozen.has(id) : true);
+      return teken();
+    }
+    if (d.vink || ev.metaKey || ev.ctrlKey){
+      staat.gekozen.has(id) ? staat.gekozen.delete(id) : staat.gekozen.add(id);
+      staat.anker = id;
+      return teken();
+    }
+    staat.anker = id;
+    return openLees(id);
+  }
+  if (d.groepvink){
+    const ids = d.groepvink.split(",").map(Number), alle = ids.every(i => staat.gekozen.has(i));
+    ids.forEach(i => alle ? staat.gekozen.delete(i) : staat.gekozen.add(i));
     return teken();
   }
-  if (d.kies){ return openLees(Number(d.kies)); }
   if (t.id === "sluit") return sluitPaneel();
   if (t.id === "ophalen"){ D.ophalen.bezig = true; teken(); return actie("ophalen").then(laad); }
   if (t.id === "goedkeuren" || t.id === "afwijzen"){
@@ -1338,6 +1364,7 @@ document.addEventListener("pointerup", ev => {
   tekenTaak();
 });
 document.getElementById("dek").addEventListener("click", sluitPaneel);
+document.addEventListener("mousedown", ev => { if (ev.shiftKey && ev.target.closest && ev.target.closest(".rij[data-kies]")) ev.preventDefault(); });
 function toonSneltoetsen(){
   if (document.querySelector(".overlay")) return document.querySelector(".overlay").remove();
   const o = document.createElement("div");
@@ -1352,6 +1379,10 @@ function toonSneltoetsen(){
     <dt><kbd>X</kbd></dt><dd>afwijzen</dd>
     <dt><kbd>1</kbd>–<kbd>${D ? D.projecten.length : 4}</kbd></dt><dd>project wijzigen</dd>
     <dt><kbd>[</kbd></dt><dd>zijbalk in- of uitklappen</dd>
+    <dt>Shift-klik</dt><dd>reeks selecteren (Opruimen)</dd>
+    <dt>⌘-klik, <kbd>Spatie</kbd></dt><dd>één mail aan- of uitvinken</dd>
+    <dt><kbd>⇧</kbd> <kbd>J</kbd> <kbd>K</kbd></dt><dd>selectie uitbreiden</dd>
+    <dt><kbd>⌘</kbd> <kbd>A</kbd></dt><dd>alles in Opruimen selecteren</dd>
     <dt><kbd>Esc</kbd></dt><dd>sluiten</dd>
     <dt><kbd>?</kbd></dt><dd>dit overzicht</dd></dl></div>`;
   o.addEventListener("click", () => o.remove());
@@ -1362,19 +1393,32 @@ document.addEventListener("keydown", ev => {
   const inVeld = ev.target.closest && ev.target.closest("input, textarea, select");
   if (ev.key === "?" && !inVeld){ ev.preventDefault(); return toonSneltoetsen(); }
   if (ev.key === "Escape" && document.querySelector(".overlay")) return document.querySelector(".overlay").remove();
-  if (ev.key === "Escape"){ if (inVeld) return ev.target.blur(); if (plaatsing){ plaatsing = null; return teken(); } return (staat.geenAuto = true, sluitPaneel()); }
+  if (ev.key === "Escape"){ if (inVeld) return ev.target.blur(); if (plaatsing){ plaatsing = null; return teken(); }
+    if (staat.gekozen.size){ staat.gekozen.clear(); return teken(); } return (staat.geenAuto = true, sluitPaneel()); }
   if (ev.key === "Enter" && ev.target.dataset && ev.target.dataset.open) return openPaneel(Number(ev.target.dataset.open));
   if (ev.key === "Enter" && ev.target.dataset && ev.target.dataset.kies) return openLees(Number(ev.target.dataset.kies));
+  if (staat.tab === "opruimen" && !taak && !antwoord && !inVeld && (ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === "a"){
+    ev.preventDefault(); opruimLijst().forEach(i => staat.gekozen.add(i.id)); return teken();
+  }
   if (staat.tab === "opruimen" && !taak && !antwoord && !inVeld && !ev.metaKey && !ev.ctrlKey && !ev.altKey){
     const lijst = opruimLijst().map(i => i.id), i = lijst.indexOf(staat.lees), id = staat.lees;
-    if (ev.key === "j" || ev.key === "ArrowDown"){ ev.preventDefault(); if (lijst.length) openLees(lijst[Math.min(lijst.length-1, i+1)]); return; }
-    if (ev.key === "k" || ev.key === "ArrowUp"){ ev.preventDefault(); if (lijst.length) openLees(lijst[Math.max(0, i-1)]); return; }
-    if (id === null) return;
-    if (ev.key === "e") return verplaats([id], "archief");
-    if (ev.key === "v"){ ev.preventDefault(); return openKiezer(id, document.querySelector('#paneel [data-opbergen]')); }
-    if (ev.key === "#" || ev.key === "Delete" || ev.key === "Backspace"){ ev.preventDefault(); return verplaats([id], "prullenbak"); }
-    if (ev.key === "t") return openTaak(id);
-    if (ev.key === " "){ ev.preventDefault(); staat.gekozen.has(id) ? staat.gekozen.delete(id) : staat.gekozen.add(id); return teken(); }
+    const omlaag = ev.key === "j" || ev.key === "J" || ev.key === "ArrowDown", omhoog = ev.key === "k" || ev.key === "K" || ev.key === "ArrowUp";
+    if (omlaag || omhoog){
+      ev.preventDefault();
+      if (!lijst.length) return;
+      const naar = lijst[omlaag ? Math.min(lijst.length-1, i+1) : Math.max(0, i-1)];
+      if (ev.shiftKey){ if (id !== null) staat.gekozen.add(id); staat.gekozen.add(naar); staat.anker = staat.anker ?? id; }
+      else staat.anker = naar;
+      return openLees(naar);
+    }
+    // acties gelden voor de selectie als die er is, anders voor de geopende mail
+    const doel = staat.gekozen.size ? [...staat.gekozen] : (id === null ? [] : [id]);
+    if (!doel.length) return;
+    if (ev.key === "e") return verplaats(doel, "archief");
+    if (ev.key === "#" || ev.key === "Delete" || ev.key === "Backspace"){ ev.preventDefault(); return verplaats(doel, "prullenbak"); }
+    if (ev.key === "v"){ ev.preventDefault(); return openKiezer(doel[0], document.querySelector('#paneel [data-opbergen]'), doel); }
+    if (ev.key === "t" && id !== null) return openTaak(id);
+    if (ev.key === " " && id !== null){ ev.preventDefault(); staat.gekozen.has(id) ? staat.gekozen.delete(id) : staat.gekozen.add(id); staat.anker = id; return teken(); }
     return;
   }
   if (staat.tab !== "te_doen" || taak || antwoord) return;
@@ -1628,7 +1672,7 @@ document.addEventListener("click", async ev => {
 
 // ---------------- Opbergen in een map ----------------
 let kiezer = null;   // {id, mappen, voorstellen, zoek, index, el}
-async function openKiezer(id, anker){
+async function openKiezer(id, anker, ids){
   sluitKiezer();
   const el = document.createElement("div");
   el.className = "kiezer";
@@ -1638,7 +1682,7 @@ async function openKiezer(id, anker){
   const boven = r.top > innerHeight * 0.55;
   el.style.left = Math.max(16, Math.min(innerWidth - el.offsetWidth - 16, r.left - 40)) + "px";
   if (boven) el.style.bottom = (innerHeight - r.top + 8) + "px"; else el.style.top = (r.bottom + 8) + "px";
-  kiezer = {id, mappen: [], voorstellen: [], zoek: "", index: 0, el};
+  kiezer = {id, ids: ids && ids.length ? ids : [id], mappen: [], voorstellen: [], zoek: "", index: 0, el};
   el.querySelector("input").focus();
   const j = await stil("mappen", {id});
   if (!kiezer || kiezer.id !== id) return;
@@ -1666,8 +1710,8 @@ function tekenKiezer(){
 }
 function sluitKiezer(){ if (kiezer){ kiezer.el.remove(); kiezer = null; } }
 function kiesMap(map){
-  const id = kiezer.id; sluitKiezer();
-  verplaats([id], "map:" + map);
+  const ids = kiezer.ids; sluitKiezer();
+  verplaats(ids, "map:" + map);
 }
 document.addEventListener("input", ev => { if (kiezer && ev.target.id === "kiezer-zoek"){ kiezer.zoek = ev.target.value; kiezer.index = 0; tekenKiezer(); } });
 document.addEventListener("keydown", ev => {
