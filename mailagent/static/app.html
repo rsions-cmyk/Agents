@@ -420,6 +420,10 @@ body.slepen iframe{pointer-events:none}
 @media (max-width:760px){ .greep,.logo .inklap{display:none} }
 
 /* taken: alles lezen, niets afkappen */
+textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:inherit;padding:8px 10px;border:1px solid var(--lijn);border-radius:9px;background:var(--vlak2);color:var(--tekst);width:100%}
+.tk-rij{align-items:flex-start!important}
+.tk-rij textarea.groei{flex:1;min-width:0}
+.tk-rij input[type=date]{flex:none}
 .kaart .r{align-items:flex-start}
 .kaart .titel,.taak .midden > div:first-child{white-space:normal;overflow-wrap:anywhere;line-height:1.4}
 .kaart .stip{margin-top:6px}
@@ -961,7 +965,7 @@ function tekenPaneel(it){
         <textarea id="concept" placeholder="Geen concept. Typ hier zelf een antwoord, of laat leeg.">${esc(concept)}</textarea></div>
       <div><div class="label">${ik("task")}Taken bij goedkeuren</div>
         <div class="takenlijst" style="gap:6px">${bewerkTaken(it).map((t, i) => `
-          <div class="tk-rij"><input type="text" data-tk="${i}" data-veld="omschrijving" value="${esc(t.omschrijving)}" placeholder="Wat moet er gebeuren?">
+          <div class="tk-rij"><textarea class="groei" rows="1" data-tk="${i}" data-veld="omschrijving" placeholder="Wat moet er gebeuren?">${esc(t.omschrijving)}</textarea>
             <input type="date" data-tk="${i}" data-veld="deadline" value="${esc(t.deadline || "")}" aria-label="Deadline">
             <button class="ikoon rood" data-tkweg="${i}" title="Taak weghalen">${ik("x")}</button></div>`).join("")}
           <div class="tk-erbij"><button class="knop klein" data-tkerbij="1">+ Taak toevoegen</button></div></div></div>
@@ -1107,7 +1111,7 @@ function tekenTaak(){
     const dagLabel = taak.dag ? new Date(taak.dag + "T12:00").toLocaleDateString("nl-NL",{weekday:"long",day:"numeric",month:"long"}) : "";
     p.innerHTML = kop + `<div class="p-inhoud">
       <div class="melding info">${ik("sparkle")}<div>${esc(v.toelichting)}</div></div>
-      <div class="veld"><div class="label">Taak</div><input type="text" id="t-titel" value="${esc(document.getElementById("t-titel")?.value ?? v.titel)}"></div>
+      <div class="veld"><div class="label">Taak</div><textarea class="groei" rows="1" id="t-titel">${esc(document.getElementById("t-titel")?.value ?? v.titel)}</textarea></div>
       <div class="veld"><div class="label">${ik("clock")}Geschatte tijd</div>
         <div class="keuzes">${duren.map(d => `<button class="keuze${d===taak.minuten?" aan":""}" data-duur="${d}">${duurTekst(d)}</button>`).join("")}</div></div>
       <div class="veld"><div class="label">${ik("task")}Wat te doen (één stap per regel)</div>
@@ -1163,7 +1167,18 @@ function bewerkTaken(it){
   if (!bewerkt[it.id]) bewerkt[it.id] = it.taken.map(t => ({omschrijving: t.omschrijving, deadline: t.deadline || ""}));
   return bewerkt[it.id];
 }
+// tekstvakken die meegroeien met hun inhoud (taken, taaktitel)
+function rekVelden(root = document){
+  root.querySelectorAll("textarea.groei").forEach(t => { t.style.height = "auto"; t.style.height = t.scrollHeight + 2 + "px"; });
+}
+new MutationObserver(() => rekVelden(document.getElementById("paneel"))).observe(document.getElementById("paneel"), {childList: true});
+window.addEventListener("resize", () => rekVelden());
+document.addEventListener("keydown", ev => {
+  // Enter in een taakveld maakt geen nieuwe regel; Shift+Enter wel
+  if (ev.key === "Enter" && !ev.shiftKey && !ev.metaKey && !ev.ctrlKey && ev.target.matches && ev.target.matches("textarea.groei")){ ev.preventDefault(); ev.target.blur(); }
+}, true);
 document.addEventListener("input", ev => {
+  if (ev.target.matches && ev.target.matches("textarea.groei")) rekVelden(ev.target.parentElement);
   const d = ev.target.dataset;
   if (d.tk === undefined || staat.open === null) return;
   bewerkt[staat.open][Number(d.tk)][d.veld] = ev.target.value;
