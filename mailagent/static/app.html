@@ -234,7 +234,7 @@ kbd{font:600 11px var(--romp,inherit);font-family:inherit;padding:1px 6px;border
 }
 
 /* planning (voorstel B) */
-.planning-grid{display:grid;grid-template-columns:minmax(260px,360px) 1fr;gap:18px;align-items:start}
+.planning-grid{display:grid;grid-template-columns:minmax(300px,430px) minmax(0,1fr);gap:18px;align-items:start}
 .kaarten{display:flex;flex-direction:column;gap:8px}
 .kaart{background:var(--vlak);border:1px solid var(--lijn);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:5px;cursor:grab;user-select:none;-webkit-user-select:none}
 .kaart:hover{border-color:var(--zacht)}
@@ -418,6 +418,21 @@ body.slepen iframe{pointer-events:none}
 .app.ingeklapt .knop-ophalen{width:44px;padding:10px 0}
 .app.ingeklapt .zij .onder{align-items:center}
 @media (max-width:760px){ .greep,.logo .inklap{display:none} }
+
+/* taken: alles lezen, niets afkappen */
+.kaart .r{align-items:flex-start}
+.kaart .titel,.taak .midden > div:first-child{white-space:normal;overflow-wrap:anywhere;line-height:1.4}
+.kaart .stip{margin-top:6px}
+.kaart .rondje{margin-top:1px}
+.kaart .stappen-klein{margin:0 0 0 48px;padding-left:16px}
+.taakmail{align-items:flex-start;flex-wrap:wrap;row-gap:6px}
+.taakmail .tekst{flex:1 1 calc(100% - 40px)}
+.taakmail .knop:first-of-type{margin-left:38px}
+.taakmail .tekst{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;line-height:1.4}
+.taakmail .avatar{margin-top:2px}
+.kaart{user-select:text;-webkit-user-select:text}
+.kaart[data-kaart]{cursor:grab}
+.afsluiten .r .titel{overflow-wrap:anywhere}
 
 /* sneltoetsen-overzicht */
 .overlay{position:fixed;inset:0;background:rgba(10,14,18,.35);display:grid;place-items:center;z-index:50;animation:inkomen var(--snel) ease}
@@ -1398,6 +1413,7 @@ function tekenPlanning(){
     <div class="kaart${plan ? " ingepland" : ""}${gekozenKaart === t.id ? " gekozen" : ""}" ${plan ? "" : `data-kaart="${t.id}"`}>
       <div class="r"><button class="rondje" data-klaar="${t.id}" title="Afvinken">${ik("check")}</button>
         <span class="stip" style="background:${kleur(t.project)}"></span><span class="titel">${esc(t.omschrijving)}</span></div>
+      ${t.stappen && t.stappen.length ? `<ul class="stappen-klein">${t.stappen.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
       <div class="chips">
         <span class="chip">${ik("clock")}${duurTekst(t.minuten || 30)}</span>
         ${plan ? `<span class="chip let">${ik("calendar")}${momentTekst(t.gepland, t.minuten)}</span>` : ""}
