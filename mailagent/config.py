@@ -39,6 +39,11 @@ class Config:
     vlag_kleur: int = 4
     web_host: str = "127.0.0.1"
     web_poort: int = 8765
+    belangrijk: list[str] = field(default_factory=list)   # adressen of domeinen (@istte.org)
+    opvolgen_aan: bool = True
+    opvolgen_werkdagen: int = 3
+    meldingen_aan: bool = True
+    meldingen_minuten: int = 15
 
     @property
     def db_pad(self) -> Path:
@@ -97,6 +102,11 @@ def laad(pad: str | Path = "config.yaml") -> Config:
         vlag_kleur=KLEUREN.get(str((ruw.get("markeren") or {}).get("kleur", "blauw")).lower(), 4),
         web_host=web.get("host", "127.0.0.1"),
         web_poort=int(web.get("poort", 8765)),
+        belangrijk=[str(s).strip().lower() for s in (ruw.get("belangrijk") or []) if str(s).strip()],
+        opvolgen_aan=bool((ruw.get("opvolgen") or {}).get("aan", True)),
+        opvolgen_werkdagen=int((ruw.get("opvolgen") or {}).get("werkdagen", 3)),
+        meldingen_aan=bool((ruw.get("meldingen") or {}).get("aan", True)),
+        meldingen_minuten=max(5, int((ruw.get("meldingen") or {}).get("elke_minuten", 15))),
     )
 
 

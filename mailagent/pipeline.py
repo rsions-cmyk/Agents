@@ -47,20 +47,21 @@ def verwerk_mail(cfg: Config, store: Store, llm: LLM, mail: Email) -> int:
 
     De mail wordt pas als verwerkt opgeslagen samen met zijn item (zie Store.nieuw_item)."""
     vast_project, sortering = sorteer_met_regels(cfg, mail)
+    belangrijk = is_belangrijk(cfg, store, mail.van)
 
     geleerd = store.afzender_regel(afzender_adres(mail.van))
-    if sortering is None and geleerd is not None:
+    if sortering is None and geleerd is not None and not belangrijk:
         s = Sortering(project=geleerd["project"] or vast_project or "overig", actie=geleerd["actie"],
                       prioriteit="laag", deadline=None, samenvatting=mail.onderwerp,
                       reden="afzender staat op je lijst 'voortaan overslaan'")
         return store.nieuw_item(mail, s, None, "genegeerd")
 
     if not mag_naar_claude(cfg, mail):
-        s = Sortering(project=vast_project or "overig", actie="antwoorden", prioriteit="normaal",
+        s = Sortering(project=vast_project or "overig", actie="antwoorden", prioriteit="hoog" if belangrijk else "normaal",
                       deadline=None, samenvatting=mail.onderwerp, reden="staat op de lijst 'nooit naar Claude'")
         return store.nieuw_item(mail, s, None, "handmatig")
 
-    if cfg.bulk_overslaan and mail.extra.get("bulk") and vast_project is None and sortering is None:
+    if cfg.bulk_overslaan and mail.extra.get("bulk") and vast_project is None and sortering is None and not belangrijk:
         s = Sortering(project="overig", actie="negeren", prioriteit="laag", deadline=None,
                       samenvatting=mail.onderwerp, reden="nieuwsbrief of reclame (afmeldlink); niet naar Claude")
         return store.nieuw_item(mail, s, None, "genegeerd")
@@ -78,8 +79,13 @@ def verwerk_mail(cfg: Config, store: Store, llm: LLM, mail: Email) -> int:
         s = sortering or Sortering(project=vast_project or "overig", actie="antwoorden", prioriteit="normaal",
                                    deadline=None, samenvatting=mail.onderwerp, reden="niet gesorteerd")
         return store.nieuw_item(mail, s, None, "fout", opmerking=f"{soort}: {e}"[:500])
+    if belangrijk:   # nooit missen: altijd in Te doen, bovenaan
+        sortering = sortering.model_copy(update={"prioriteit": "hoog",
+                                                 "reden": f"{sortering.reden} · belangrijke afzender".strip(" ·")})
     if sortering.actie in UITWERK_ACTIES:
         return store.nieuw_item(mail, sortering, uitwerking, "wacht")
+    if belangrijk:
+        return store.nieuw_item(mail, sortering, None, "wacht")
     status = "genegeerd" if sortering.actie == "negeren" else "ter_info"
     return store.nieuw_item(mail, sortering, None, status)
 
@@ -330,7 +336,8 @@ def run(cfg: Config, store: Store, bronnen: dict, llm: LLM, dagen: int | None = 
                 continue
 
             totaal = getattr(bron, "laatste_totaal", len(mails))
-            te_doen = [m for m in sorted(mails, key=lambda m: m.datum) if not store.is_bekend(m)]
+            te_doen = [m for m in sorted(mails, key=lambda m: (not is_belangrijk(cfg, store, m.van), m.datum))
+                       if not store.is_bekend(m)]   # belangrijke afzenders eerst
             log.info("%s: %d onverwerkte mail(s) sinds %s, deze ronde %d", naam, totaal, f"{sinds:%d-%m}", len(te_doen))
             nieuw = 0
             for i, mail in enumerate(te_doen, 1):
@@ -353,11 +360,11 @@ def run(cfg: Config, store: Store, bronnen: dict, llm: LLM, dagen: int | None = 
             store.log(None, f"run {naam}: {len(mails)} van {totaal} verwerkt, nog {rest}")
             resultaat[naam] = nieuw
         try:
-            gedaan = controleer_taken(cfg, store, bronnen, llm)
-            if gedaan:
-                log.info("%d taak/taken lijken al gedaan", gedaan)
+            telling = controleer_uitgaand(cfg, store, bronnen, llm)
+            log.info("controle: %(taken)d taken en %(beantwoord)d mails lijken al gedaan; wacht op antwoord: "
+                     "%(wacht_nieuw)d nieuw, %(wacht_opgelost)d beantwoord", telling)
         except Exception as e:  # de controle mag de ronde niet laten mislukken
-            log.warning("taakcontrole mislukt: %s", e)
+            log.warning("controle na de ronde mislukt: %s", e)
         return resultaat
 
 
@@ -446,74 +453,206 @@ def zoek_antwoorden(item, verstuurd: list[dict]) -> list[dict]:
     return sorted(treffers, key=lambda v: v["datum"])
 
 
-def controleer_taken(cfg: Config, store: Store, bronnen: dict, llm: LLM | None = None, slot=None) -> int:
-    """Kijkt of open taken bij een mail al gedaan zijn, aan de hand van mail die je daarna verstuurde.
+def is_belangrijk(cfg: Config, store: Store, van: str) -> bool:
+    """Staat de afzender op je lijst belangrijke afzenders (config of sterretje in de app)?"""
+    adres = afzender_adres(van or "")
+    if not adres:
+        return False
+    for e in list(cfg.belangrijk) + [r["adres"] for r in store.belangrijke()]:
+        e = e.strip().lower()
+        if not e:
+            continue
+        if "@" not in e:
+            e = "@" + e                       # alleen een domein: istte.org
+        if adres == e or (e.startswith("@") and adres.endswith(e)):
+            return True
+    return False
 
-    De taak 'Beantwoorden: …' geldt als gedaan zodra er een antwoord is. Andere taken bij dezelfde
-    mail legt de app aan Claude voor, met alleen jouw eigen tekst. De app vinkt niets af: hij zet
-    'lijkt gedaan' met de reden, en jij vinkt af. Geeft het aantal nieuw gemarkeerde taken."""
+
+def plus_werkdagen(dag, n: int, werkdagen: set[int]) -> "date":
+    d = dag.date() if isinstance(dag, datetime) else dag   # datetime is ook een date: eerst die
+    while n > 0:
+        d += timedelta(days=1)
+        if d.isoweekday() in werkdagen:
+            n -= 1
+    return d
+
+
+VRAAGT = re.compile(r"\?|\b(graag|kun je|kunt u|zou je|zou u|wil je|laat (je|u) .*weten|hoor (ik )?graag|"
+                    r"could you|can you|would you|please|let me know|looking forward to)\b", re.IGNORECASE)
+
+
+def controleer_taken(cfg: Config, store: Store, bronnen: dict, llm: LLM | None = None, slot=None) -> int:
+    return controleer_uitgaand(cfg, store, bronnen, llm, slot)["taken"]
+
+
+def controleer_uitgaand(cfg: Config, store: Store, bronnen: dict, llm: LLM | None = None, slot=None) -> dict:
+    """Leest per bron je map Verzonden (van elk apparaat) en doet daar drie dingen mee.
+
+    1. Taken bij een mail die je al beantwoordde krijgen 'lijkt gedaan' (andere taken: Claude kijkt mee).
+    2. Mail in Te doen die je al beantwoordde krijgt 'lijkt beantwoord'.
+    3. Nieuwe mail waarin jij iets vraagt, komt op de lijst 'wacht op antwoord'.
+    Daarna sluit hij 'wacht op antwoord' af voor mail waarop een antwoord binnenkwam.
+    De app vinkt en handelt niets zelf af. Geeft tellingen terug."""
     from collections import defaultdict
     from contextlib import nullcontext
 
+    telling = {"taken": 0, "beantwoord": 0, "wacht_nieuw": 0, "wacht_opgelost": 0}
+    nu_ = datetime.now().astimezone()
     per_item = defaultdict(list)
     for t in store.open_taken():
         if t["item_id"]:
             per_item[t["item_id"]].append(t)
-    per_bron = defaultdict(list)
+    taak_items, te_doen = defaultdict(list), defaultdict(list)
     for item_id in per_item:
         it = store.item(item_id)
         if it is not None:
-            per_bron[it["bron"]].append(it)
-    nu_ = datetime.now().astimezone()
-    nieuw = 0
-    for bron_naam, items in per_bron.items():
-        bron = bronnen.get(bron_naam)
-        if bron is None or not hasattr(bron, "verzonden_sinds"):
+            taak_items[it["bron"]].append(it)
+    for status in ("wacht", "fout", "handmatig"):
+        for r in store.items(status=status):
+            it = store.item(r["id"])
+            te_doen[it["bron"]].append(it)
+
+    for bron_naam, bron in bronnen.items():
+        if not hasattr(bron, "verzonden_sinds"):
             continue
-        sinds = max(min(datetime.fromisoformat(it["datum"]) for it in items), nu_ - timedelta(days=30))
+        items = taak_items[bron_naam] + te_doen[bron_naam]
+        # de laatste week; wat al bekeken is, onthoudt de lijst (ook mail die later van je telefoon binnenkomt)
+        nieuw_vanaf = nu_ - timedelta(days=7)
+        sinds = min([datetime.fromisoformat(it["datum"]) for it in items] + [nieuw_vanaf])
+        sinds = max(sinds, nu_ - timedelta(days=30))
         try:
             with (slot or nullcontext()):
                 verstuurd = bron.verzonden_sinds(sinds)
         except Exception as e:
             log.warning("%s: verzonden mail niet te lezen: %s", bron_naam, e)
             continue
-        for it in items:
+
+        # 1. taken
+        for it in taak_items[bron_naam]:
+            telling["taken"] += _taken_met_antwoord(cfg, store, llm, it, per_item[it["id"]], verstuurd)
+        # 2. Te doen
+        for it in te_doen[bron_naam]:
             antwoorden = zoek_antwoorden(it, verstuurd)
-            if not antwoorden:
+            if not antwoorden or it["bewijs"] == antwoorden[-1]["message_id"]:
                 continue
-            laatste = antwoorden[-1]
-            bewijs = laatste["message_id"]
-            ontvanger = laatste["aan"].split(",")[0].strip() or "de afzender"
-            wanneer = f"{laatste['datum'].astimezone():%d-%m %H:%M}"
-            te_vragen = []
-            for t in per_item[it["id"]]:
-                if t["bewijs"] == bewijs:
-                    continue          # al bekeken met dit antwoord (of door jou op 'nog niet' gezet)
-                if t["soort"] == "antwoord":
-                    soort = "doorgestuurd" if DOORSTUREN.match(laatste["onderwerp"] or "") else "beantwoord"
-                    store.zet_lijkt_klaar(t["id"], f"Je hebt deze mail {soort} op {wanneer} (aan {ontvanger})", bewijs)
-                    nieuw += 1
-                else:
-                    te_vragen.append(t)
-            mail = Email(bron=it["bron"], bron_id=it["bron_id"], van=it["van"] or "", aan=it["aan"] or "",
-                         onderwerp=it["onderwerp"] or "", datum=datetime.fromisoformat(it["datum"]), tekst="")
-            if not te_vragen or llm is None or not hasattr(llm, "taken_gedaan") or not mag_naar_claude(cfg, mail):
-                continue
-            eigen = "\n\n---\n\n".join(_eigen_tekst(v["tekst"]) for v in antwoorden)
-            try:
-                oordeel = llm.taken_gedaan(it["onderwerp"] or "", [(t["id"], t["omschrijving"]) for t in te_vragen],
-                                           anonimiseer(cfg, eigen))
-            except Exception as e:
-                log.warning("taakcontrole voor %s mislukt: %s", it["sleutel"], e)
-                continue
-            klaar = {o.taak_id: o.reden for o in oordeel.taken if o.klaar}
-            for t in te_vragen:
-                if t["id"] in klaar:
-                    store.zet_lijkt_klaar(t["id"], f"Je mail van {wanneer} aan {ontvanger}: {klaar[t['id']]}", bewijs)
-                    nieuw += 1
-                else:
-                    store.zet_lijkt_klaar(t["id"], None, bewijs)   # bekeken, niet gedaan
+            v = antwoorden[-1]
+            soort = "doorgestuurd" if DOORSTUREN.match(v["onderwerp"] or "") else "beantwoord"
+            ontvanger = v["aan"].split(",")[0].strip() or "de afzender"
+            store.zet_lijkt_beantwoord(it["id"], f"Je hebt deze mail {soort} op {v['datum'].astimezone():%d-%m %H:%M} "
+                                       f"(aan {ontvanger})", v["message_id"])
+            telling["beantwoord"] += 1
+        # 3. wacht op antwoord
+        if cfg.opvolgen_aan:
+            telling["wacht_nieuw"] += _nieuwe_wacht_op(cfg, store, llm, bron_naam,
+                                                       [v for v in verstuurd if v["datum"] > nieuw_vanaf])
+
+    telling["wacht_opgelost"] = _sluit_wacht_op(store)
+    return telling
+
+
+def _taken_met_antwoord(cfg: Config, store: Store, llm, it, taken: list, verstuurd: list[dict]) -> int:
+    """Taak 'Beantwoorden: …' lijkt gedaan zodra er een antwoord is; andere taken legt de app aan Claude voor."""
+    antwoorden = zoek_antwoorden(it, verstuurd)
+    if not antwoorden:
+        return 0
+    laatste = antwoorden[-1]
+    bewijs = laatste["message_id"]
+    ontvanger = laatste["aan"].split(",")[0].strip() or "de afzender"
+    wanneer = f"{laatste['datum'].astimezone():%d-%m %H:%M}"
+    nieuw, te_vragen = 0, []
+    for t in taken:
+        if t["bewijs"] == bewijs:
+            continue          # al bekeken met dit antwoord (of door jou op 'nog niet' gezet)
+        if t["soort"] == "antwoord":
+            soort = "doorgestuurd" if DOORSTUREN.match(laatste["onderwerp"] or "") else "beantwoord"
+            store.zet_lijkt_klaar(t["id"], f"Je hebt deze mail {soort} op {wanneer} (aan {ontvanger})", bewijs)
+            nieuw += 1
+        else:
+            te_vragen.append(t)
+    mail = Email(bron=it["bron"], bron_id=it["bron_id"], van=it["van"] or "", aan=it["aan"] or "",
+                 onderwerp=it["onderwerp"] or "", datum=datetime.fromisoformat(it["datum"]), tekst="")
+    if not te_vragen or llm is None or not hasattr(llm, "taken_gedaan") or not mag_naar_claude(cfg, mail):
+        return nieuw
+    eigen = "\n\n---\n\n".join(_eigen_tekst(v["tekst"]) for v in antwoorden)
+    try:
+        oordeel = llm.taken_gedaan(it["onderwerp"] or "", [(t["id"], t["omschrijving"]) for t in te_vragen],
+                                   anonimiseer(cfg, eigen))
+    except Exception as e:
+        log.warning("taakcontrole voor %s mislukt: %s", it["sleutel"], e)
+        return nieuw
+    klaar = {o.taak_id: o.reden for o in oordeel.taken if o.klaar}
+    for t in te_vragen:
+        if t["id"] in klaar:
+            store.zet_lijkt_klaar(t["id"], f"Je mail van {wanneer} aan {ontvanger}: {klaar[t['id']]}", bewijs)
+            nieuw += 1
+        else:
+            store.zet_lijkt_klaar(t["id"], None, bewijs)   # bekeken, niet gedaan
     return nieuw
+
+
+def _nieuwe_wacht_op(cfg: Config, store: Store, llm, bron_naam: str, verstuurd: list[dict]) -> int:
+    """Verstuurde mail waarin je iets vraagt: op de lijst, terug in Te doen na x werkdagen zonder antwoord."""
+    from .agenda import lees_werktijd
+    kandidaten = []
+    for v in verstuurd:
+        mid = v["message_id"]
+        if not mid or store.wacht_op_bekend(mid) or not v["aan"].strip(" ,"):
+            continue
+        if all(re.search(r"no-?reply|donotreply|niet-?beantwoorden", a) for a in v["aan"].split(",") if a.strip()):
+            continue          # op een no-reply-adres komt geen antwoord
+        eigen = _eigen_tekst(v["tekst"])
+        ontvangers = Email(bron="", bron_id="", van=v["aan"], aan="", onderwerp=v["onderwerp"] or "",
+                           datum=v["datum"], tekst="")
+        if not VRAAGT.search(eigen) or not mag_naar_claude(cfg, ontvangers):
+            store.nieuw_wacht_op(bron_naam, mid, v["aan"], v["onderwerp"], v["datum"].isoformat(), None,
+                                 v["datum"].date().isoformat(), status="geen")   # onthouden: niet opnieuw bekijken
+            continue
+        kandidaten.append((v, eigen))
+    if not kandidaten or llm is None or not hasattr(llm, "verwacht_antwoord"):
+        return 0
+    werkdagen = lees_werktijd(cfg.agenda).dagen
+    nieuw = 0
+    for begin in range(0, len(kandidaten), 10):            # tien per vraag aan Claude
+        groep = kandidaten[begin:begin + 10]
+        try:
+            oordeel = llm.verwacht_antwoord([{"nr": i, "aan": v["aan"], "onderwerp": v["onderwerp"],
+                                              "tekst": anonimiseer(cfg, eigen)} for i, (v, eigen) in enumerate(groep)])
+        except Exception as e:
+            log.warning("wacht op antwoord: Claude-fout: %s", e)
+            return nieuw
+        per_nr = {o.nr: o for o in oordeel.mails}
+        for i, (v, _) in enumerate(groep):
+            o = per_nr.get(i)
+            verwacht = bool(o and o.verwacht_antwoord)
+            terug = plus_werkdagen(v["datum"].astimezone(), cfg.opvolgen_werkdagen, werkdagen)
+            store.nieuw_wacht_op(bron_naam, v["message_id"], v["aan"], v["onderwerp"], v["datum"].isoformat(),
+                                 (o.wat if o else None), terug.isoformat(), status="wacht" if verwacht else "geen")
+            nieuw += verwacht
+    return nieuw
+
+
+def _sluit_wacht_op(store: Store) -> int:
+    """Kwam er een antwoord binnen? Zeker via In-Reply-To/References, anders zelfde onderwerp van een ontvanger."""
+    opgelost = 0
+    for w in store.wacht_op_lijst("wacht"):
+        verstuurd = datetime.fromisoformat(w["verstuurd"])
+        mid = (w["message_id"] or "").strip().strip("<>").lower()
+        onderwerp = _kaal_onderwerp(w["onderwerp"])
+        ontvangers = {a.strip() for a in (w["aan"] or "").split(",") if a.strip()}
+        for m in store.inkomend_sinds((verstuurd - timedelta(days=1)).isoformat()):
+            try:
+                if datetime.fromisoformat(m["datum"]) <= verstuurd:
+                    continue
+            except ValueError:
+                continue
+            zeker = bool(mid) and mid in (m["verwijzingen"] or "").lower()
+            zelfde = bool(onderwerp) and _kaal_onderwerp(m["onderwerp"]) == onderwerp and afzender_adres(m["van"] or "") in ontvangers
+            if zeker or zelfde:
+                store.zet_wacht_op(w["id"], status="beantwoord", antwoord=m["sleutel"])
+                opgelost += 1
+                break
+    return opgelost
 
 
 def schone_taken(taken: list[dict]) -> list[dict]:

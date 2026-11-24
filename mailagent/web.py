@@ -14,8 +14,10 @@ from __future__ import annotations
 
 import json
 import secrets
+import logging
 import subprocess
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -28,7 +30,7 @@ from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
 from .opmaak import html_uit_bron, veilig
-from .pipeline import RondeBezig, afzender_adres, controleer_taken, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
+from .pipeline import RondeBezig, afzender_adres, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
 from .store import Store
 
 APP_HTML = Path(__file__).with_name("static") / "app.html"
@@ -36,7 +38,7 @@ APP_HTML = Path(__file__).with_name("static") / "app.html"
 
 def item_dict(rij, volledig: bool = False) -> dict:
     d = {k: rij[k] for k in ("id", "project", "actie", "prioriteit", "deadline", "samenvatting",
-                             "status", "van", "onderwerp", "datum")}
+                             "status", "van", "onderwerp", "datum", "lijkt_beantwoord")}
     if volledig:
         d.update({
             "reden": rij["reden"], "concept": rij["concept"] or "", "agenda": rij["agenda"],
@@ -94,8 +96,9 @@ def verzamel(cfg: Config, store: Store, ophalen: dict) -> dict:
     zelf = store.items(status="fout") + store.items(status="handmatig")
     return {
         "projecten": [{"naam": p, "wacht": tellingen[p]} for p in cfg.projecten],
-        "wacht": [item_dict(store.item(r["id"]), True) for r in store.items(status="wacht")],
-        "zelf": [item_dict(store.item(r["id"]), True) for r in zelf],
+        "wacht": [{**item_dict(store.item(r["id"]), True), "belangrijk": is_belangrijk(cfg, store, r["van"])}
+                  for r in store.items(status="wacht")],
+        "zelf": [{**item_dict(store.item(r["id"]), True), "belangrijk": is_belangrijk(cfg, store, r["van"])} for r in zelf],
         "info": [item_dict(r) for r in store.items(status="ter_info")[:100]],
         "overgeslagen": [item_dict(r) for r in store.items(status="genegeerd")[:100]],
         "taken": [taak_dict(store, t) for t in store.open_taken()],
@@ -107,6 +110,9 @@ def verzamel(cfg: Config, store: Store, ophalen: dict) -> dict:
         "agenda_aan": bool((cfg.agenda or {}).get("kalender")),
         "vandaag_afgehandeld": store.vandaag_afgehandeld(),
         "volgende_ronde": volgende_ronde(cfg),
+        "wacht_op": [dict(w) for w in store.wacht_op_lijst("wacht")],
+        "belangrijk": [{"adres": a, "vast": True} for a in cfg.belangrijk]
+                      + [{"adres": r["adres"], "naam": r["naam"], "vast": False} for r in store.belangrijke()],
     }
 
 
@@ -177,6 +183,43 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
             ophalen["laatste"] = f"ophalen mislukt: {ex}"
         finally:
             ophalen["bezig"] = False
+
+    def bewaak_belangrijk() -> int:
+        """Eén keer kijken: nieuwe mail van een belangrijke afzender? Dan een melding op je Mac, en meteen
+        een ronde zodat hij met concept in Te doen staat. Zonder Claude; alleen afzender en onderwerp."""
+        st = Store(db_pad)
+        gevonden = 0
+        for naam, bron in bronnen.items():
+            if not hasattr(bron, "recente"):
+                continue
+            try:
+                with mail_slot:
+                    recent = bron.recente(cfg.meldingen_minuten * 60 + 300)
+            except Exception as e:
+                logging.getLogger("mailagent").warning("bewaking %s: %s", naam, e)
+                continue
+            for bid, van, onderwerp in recent:
+                sleutel = f"{naam}:{bid}"
+                if st.is_gemeld(sleutel) or not is_belangrijk(cfg, st, van):
+                    continue
+                st.zet_gemeld(sleutel)
+                meld(f"Mail van {van.split('<')[0].strip() or van}", onderwerp or "(geen onderwerp)")
+                gevonden += 1
+        if gevonden and not ophalen["bezig"]:
+            ophalen["bezig"], ophalen["laatste"] = True, ""
+            threading.Thread(target=ophalen_op_achtergrond, daemon=True).start()
+        return gevonden
+
+    def start_bewaking() -> None:
+        def lus():
+            while True:
+                if 7 <= datetime.now().hour < 22:
+                    try:
+                        bewaak_belangrijk()
+                    except Exception as e:
+                        logging.getLogger("mailagent").warning("bewaking: %s", e)
+                time.sleep(cfg.meldingen_minuten * 60)
+        threading.Thread(target=lus, daemon=True).start()
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):  # geen mailinhoud in de terminal
@@ -304,9 +347,53 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                         threading.Thread(target=vlag, daemon=True).start()   # niet wachten op Apple Mail
                     return self._json({"ok": True, "melding": melding, "taken": ids})
                 elif actie == "taken-controleren":
-                    n = controleer_taken(cfg, store, bronnen, llm_factory(), slot=mail_slot)
-                    melding = ("Geen taken gevonden die al gedaan lijken" if not n else
-                               "1 taak lijkt al gedaan" if n == 1 else f"{n} taken lijken al gedaan")
+                    tel = controleer_uitgaand(cfg, store, bronnen, llm_factory(), slot=mail_slot)
+                    delen = []
+                    if tel["taken"]:
+                        delen.append("1 taak lijkt al gedaan" if tel["taken"] == 1 else f"{tel['taken']} taken lijken al gedaan")
+                    if tel["beantwoord"]:
+                        delen.append("1 mail in Te doen lijkt al beantwoord" if tel["beantwoord"] == 1
+                                     else f"{tel['beantwoord']} mails in Te doen lijken al beantwoord")
+                    if tel["wacht_opgelost"]:
+                        delen.append(f"{tel['wacht_opgelost']} keer kwam het antwoord waarop je wachtte")
+                    melding = "; ".join(delen) or "Niets nieuws gevonden"
+                elif actie == "niet-beantwoord":
+                    store.wis_lijkt_beantwoord(int(v["id"]))
+                    melding = "Blijft in Te doen"
+                elif actie == "belangrijk":
+                    adres = (v.get("adres") or "").strip().lower()
+                    if not adres:
+                        return self._json({"ok": False, "melding": "Geen adres"})
+                    if v.get("aan", True):
+                        store.zet_belangrijk(adres, v.get("naam"))
+                        melding = f"{v.get('naam') or adres} is nu een belangrijke afzender"
+                    else:
+                        if adres in cfg.belangrijk:
+                            return self._json({"ok": False, "melding": "Dit adres staat in config.yaml bij belangrijk:; haal het daar weg"})
+                        store.verwijder_belangrijk(adres)
+                        melding = f"{v.get('naam') or adres} is geen belangrijke afzender meer"
+                elif actie in ("wacht-klaar", "wacht-later", "wacht-terug"):
+                    w = store.wacht_op(int(v["id"]))
+                    if w is None:
+                        return self._json({"ok": False, "melding": "Niet gevonden"})
+                    if actie == "wacht-klaar":
+                        store.zet_wacht_op(w["id"], status="klaar")
+                        melding = "Van de lijst"
+                    elif actie == "wacht-terug":
+                        store.zet_wacht_op(w["id"], status="wacht")
+                        melding = "Terug op de lijst"
+                    else:
+                        dagen = int(v.get("werkdagen") or 3)
+                        terug = plus_werkdagen(date.today(), dagen, lees_werktijd(cfg.agenda).dagen)
+                        store.zet_wacht_op(w["id"], herinner_op=terug.isoformat())
+                        melding = f"Komt terug op {terug:%d-%m}"
+                elif actie == "wacht-openen":
+                    w = store.wacht_op(int(v["id"]))
+                    mid = (w["message_id"] or "").strip().strip("<>") if w else ""
+                    if not mid:
+                        return self._json({"ok": False, "melding": "Deze mail kan niet in Mail worden geopend"})
+                    subprocess.run(["open", f"message://%3c{mid}%3e"], check=False, timeout=20)
+                    melding = ""
                 elif actie == "taak-niet-klaar":
                     store.wis_lijkt_klaar(int(v["id"]))
                     melding = "Blijft open"
@@ -455,11 +542,26 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                 return self._json({"ok": False, "melding": f"Fout: {ex}"})
             self._json({"ok": True, "melding": melding})
 
+    Handler.bewaak_belangrijk = staticmethod(bewaak_belangrijk)
+    Handler.start_bewaking = staticmethod(start_bewaking)
     return Handler
 
 
+def meld(titel: str, tekst: str) -> None:
+    """Melding in het Berichtencentrum van je Mac."""
+    script = 'on run argv\ndisplay notification (item 2 of argv) with title (item 1 of argv) sound name "Glass"\nend run'
+    try:
+        subprocess.run(["osascript", "-e", script, titel[:120], tekst[:200]], check=False, timeout=20,
+                       capture_output=True)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+
 def serveer(cfg: Config, store: Store, bronnen: dict, llm_factory) -> None:
-    server = ThreadingHTTPServer((cfg.web_host, cfg.web_poort), maak_handler(cfg, store, bronnen, llm_factory))
+    handler = maak_handler(cfg, store, bronnen, llm_factory)
+    server = ThreadingHTTPServer((cfg.web_host, cfg.web_poort), handler)
+    if cfg.meldingen_aan:
+        handler.start_bewaking()
     print(f"Goedkeuringsapp: http://{cfg.web_host}:{cfg.web_poort}  (stoppen met Ctrl+C)")
     try:
         server.serve_forever()

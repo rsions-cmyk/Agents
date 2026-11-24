@@ -154,3 +154,36 @@ SCHEMA_TAKEN_OORDEEL = {
     "required": ["taken"],
     "additionalProperties": False,
 }
+
+
+class Verwachting(BaseModel):
+    nr: int
+    verwacht_antwoord: bool
+    wat: str
+
+
+class Verwachtingen(BaseModel):
+    mails: list[Verwachting]
+
+
+SCHEMA_VERWACHTINGEN = {
+    "type": "object",
+    "properties": {
+        "mails": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "nr": {"type": "integer"},
+                    "verwacht_antwoord": {"type": "boolean",
+                                          "description": "true als de eigenaar iets vraagt of verzoekt waarop de ontvanger moet reageren"},
+                    "wat": {"type": "string", "description": "Waarop hij wacht, in hoogstens acht woorden, Nederlands; leeg als er niets verwacht wordt"},
+                },
+                "required": ["nr", "verwacht_antwoord", "wat"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["mails"],
+    "additionalProperties": False,
+}

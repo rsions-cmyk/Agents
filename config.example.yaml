@@ -123,3 +123,21 @@ markeren:
 web:
   host: 127.0.0.1
   poort: 8765
+
+# Afzenders die je nooit wilt missen: hun mail komt altijd in Te doen (hoge prioriteit, nooit
+# overgeslagen) en je krijgt een melding op je Mac zodra hij binnenkomt. Een adres of een domein.
+# Je kunt ook in de app op het sterretje bij een afzender klikken.
+belangrijk:
+  # - "voorzitter@istte.org"
+  # - "@istte.org"
+
+# Wacht op antwoord: stuur je een mail met een vraag en komt er na zoveel werkdagen geen
+# antwoord, dan staat hij weer bovenaan Te doen.
+opvolgen:
+  aan: true
+  werkdagen: 3
+
+# Meldingen op je Mac voor mail van belangrijke afzenders (alleen tussen 07:00 en 22:00).
+meldingen:
+  aan: true
+  elke_minuten: 15

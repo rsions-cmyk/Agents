@@ -39,7 +39,8 @@ class MapBron:
                                aan=str(msg["To"] or ""), onderwerp=str(msg["Subject"] or ""),
                                datum=datum, tekst=tekst.strip(), thread_id=msg["Message-ID"],
                                extra={"bulk": bool(msg["List-Unsubscribe"])
-                                      or str(msg["Precedence"] or "").lower() in ("bulk", "list")}))
+                                      or str(msg["Precedence"] or "").lower() in ("bulk", "list"),
+                                      "verwijzingen": f"{msg['In-Reply-To'] or ''} {msg['References'] or ''}".strip()}))
         mails.sort(key=lambda m: m.datum)
         self.laatste_totaal = len(mails)
         return mails[:maximum]
@@ -57,6 +58,14 @@ class MapBron:
         doel.write_bytes(bytes(msg))
         self.laatste_uitkomst = "verzonden" if verzenden else "geplakt"
         return "verzonden" if verzenden else f"opgeslagen als {doel}"
+
+    def recente(self, seconden: int) -> list[tuple[str, str, str]]:
+        """Voor tests: alle .eml-bestanden gelden als net binnengekomen."""
+        uit = []
+        for f in sorted(self.pad.glob("*.eml")):
+            msg = email.message_from_bytes(f.read_bytes(), policy=email.policy.default)
+            uit.append((f.name, str(msg["From"] or ""), str(msg["Subject"] or "")))
+        return uit
 
     def verzonden_sinds(self, sinds) -> list[dict]:
         """Voor tests: .eml-bestanden in de submap _verzonden gelden als door jou verstuurde mail."""

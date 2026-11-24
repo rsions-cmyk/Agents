@@ -201,6 +201,14 @@ details.origineel pre{white-space:pre-wrap;font:13px/1.5 -apple-system,sans-seri
 .lijktgedaan>svg{color:var(--ok);width:16px;height:16px;flex:none}
 .lijktgedaan>div{flex:1;min-width:180px}
 .controle{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-bottom:8px}
+.chip.ok{color:var(--ok);background:var(--ok-zacht);border-color:transparent}
+.vip svg{width:13px;height:13px;color:var(--let);fill:var(--let);vertical-align:-2px;margin-right:4px}
+.sterknop{display:inline-flex;vertical-align:middle;margin-left:4px;padding:2px}
+.sterknop svg{width:15px;height:15px;color:var(--zacht)}
+.sterknop.aan svg{color:var(--let);fill:var(--let)}
+.groep-kop h2 svg{width:15px;height:15px;vertical-align:-2px;margin-right:6px;color:var(--let)}
+details.regels summary svg{width:14px;height:14px;vertical-align:-2px;margin-right:6px}
+.wachtrij .ikoon svg{width:18px;height:18px}
 .stappen-klein{margin:4px 0 0;padding-left:18px;color:var(--zacht);font-size:13px}
 .regels summary{cursor:pointer;color:var(--zacht);font-size:13px;padding:4px}
 
@@ -506,6 +514,8 @@ const IKONEN = {
   ban:'<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',
   list:'<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',
   sparkle:'<path d="M12 3l1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2z"/>',
+  ster:'<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
+  wacht:'<path d="M6 3h12M6 21h12M7 3c0 5 10 5 10 9s-10 4-10 9M17 3c0 5-10 5-10 9s10 4 10 9"/>',
   alert:'<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
   calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>',
   reply:'<path d="M9 17l-5-5 5-5"/><path d="M4 12h11a5 5 0 0 1 5 5v2"/>',
@@ -722,7 +732,7 @@ function teken(){
     : (D.ophalen.laatste || (D.volgende_ronde ? `Volgende ronde ${D.volgende_ronde}` : ""));
 
   const inhoud = document.getElementById("inhoud");
-  if (staat.tab === "te_doen") inhoud.innerHTML = tekenVoortgang() + tekenBeoordelen(teDoen());
+  if (staat.tab === "te_doen") inhoud.innerHTML = tekenVoortgang() + tekenWachtOp() + tekenBeoordelen(teDoen()) + tekenBelangrijk();
   else if (staat.tab === "planning") inhoud.innerHTML = tekenPlanning();
   else inhoud.innerHTML = tekenOpruimen();
   tekenBalk();
@@ -876,19 +886,50 @@ function volgendeNa(id){
 
 const leeg = (titel, tekst) => `<div class="lijst"><div class="leeg"><div class="rond">${ik("check")}</div><b>${titel}</b>${tekst}</div></div>`;
 
+// Wacht op antwoord: verstuurde mail met een vraag, zonder antwoord na een paar werkdagen
+const kortDatum = iso => new Date(iso.length > 10 ? iso : iso + "T12:00").toLocaleDateString("nl-NL", {day:"numeric", month:"short"});
+function tekenWachtOp(){
+  const vandaag = isoDag(new Date()), lijst = D.wacht_op || [];
+  const nu = lijst.filter(w => w.herinner_op <= vandaag), loopt = lijst.filter(w => w.herinner_op > vandaag);
+  if (!lijst.length) return "";
+  const naam = w => esc((w.aan || "").split(",")[0].trim() || "de ontvanger");
+  const rij = (w, open) => `<div class="rij wachtrij" style="cursor:default">
+      <span class="ikoon" style="color:var(--let)">${ik("wacht")}</span>
+      <div class="midden"><div class="regel1"><span class="van">${esc(w.onderwerp || "(geen onderwerp)")}</span><span class="datum">${kortDatum(w.verstuurd)}</span></div>
+        <div class="samenvatting">Aan ${naam(w)}${w.wat ? ` · wacht op: ${esc(w.wat)}` : ""}${open ? "" : ` · komt terug op ${kortDatum(w.herinner_op)}`}</div>
+        ${open ? `<div class="chips" style="margin-top:6px">
+          <button class="knop klein" data-wachtopen="${w.id}">${ik("mail")}Open in Mail</button>
+          <button class="knop klein" data-wachtlater="${w.id}">Nog 3 werkdagen</button>
+          <button class="knop klein" data-wachtklaar="${w.id}">${ik("check")}Geregeld</button></div>` : `<button class="knop klein" data-wachtklaar="${w.id}" title="Niet meer bijhouden">${ik("x")}</button>`}
+      </div></div>`;
+  return (nu.length ? `<div class="groep-kop"><h2>${ik("wacht")}Wacht op antwoord · ${nu.length}</h2></div><div class="lijst" style="margin-bottom:14px">${nu.map(w => rij(w, true)).join("")}</div>` : "")
+    + (loopt.length ? `<details class="regels wachtloopt"><summary>Je wacht op ${loopt.length} antwoord${loopt.length === 1 ? "" : "en"}</summary><div class="lijst">${loopt.map(w => rij(w, false)).join("")}</div></details>` : "");
+}
+
+function tekenBelangrijk(){
+  const lijst = D.belangrijk || [];
+  return `<details class="regels"><summary>${ik("ster")}Belangrijke afzenders (${lijst.length})</summary><div class="lijst">
+    ${lijst.length ? lijst.map(b => `<div class="rij" style="cursor:default"><span class="ikoon" style="color:var(--let)">${ik("ster")}</span>
+      <div class="midden">${esc(b.naam ? `${b.naam} · ${b.adres}` : b.adres)}</div>
+      ${b.vast ? `<span class="meta">in config.yaml</span>` : `<button class="knop klein" data-belangrijkweg="${esc(b.adres)}">Weghalen</button>`}</div>`).join("")
+      : `<div class="leeg" style="padding:18px">Klik bij een mail op het sterretje naast de afzender. Hun mail komt altijd in Te doen en je krijgt een melding op je Mac.</div>`}
+  </div></details>`;
+}
+
 function tekenBeoordelen(items){
   if (!items.length) return leeg("Alles bijgewerkt", "Er wacht niets op je beoordeling.");
   return `<div class="lijst">${items.map(it => { const a = afzender(it.van), [ai, al] = ACTIES[it.actie] || ["mail", it.actie];
     // één label: wat er van jou nodig is; deadline erbij als die er is
     const dl = it.deadline ? ` · ${new Date(it.deadline + "T12:00").toLocaleDateString("nl-NL",{day:"numeric",month:"short"})}` : "";
     const chips = [];
+    if (it.lijkt_beantwoord) chips.push(`<span class="chip ok">${ik("check")}Lijkt beantwoord</span>`);
     if (it.status === "fout" || it.status === "handmatig") chips.push(`<span class="chip let">${ik("alert")}Zelf bekijken</span>`);
     else if (it.vragen) chips.push(`<span class="chip let">Beslissing${dl}</span>`);
     else chips.push(`<span class="chip">${ik(ai)}${al}${dl}</span>`);
     return `<div class="rij${staat.open===it.id?" gekozen":""}" data-open="${it.id}" tabindex="0">
       ${avatar(it)}
       <div class="midden">
-        <div class="regel1"><span class="van">${esc(a.naam)}${it.prioriteit === "hoog" ? `<span class="prio" title="Hoge prioriteit"></span>` : ""}</span><span class="datum">${datum(it.datum)}</span></div>
+        <div class="regel1"><span class="van">${it.belangrijk ? `<span class="vip" title="Belangrijke afzender">${ik("ster")}</span>` : ""}${esc(a.naam)}${it.prioriteit === "hoog" ? `<span class="prio" title="Hoge prioriteit"></span>` : ""}</span><span class="datum">${datum(it.datum)}</span></div>
         <div class="onderwerp">${esc(it.onderwerp)}</div>
         <div class="samenvatting">${esc(it.samenvatting && it.samenvatting !== it.onderwerp ? it.samenvatting : (it.opmerking || ""))}</div>
         <div class="chips">${chips.join("")}</div>
@@ -1055,13 +1096,18 @@ function tekenPaneel(it){
   p.dataset.id = it.id; p.dataset.sleutel = ""; p.dataset.lees = "";
   p.innerHTML = `
     <div class="p-kop">${avatar(it)}
-      <div style="min-width:0"><h2>${esc(it.onderwerp)}</h2><div class="van">${esc(a.naam)} · ${esc(a.adres)} · ${datum(it.datum)}</div>
+      <div style="min-width:0"><h2>${esc(it.onderwerp)}</h2><div class="van">${esc(a.naam)} · ${esc(a.adres)} · ${datum(it.datum)}
+          <button class="ikoon sterknop${it.belangrijk ? " aan" : ""}" data-ster="${esc(a.adres)}" data-naam="${esc(a.naam)}" data-aan="${it.belangrijk ? "0" : "1"}"
+            title="${it.belangrijk ? "Belangrijke afzender: klik om weg te halen" : "Belangrijke afzender maken: altijd in Te doen, met een melding op je Mac"}">${ik("ster")}</button></div>
         <div class="chips"><select class="projectkies" data-projectkies="${it.id}" style="background-color:${kleur(it.project)}" aria-label="Project">
             ${D.projecten.map((pr, i) => `<option value="${esc(pr.naam)}"${pr.naam===it.project?" selected":""}>${esc(naamProject(pr.naam))} (${i+1})</option>`).join("")}</select>
           <span class="chip">${ik(ai)}${al}</span>${it.prioriteit==="hoog"?`<span class="chip hoog">${ik("alert")}Hoog</span>`:""}
           ${it.deadline?`<span class="chip">${ik("clock")}${esc(it.deadline)}</span>`:""}</div></div>
       <button class="ikoon sluit-mail" id="sluit" title="Sluiten (Esc)">${ik("x")}</button></div>
     <div class="p-inhoud">
+      ${it.lijkt_beantwoord ? `<div class="lijktgedaan">${ik("check")}<div><b>Lijkt beantwoord.</b> ${esc(it.lijkt_beantwoord)}</div>
+        <button class="knop klein goed" data-gedaanmelding="1">Gedaan</button>
+        <button class="knop klein" data-nietbeantwoord="${it.id}">Nog niet</button></div>` : ""}
       ${it.samenvatting && it.samenvatting !== it.onderwerp ? `<div class="melding info">${ik("sparkle")}<div>${esc(it.samenvatting)}</div></div>` : ""}
       ${zelf ? `<div class="melding fout">${ik("alert")}<div>${esc(it.opmerking || it.reden || "Bekijk deze mail zelf.")}</div></div>` : ""}
       ${it.vragen ? `<div class="melding">${ik("alert")}<div><b>Beslissing voor jou</b><br>${esc(it.vragen)}</div></div>` : ""}
@@ -1349,6 +1395,20 @@ document.addEventListener("click", async ev => {
   }
   if (t.id === "c-claude") return schrijfConcept(Number(document.getElementById("paneel").dataset.id));
   if (t.id === "controleer") return controleerTaken();
+  if (d.gedaanmelding) return document.getElementById("gedaan")?.click();
+  if (d.nietbeantwoord){ const j = await stil("niet-beantwoord", {id: Number(d.nietbeantwoord)}); toast(j.melding, !j.ok); return laad(); }
+  if (d.ster !== undefined){
+    const j = await stil("belangrijk", {adres: d.ster, naam: d.naam, aan: d.aan === "1"});
+    toast(j.melding, !j.ok); return laad();
+  }
+  if (d.belangrijkweg){ const j = await stil("belangrijk", {adres: d.belangrijkweg, aan: false}); toast(j.melding, !j.ok); return laad(); }
+  if (d.wachtopen){ const j = await stil("wacht-openen", {id: Number(d.wachtopen)}); if (!j.ok) toast(j.melding, true); return; }
+  if (d.wachtlater){ const j = await stil("wacht-later", {id: Number(d.wachtlater), werkdagen: 3}); toast(j.melding, !j.ok); return laad(); }
+  if (d.wachtklaar){
+    const id = Number(d.wachtklaar), j = await stil("wacht-klaar", {id});
+    toast(j.melding, !j.ok, j.ok ? {label: "Ongedaan maken", doe: async () => { await stil("wacht-terug", {id}); laad(); }} : null);
+    return laad();
+  }
   if (d.nietklaar){ const j = await stil("taak-niet-klaar", {id: Number(d.nietklaar)}); toast(j.melding, !j.ok); return laad(); }
   if (d.allesklaar){
     const ids = filter(D.taken, true).filter(x => x.lijkt_klaar).map(x => x.id);
@@ -1641,7 +1701,7 @@ function tekenPlanning(){
   const gedaan = taken.filter(t => t.lijkt_klaar);
   const links = `<div class="kaarten">
       <div class="controle">${gedaan.length > 1 ? `<button class="knop klein goed" data-allesklaar="1">${ik("check")}${gedaan.length} gedane taken afvinken</button>` : ""}
-        <button class="knop klein" id="controleer"${controleert ? " disabled" : ""} title="Kijkt in je verzonden mail of taken bij een mail al gedaan zijn">${ik("sparkle")}${controleert ? "Controleren…" : "Al gedaan? Controleren"}</button></div>
+        <button class="knop klein" id="controleer"${controleert ? " disabled" : ""} title="Kijkt in je verzonden mail of taken en mail in Te doen al gedaan zijn, en of er antwoord kwam waarop je wachtte">${ik("sparkle")}${controleert ? "Controleren…" : "Al gedaan? Controleren"}</button></div>
       <div class="groep-kop"><h2>Nog in te plannen · ${open.length}</h2><span class="meta" style="margin-left:auto">${open.length ? duurTekst(totaal) : ""}</span></div>
       ${open.length ? open.map(t => kaart(t, false)).join("") : `<div class="lijst"><div class="leeg" style="padding:30px"><b>Alles ingepland</b>Nieuwe taken verschijnen hier.</div></div>`}
       ${ingepland.length ? `<div class="groep-kop" style="margin-top:14px"><h2>Ingepland · ${ingepland.length}</h2></div>${ingepland.map(t => kaart(t, true)).join("")}` : ""}

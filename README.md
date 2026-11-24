@@ -23,6 +23,12 @@ Na elke run staat er een overzicht per project in `data/overzicht.md`.
 
 **Al gedaan?** Na elke mailronde, en met de knop in Planning, kijkt de app in je map Verzonden (van elk apparaat) of je een mail achter een taak al hebt beantwoord. De taak Beantwoorden krijgt dan "Lijkt gedaan"; andere taken bij die mail legt de app met alleen jouw eigen tekst aan Claude voor. De app vinkt niets zelf af: jij kiest Afvinken of Nog niet. De map Verzonden is `Sent Items` (Exchange) of `[Gmail]/Sent Mail`; een andere naam zet je bij de bron als `verzonden:`.
 
+**Al beantwoord in Te doen.** Dezelfde controle kijkt ook naar mail in Te doen. Heb je die al vanaf je telefoon of in Outlook beantwoord, dan staat er "Lijkt beantwoord" bij, met Gedaan en Nog niet.
+
+**Belangrijke afzenders.** Klik bij een mail op het sterretje naast de afzender, of zet adressen of domeinen bij `belangrijk:` in `config.yaml`. Hun mail wordt nooit overgeslagen, komt altijd in Te doen met hoge prioriteit, en wordt als eerste verwerkt. Zolang de app openstaat, kijkt hij elk kwartier (07:00 tot 22:00, zonder Claude) of er mail van hen is, geeft een melding op je Mac en haalt de mail meteen op. De eerste melding komt van Scripteditor; sta die toe in Systeeminstellingen, Meldingen.
+
+**Wacht op antwoord.** De app leest elke ronde je verzonden mail van de afgelopen week. Vraag je iets (Claude beoordeelt dat, alleen bij mail met een vraag of verzoek), dan komt die mail op de lijst. Komt er na drie werkdagen geen antwoord, dan staat hij bovenaan Te doen, met Open in Mail, Nog 3 werkdagen en Geregeld. Instellen bij `opvolgen:`.
+
 **De mail blijft aan de taak vast.** Een taak gemaakt vanuit een mail houdt die mail erbij: in Taken zie je afzender en onderwerp, met "Open" (opent de mail in Apple Mail) en "Beantwoorden" (antwoord typen of door Claude laten schrijven, en openen in Apple Mail). De mail wordt niet gearchiveerd, tenzij je dat aanvinkt. Ook gearchiveerd blijft hij gekoppeld.
 
 **Zichtbaar in Mail.** Een mail met een taak krijgt in Apple Mail een gekleurde vlag (standaard blauw; in Outlook een opvolgvlag, in Gmail een ster). Afvinken haalt de vlag weg, tenzij er nog een andere open taak bij die mail hoort. Hernoem de vlagkleur in Apple Mail eenmalig naar "Ingepland". Instellen of uitzetten: `markeren:` in `config.yaml`.

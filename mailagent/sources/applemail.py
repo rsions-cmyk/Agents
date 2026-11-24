@@ -76,7 +76,15 @@ on run argv
                     set prec to content of (first header of m whose name is "Precedence")
                     if prec contains "bulk" or prec contains "list" then set bulk to "1"
                 end try
-                set uitvoer to uitvoer & (mid as string) & US & (message id of m) & US & (sender of m) & US & ontvangers & US & (subject of m) & US & (geleden as string) & US & bulk & US & (content of m) & RS
+                -- waarop deze mail antwoordt: om 'wacht op antwoord' af te sluiten
+                set verw to ""
+                try
+                    set verw to content of (first header of m whose name is "In-Reply-To")
+                end try
+                try
+                    set verw to verw & " " & (content of (first header of m whose name is "References"))
+                end try
+                set uitvoer to uitvoer & (mid as string) & US & (message id of m) & US & (sender of m) & US & ontvangers & US & (subject of m) & US & (geleden as string) & US & bulk & US & verw & US & (content of m) & RS
             end if
         end repeat
     end tell
@@ -224,6 +232,26 @@ on run argv
 end run
 '''
 
+
+SCRIPT_RECENT = r'''
+on run argv
+    set accountNaam to item 1 of argv
+    set mailboxNaam to item 2 of argv
+    set secondenTerug to (item 3 of argv) as integer
+    set RS to character id 30
+    set US to character id 31
+    set uitvoer to ""
+    tell application "Mail"
+        set mb to mailbox mailboxNaam of account accountNaam
+        repeat with m in (every message of mb whose date received > ((current date) - secondenTerug))
+            try
+                set uitvoer to uitvoer & (id of m as string) & US & (sender of m) & US & (subject of m) & RS
+            end try
+        end repeat
+    end tell
+    return uitvoer
+end run
+'''
 
 SCRIPT_VERZONDEN = HULP + r'''
 on run argv
@@ -443,6 +471,16 @@ class AppleMailBron:
             verzonden = "[Gmail]/Sent Mail" if archief.startswith("[Gmail]") or prullenbak.startswith("[Gmail]") else "Sent Items"
         self.mappen = {"archief": archief, "prullenbak": prullenbak, "verzonden": verzonden}
 
+    def recente(self, seconden: int) -> list[tuple[str, str, str]]:
+        """Snel, zonder inhoud: (id, afzender, onderwerp) van mail die de laatste `seconden` binnenkwam."""
+        uit = _osascript(SCRIPT_RECENT, self.account, self.mailbox, str(int(seconden)))
+        rijen = []
+        for rec in uit.split(RS):
+            velden = rec.split(US)
+            if len(velden) >= 3:
+                rijen.append((velden[0].strip(), velden[1], US.join(velden[2:]).strip()))
+        return rijen
+
     def verzonden_sinds(self, sinds: datetime) -> list[dict]:
         """Mail die je zelf verstuurde sinds `sinds`, vanaf elk apparaat (de map Verzonden synchroniseert)."""
         nu = datetime.now().astimezone()
@@ -491,12 +529,13 @@ class AppleMailBron:
             uit = _osascript(SCRIPT_DETAILS, self.account, self.mailbox, str(seconden), *deel)
             for rec in uit.split(RS):
                 velden = rec.split(US)
-                if len(velden) < 8:
+                if len(velden) < 9:
                     continue
-                mid, message_id, van, aan, onderwerp, geleden, bulk, inhoud = velden[:7] + [US.join(velden[7:])]
+                mid, message_id, van, aan, onderwerp, geleden, bulk, verw, inhoud = velden[:8] + [US.join(velden[8:])]
                 mails.append(Email(bron=self.naam, bron_id=mid.strip(), van=van, aan=aan.rstrip(", "),
                                    onderwerp=onderwerp, datum=nu - timedelta(seconds=int(geleden or 0)),
-                                   tekst=inhoud.strip(), thread_id=message_id, extra={"bulk": bulk == "1"}))
+                                   tekst=inhoud.strip(), thread_id=message_id,
+                                   extra={"bulk": bulk == "1", "verwijzingen": verw.strip()}))
         return sorted(mails, key=lambda m: m.datum)
 
     def maak_concept(self, bron_id: str, tekst: str, onderwerp: str, aan: str, message_id: str | None = None,

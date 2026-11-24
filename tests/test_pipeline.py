@@ -49,6 +49,12 @@ class NepLLM:
         return TakenOordeel(taken=[TaakOordeel(taak_id=i, klaar=any(w in antwoord.lower() for w in t.lower().split()[:1]),
                                                reden="test") for i, t in taken])
 
+    def verwacht_antwoord(self, mails):
+        from mailagent.models import Verwachting, Verwachtingen
+        self.gezien.extend(m["tekst"] for m in mails)
+        return Verwachtingen(mails=[Verwachting(nr=m["nr"], verwacht_antwoord="?" in m["tekst"], wat="de datum")
+                                    for m in mails])
+
     def plan_taak(self, mail, tekst, project):
         from mailagent.models import Taakplan
         self.gezien.append(tekst)
@@ -824,3 +830,76 @@ def test_taken_lijken_gedaan_na_verstuurd_antwoord(omgeving):
 
     store.wis_lijkt_klaar(taken["Stagebedrijf mailen over de evaluatie"]["id"])   # 'Nog niet'
     assert controleer_taken(cfg, store, bronnen, llm) == 0                 # hetzelfde antwoord markeert niet opnieuw
+
+
+def _verstuur(cfg, naam, tekst):
+    map_ = cfg.pad.parent / "mail" / "_verzonden"
+    map_.mkdir(exist_ok=True)
+    (map_ / naam).write_text(tekst)
+
+
+def test_belangrijke_afzender_nooit_overgeslagen(omgeving):
+    from mailagent.pipeline import is_belangrijk
+
+    cfg, store, bronnen = omgeving
+    cfg.belangrijk = ["nieuwsbrief@buas.nl"]                      # uit config.yaml
+    store.zet_belangrijk("istte.org", "ISTTE")                    # sterretje in de app, een heel domein
+    assert is_belangrijk(cfg, store, "Board Chair <chair@istte.org>")
+    assert not is_belangrijk(cfg, store, "Iemand <iemand@istte.org.example>")
+    assert not is_belangrijk(cfg, store, "Sanne <123456@students.buas.nl>")
+    store.zet_afzender_regel("nieuwsbrief@buas.nl", "negeren", "overig")   # eerder 'voortaan overslaan'
+    run(cfg, store, bronnen, NepLLM())
+    it = next(r for r in store.items() if r["onderwerp"] == "Nieuwsbrief week 47")
+    assert it["status"] == "wacht" and it["prioriteit"] == "hoog"   # niet overgeslagen, niet ter info
+
+
+def test_al_beantwoord_en_wacht_op_antwoord(omgeving):
+    from datetime import date
+    from mailagent.pipeline import controleer_uitgaand
+
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    # 1. de studentmail beantwoordde je vanaf je telefoon
+    _verstuur(cfg, "antwoord.eml",
+              "From: docent@buas.nl\nTo: 123456@students.buas.nl\nSubject: Re: Uitstel portfolio stage\n"
+              "Date: Mon, 23 Nov 2026 10:00:00 +0100\nMessage-ID: <antw1@buas.nl>\nIn-Reply-To: <a1@students.buas.nl>\n\n"
+              "Hoi Sanne, je krijgt een week uitstel.\n")
+    # 2. een eigen mail met een vraag, en een zonder
+    _verstuur(cfg, "vraag.eml",
+              "From: docent@buas.nl\nTo: co-auteur@uni.example\nSubject: Revisie hoofdstuk 3\n"
+              "Date: Mon, 23 Nov 2026 11:00:00 +0100\nMessage-ID: <vraag1@buas.nl>\n\n"
+              "Hoi Mark,\n\nKun je voor vrijdag laten weten of de revisie lukt?\n")
+    _verstuur(cfg, "bedankt.eml",
+              "From: docent@buas.nl\nTo: collega@buas.nl\nSubject: Dank\n"
+              "Date: Mon, 23 Nov 2026 12:00:00 +0100\nMessage-ID: <dank1@buas.nl>\n\nDank voor het overleg.\n")
+    tel = controleer_uitgaand(cfg, store, bronnen, NepLLM())
+    assert tel["beantwoord"] == 1 and tel["wacht_nieuw"] == 1
+    student = next(r for r in store.items() if r["onderwerp"] == "Uitstel portfolio stage")
+    assert "beantwoord op 23-11" in store.item(student["id"])["lijkt_beantwoord"]
+    assert store.item(student["id"])["status"] == "wacht"                  # de app handelt niets zelf af
+    wacht = store.wacht_op_lijst("wacht")
+    assert [w["onderwerp"] for w in wacht] == ["Revisie hoofdstuk 3"] and wacht[0]["wat"] == "de datum"
+    assert wacht[0]["herinner_op"] == "2026-11-26"                         # ma 23 nov + drie werkdagen
+    assert controleer_uitgaand(cfg, store, bronnen, NepLLM())["wacht_nieuw"] == 0   # niet dubbel
+
+    # 3. het antwoord van de co-auteur komt binnen: van de lijst
+    (cfg.pad.parent / "mail" / "06-antwoord.eml").write_text(
+        "From: Mark <co-auteur@uni.example>\nTo: docent@buas.nl\nSubject: RE: Revisie hoofdstuk 3\n"
+        "Date: Tue, 24 Nov 2026 09:00:00 +0100\nMessage-ID: <m2@uni.example>\nIn-Reply-To: <vraag1@buas.nl>\n\n"
+        "Ja, dat lukt.\n")
+    run(cfg, store, bronnen, NepLLM())
+    assert store.wacht_op_lijst("wacht") == [] and len(store.wacht_op_lijst("beantwoord")) == 1
+
+
+def test_melding_bij_belangrijke_afzender(omgeving, monkeypatch):
+    from mailagent import web
+    from mailagent.web import maak_handler
+
+    cfg, store, bronnen = omgeving
+    meldingen = []
+    monkeypatch.setattr(web, "meld", lambda titel, tekst: meldingen.append((titel, tekst)))
+    store.zet_belangrijk("chair@istte.org", "Board Chair")
+    handler = maak_handler(cfg, store, bronnen, NepLLM)
+    assert handler.bewaak_belangrijk() == 1
+    assert meldingen and "Agenda board meeting" in meldingen[0][1]
+    assert handler.bewaak_belangrijk() == 0                                 # niet twee keer

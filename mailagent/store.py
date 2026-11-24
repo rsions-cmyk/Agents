@@ -71,6 +71,27 @@ CREATE TABLE IF NOT EXISTS map_keuzes (
     aantal INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (bron, map, adres, project)
 );
+CREATE TABLE IF NOT EXISTS belangrijk (
+    adres TEXT PRIMARY KEY,      -- e-mailadres of domein (@istte.org), kleine letters
+    naam TEXT,
+    aangemaakt TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS wacht_op (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bron TEXT NOT NULL,
+    message_id TEXT NOT NULL UNIQUE,   -- van de mail die je verstuurde
+    aan TEXT, onderwerp TEXT,
+    verstuurd TEXT NOT NULL,
+    wat TEXT,                          -- waarop je wacht, in een paar woorden
+    herinner_op TEXT NOT NULL,         -- datum waarop hij terugkomt in Te doen
+    status TEXT NOT NULL,              -- wacht | beantwoord | klaar | geen
+    antwoord TEXT,                     -- sleutel van het antwoord dat binnenkwam
+    aangemaakt TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS gemeld (
+    sleutel TEXT PRIMARY KEY,
+    tijd TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS log (
     tijd TEXT NOT NULL,
     item_id INTEGER,
@@ -108,6 +129,11 @@ class Store:
             self.db.execute("ALTER TABLE items ADD COLUMN eigen_antwoord TEXT")
         if "vorige_status" not in itemkolommen:
             self.db.execute("ALTER TABLE items ADD COLUMN vorige_status TEXT")
+        for kolom in ("lijkt_beantwoord", "bewijs"):   # al beantwoord vanaf een ander apparaat?
+            if kolom not in itemkolommen:
+                self.db.execute(f"ALTER TABLE items ADD COLUMN {kolom} TEXT")
+        if "verwijzingen" not in {r["name"] for r in self.db.execute("PRAGMA table_info(mails)")}:
+            self.db.execute("ALTER TABLE mails ADD COLUMN verwijzingen TEXT")   # In-Reply-To en References
         # mail met een open taak hoort niet meer in Beoordelen (oudere versies lieten hem staan)
         self.db.execute("UPDATE items SET status='taak' WHERE status IN ('wacht','fout','handmatig') "
                         "AND id IN (SELECT item_id FROM taken WHERE klaar=0 AND item_id IS NOT NULL)")
@@ -138,9 +164,10 @@ class Store:
 
     def _bewaar_mail(self, mail: Email) -> None:
         self.db.execute(
-            "INSERT OR IGNORE INTO mails VALUES (?,?,?,?,?,?,?,?,?,?)",
+            "INSERT OR IGNORE INTO mails(sleutel, bron, bron_id, van, aan, onderwerp, datum, thread_id, tekst, "
+            "opgehaald, verwijzingen) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             (mail.sleutel, mail.bron, mail.bron_id, mail.van, mail.aan, mail.onderwerp,
-             mail.datum.isoformat(), mail.thread_id, mail.tekst[:20000], nu()),
+             mail.datum.isoformat(), mail.thread_id, mail.tekst[:20000], nu(), mail.extra.get("verwijzingen")),
         )
 
     def bewaar_mail(self, mail: Email) -> None:
@@ -227,6 +254,65 @@ class Store:
     def wis_lijkt_klaar(self, taak_id: int) -> None:
         """'Nog niet gedaan': markering weg; hetzelfde antwoord markeert de taak niet opnieuw."""
         self.db.execute("UPDATE taken SET lijkt_klaar=NULL WHERE id=?", (taak_id,))
+        self.db.commit()
+
+    # --- al beantwoord, belangrijke afzenders, wacht op antwoord, meldingen ---
+    def zet_lijkt_beantwoord(self, item_id: int, reden: str | None, bewijs: str) -> None:
+        self.db.execute("UPDATE items SET lijkt_beantwoord=?, bewijs=? WHERE id=?", (reden, bewijs, item_id))
+        self.db.commit()
+
+    def wis_lijkt_beantwoord(self, item_id: int) -> None:
+        self.db.execute("UPDATE items SET lijkt_beantwoord=NULL WHERE id=?", (item_id,))
+        self.db.commit()
+
+    def belangrijke(self) -> list[sqlite3.Row]:
+        return self.db.execute("SELECT * FROM belangrijk ORDER BY adres").fetchall()
+
+    def zet_belangrijk(self, adres: str, naam: str | None = None) -> None:
+        self.db.execute("INSERT OR REPLACE INTO belangrijk(adres, naam, aangemaakt) VALUES (?,?,?)",
+                        (adres.strip().lower(), naam, nu()))
+        self.db.commit()
+
+    def verwijder_belangrijk(self, adres: str) -> None:
+        self.db.execute("DELETE FROM belangrijk WHERE adres=?", (adres.strip().lower(),))
+        self.db.commit()
+
+    def wacht_op_bekend(self, message_id: str) -> bool:
+        return self.db.execute("SELECT 1 FROM wacht_op WHERE message_id=?", (message_id,)).fetchone() is not None
+
+    def nieuw_wacht_op(self, bron: str, message_id: str, aan: str, onderwerp: str, verstuurd: str,
+                       wat: str | None, herinner_op: str, status: str = "wacht") -> None:
+        self.db.execute("INSERT OR IGNORE INTO wacht_op(bron, message_id, aan, onderwerp, verstuurd, wat, herinner_op, "
+                        "status, aangemaakt) VALUES (?,?,?,?,?,?,?,?,?)",
+                        (bron, message_id, aan, onderwerp, verstuurd, wat, herinner_op, status, nu()))
+        self.db.commit()
+
+    def wacht_op_lijst(self, status: str = "wacht") -> list[sqlite3.Row]:
+        return self.db.execute("SELECT * FROM wacht_op WHERE status=? ORDER BY herinner_op, verstuurd",
+                               (status,)).fetchall()
+
+    def wacht_op(self, wacht_id: int) -> Optional[sqlite3.Row]:
+        return self.db.execute("SELECT * FROM wacht_op WHERE id=?", (wacht_id,)).fetchone()
+
+    def zet_wacht_op(self, wacht_id: int, status: str | None = None, herinner_op: str | None = None,
+                     antwoord: str | None = None) -> None:
+        if status:
+            self.db.execute("UPDATE wacht_op SET status=? WHERE id=?", (status, wacht_id))
+        if herinner_op:
+            self.db.execute("UPDATE wacht_op SET herinner_op=? WHERE id=?", (herinner_op, wacht_id))
+        if antwoord:
+            self.db.execute("UPDATE wacht_op SET antwoord=? WHERE id=?", (antwoord, wacht_id))
+        self.db.commit()
+
+    def inkomend_sinds(self, sinds: str) -> list[sqlite3.Row]:
+        return self.db.execute("SELECT sleutel, van, onderwerp, datum, verwijzingen FROM mails WHERE datum>?",
+                               (sinds,)).fetchall()
+
+    def is_gemeld(self, sleutel: str) -> bool:
+        return self.db.execute("SELECT 1 FROM gemeld WHERE sleutel=?", (sleutel,)).fetchone() is not None
+
+    def zet_gemeld(self, sleutel: str) -> None:
+        self.db.execute("INSERT OR IGNORE INTO gemeld(sleutel, tijd) VALUES (?,?)", (sleutel, nu()))
         self.db.commit()
 
     def verwijder_open_taken(self, taak_ids: list[int]) -> int:
