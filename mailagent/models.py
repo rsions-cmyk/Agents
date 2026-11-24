@@ -44,6 +44,7 @@ class Sortering(BaseModel):
 class Taak(BaseModel):
     omschrijving: str
     deadline: Optional[str]
+    minuten: Optional[int] = None   # geschat eigen werk; oudere items hebben dit niet
 
 
 class Uitwerking(BaseModel):
@@ -105,8 +106,10 @@ SCHEMA_UITWERKING = {
                 "properties": {
                     "omschrijving": {"type": "string"},
                     "deadline": {"type": ["string", "null"]},
+                    "minuten": {"type": ["integer", "null"],
+                                "description": "Geschatte minuten eigen werk voor deze taak, afgerond op 15"},
                 },
-                "required": ["omschrijving", "deadline"],
+                "required": ["omschrijving", "deadline", "minuten"],
                 "additionalProperties": False,
             },
         },

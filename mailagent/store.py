@@ -203,11 +203,23 @@ class Store:
         self.log(item_id, f"status -> {status}" + (f": {opmerking}" if opmerking else ""))
 
     # --- taken ---------------------------------------------------------------
-    def voeg_taken_toe(self, item_id: int, project: str, taken: list[dict]) -> None:
+    def voeg_taken_toe(self, item_id: int, project: str, taken: list[dict]) -> list[int]:
+        ids = []
         for t in taken:
-            self.db.execute("INSERT INTO taken(item_id, project, omschrijving, deadline, aangemaakt) VALUES (?,?,?,?,?)",
-                            (item_id, project, t["omschrijving"], t.get("deadline"), nu()))
+            cur = self.db.execute(
+                "INSERT INTO taken(item_id, project, omschrijving, deadline, aangemaakt, minuten) VALUES (?,?,?,?,?,?)",
+                (item_id, project, t["omschrijving"], t.get("deadline"), nu(), t.get("minuten")))
+            ids.append(cur.lastrowid)
         self.db.commit()
+        return ids
+
+    def verwijder_open_taken(self, taak_ids: list[int]) -> int:
+        """Alleen taken die nog open en niet ingepland zijn (voor ongedaan maken)."""
+        n = 0
+        for i in taak_ids:
+            n += self.db.execute("DELETE FROM taken WHERE id=? AND klaar=0 AND gepland IS NULL", (i,)).rowcount
+        self.db.commit()
+        return n
 
     def nieuwe_taak(self, item_id: Optional[int], project: str, titel: str, deadline: Optional[str],
                     minuten: Optional[int], stappen: list[str], gepland: Optional[str]) -> int:
@@ -326,8 +338,10 @@ class Store:
     def map_keuzes(self, bron: str) -> list[sqlite3.Row]:
         return self.db.execute("SELECT * FROM map_keuzes WHERE bron=?", (bron,)).fetchall()
 
-    def zet_concept(self, item_id: int, concept: str) -> None:
+    def zet_concept(self, item_id: int, concept: str, vragen: Optional[str] = None) -> None:
         self.db.execute("UPDATE items SET concept=? WHERE id=?", (concept, item_id))
+        if vragen is not None:
+            self.db.execute("UPDATE items SET vragen=? WHERE id=?", (vragen or None, item_id))
         self.db.commit()
 
     # --- geleerde afzenderregels ---------------------------------------------

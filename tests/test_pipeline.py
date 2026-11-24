@@ -679,3 +679,51 @@ def test_een_ronde_tegelijk_en_een_item_per_mail(omgeving):
     s = Sortering(project="overig", actie="ter_info", prioriteit="laag", deadline=None, samenvatting="x", reden="x")
     assert store.nieuw_item(mail, s, None, "ter_info") == it["id"]          # geen tweede item
     assert len(store.items()) == 5
+
+
+def test_taken_klaarzetten_zonder_te_antwoorden(omgeving):
+    from mailagent.pipeline import keur_goed, zet_taken_klaar, zet_taken_klaar_terug
+
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    a, b = [r["id"] for r in store.items(status="wacht")][:2]
+    taken = [{"omschrijving": "Beantwoorden: uitstel", "deadline": "", "minuten": "15", "antwoord": True},
+             {"omschrijving": "Rooster nakijken", "deadline": "2026-12-01", "minuten": "45"},
+             {"omschrijving": "   ", "deadline": ""}]
+    melding, ids = zet_taken_klaar(store, bronnen, a, "Mijn concept", taken)
+    assert "2 taken klaargezet" in melding and len(ids) == 2
+    it = store.item(a)
+    assert it["status"] == "taak" and it["concept"] == "Mijn concept"          # concept wacht bij Beantwoorden
+    open_ = {t["omschrijving"]: t for t in store.open_taken()}
+    assert open_["Rooster nakijken"]["minuten"] == 45 and open_["Beantwoorden: uitstel"]["item_id"] == a
+
+    assert zet_taken_klaar_terug(store, bronnen, a, ids) == "Terug in Te doen"   # ongedaan maken
+    assert store.item(a)["status"] == "wacht" and not store.open_taken()
+
+    # nu antwoorden: de antwoordtaak vervalt, de andere taken gaan mee
+    keur_goed(store, bronnen, b, "Dank, akkoord.", taken)
+    assert [t["omschrijving"] for t in store.open_taken()] == ["Rooster nakijken"]
+
+
+def test_concept_laten_schrijven_wordt_bewaard(omgeving):
+    import threading
+    import urllib.request
+    from http.server import HTTPServer
+    from mailagent.web import maak_handler
+
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    a = store.items(status="wacht")[0]["id"]
+    store.zet_concept(a, "")
+    server = HTTPServer(("127.0.0.1", 0), maak_handler(cfg, store, bronnen, NepLLM))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    basis = f"http://127.0.0.1:{server.server_port}"
+    try:
+        token = urllib.request.urlopen(basis + "/").read().decode().split('const TOKEN = "')[1].split('"')[0]
+        req = urllib.request.Request(basis + "/api/antwoord-concept", data=json.dumps({"id": a}).encode(), method="POST",
+                                     headers={"Content-Type": "application/json", "X-Token": token})
+        j = json.loads(urllib.request.urlopen(req).read())
+        assert j["ok"] and j["concept"].startswith("Concept voor:")
+        assert store.item(a)["concept"] == j["concept"]                         # blijft na herladen staan
+    finally:
+        server.shutdown()

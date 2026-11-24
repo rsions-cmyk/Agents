@@ -28,7 +28,7 @@ from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
 from .opmaak import html_uit_bron, veilig
-from .pipeline import RondeBezig, afzender_adres, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
+from .pipeline import RondeBezig, afzender_adres, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
 from .store import Store
 
 APP_HTML = Path(__file__).with_name("static") / "app.html"
@@ -290,7 +290,27 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                                   deadline=it["deadline"], samenvatting=it["samenvatting"] or it["onderwerp"], reden="")
                     u = llm_factory().werk_uit(mail, anonimiseer(cfg, mail.tekst), s,
                                                stijlvoorbeelden(cfg, store, mail, it["project"]))
-                    return self._json({"ok": True, "concept": u.concept_antwoord or "", "vragen": u.vragen_aan_jou})
+                    if not (u.concept_antwoord or "").strip():
+                        return self._json({"ok": False, "melding": "Claude vond geen antwoord nodig en schreef geen concept"})
+                    store.zet_concept(it["id"], u.concept_antwoord.strip(), vragen=u.vragen_aan_jou or "")
+                    return self._json({"ok": True, "concept": u.concept_antwoord.strip(), "vragen": u.vragen_aan_jou})
+                elif actie == "taken-klaarzetten":
+                    item_id = int(v["id"])
+                    melding, ids = zet_taken_klaar(store, bronnen, item_id, v.get("concept"), v.get("taken") or [])
+                    if cfg.vlag_aan:
+                        def vlag(item_id=item_id):
+                            with mail_slot:
+                                markeer_mail(Store(db_pad), bronnen, item_id, True, cfg.vlag_kleur)
+                        threading.Thread(target=vlag, daemon=True).start()   # niet wachten op Apple Mail
+                    return self._json({"ok": True, "melding": melding, "taken": ids})
+                elif actie == "taken-terug":
+                    item_id = int(v["id"])
+                    melding = zet_taken_klaar_terug(store, bronnen, item_id, [int(x) for x in v.get("taken", [])])
+                    if cfg.vlag_aan and not any(t["item_id"] == item_id for t in store.open_taken()):
+                        def vlag_weg(item_id=item_id):
+                            with mail_slot:
+                                markeer_mail(Store(db_pad), bronnen, item_id, False, cfg.vlag_kleur)
+                        threading.Thread(target=vlag_weg, daemon=True).start()
                 elif actie == "antwoord-openen":
                     with mail_slot:
                         melding = open_antwoord(store, bronnen, int(v["id"]), v.get("tekst", ""))

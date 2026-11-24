@@ -191,6 +191,11 @@ details.origineel pre{white-space:pre-wrap;font:13px/1.5 -apple-system,sans-seri
 .tk-rij input{font:inherit;padding:7px 10px;border:1px solid var(--lijn);border-radius:9px;background:var(--vlak2);color:var(--tekst);min-width:0}
 .tk-rij input[type=text]{flex:1}
 .tk-rij input[type=date]{width:150px}
+.tk-rij input.tk-min{width:68px}
+.tk-rij .tk-ik{display:flex;align-items:center;height:36px;padding:0 2px;color:var(--zacht)}
+.tk-erbij{display:flex;gap:8px;flex-wrap:wrap}
+.tk-uitleg{font-size:12px;color:var(--zacht)}
+.c-schrijf{margin-top:8px}
 .stappen-klein{margin:4px 0 0;padding-left:18px;color:var(--zacht);font-size:13px}
 .regels summary{cursor:pointer;color:var(--zacht);font-size:13px;padding:4px}
 
@@ -577,6 +582,41 @@ async function meteen(ids, naam, data, set = verborgen){
   return ok;
 }
 
+// Concept laten schrijven voor een mail in Te doen die er nog geen heeft
+const schrijft = new Set();
+async function schrijfConcept(id){
+  if (schrijft.has(id)) return;
+  schrijft.add(id); teken();
+  const j = await stil("antwoord-concept", {id});
+  schrijft.delete(id);
+  if (!j.ok){ toast(j.melding, true); return teken(); }
+  const it = [...D.zelf, ...D.wacht].find(x => x.id === id);
+  if (it){ it.concept = j.concept; if (j.vragen) it.vragen = j.vragen; }
+  const veld = document.getElementById("concept");
+  if (veld && Number(document.getElementById("paneel").dataset.id) === id && !veld.value.trim()) veld.value = j.concept;
+  teken();
+}
+
+// Taken uit een mail naar Planning, zonder nu te antwoorden
+async function zetTakenKlaar(id){
+  const taken = (bewerkt[id] || []).filter(x => (x.omschrijving || "").trim());
+  if (!taken.length) return toast("Er staan geen taken in de lijst", true);
+  const veld = document.getElementById("concept"), concept = veld ? veld.value : null;
+  if (concept !== null) bewaarTekst(id, concept);
+  const volgende = drieKolommen() ? volgendeNa(id) : null;
+  sluitPaneel(); if (volgende !== null) staat.open = volgende;
+  await animeerWeg([id]); verborgen.add(id); teken();
+  const j = await stil("taken-klaarzetten", {id, concept, taken});
+  verborgen.delete(id);
+  if (!j.ok){ toast(j.melding, true); staat.open = id; teken(); return laad(); }
+  delete bewerkt[id];
+  toast(j.melding, false, {label: "Ongedaan maken", doe: async () => {
+    const r = await stil("taken-terug", {id, taken: j.taken});
+    toast(r.melding, !r.ok); laad();
+  }});
+  laad();
+}
+
 function bewaarTekst(id, concept){
   const it = [...D.zelf, ...D.wacht].find(x => x.id === id);
   if (it) it.concept = concept;
@@ -858,7 +898,7 @@ function afgerondHTML(){
 
 function tekenTaken(items){
   const lijstAfgerond = afgerondHTML();
-  if (!items.length) return leeg("Geen open taken", "Taken verschijnen hier zodra je er een maakt of een uitwerking goedkeurt.") + lijstAfgerond;
+  if (!items.length) return leeg("Geen open taken", "Taken verschijnen hier zodra je er een maakt of taken uit een mail klaarzet.") + lijstAfgerond;
   return `<div class="lijst">${items.map(t => `
     <div class="rij taak" data-taak="${t.id}">
       <button class="rondje" data-klaar="${t.id}" title="Afvinken">${ik("check")}</button>
@@ -1002,13 +1042,17 @@ function tekenPaneel(it){
       ${zelf ? `<div class="melding fout">${ik("alert")}<div>${esc(it.opmerking || it.reden || "Bekijk deze mail zelf.")}</div></div>` : ""}
       ${it.vragen ? `<div class="melding">${ik("alert")}<div><b>Beslissing voor jou</b><br>${esc(it.vragen)}</div></div>` : ""}
       <div><div class="label">${ik("reply")}Concept-antwoord</div>
-        <textarea id="concept" placeholder="Geen concept. Typ hier zelf een antwoord, of laat leeg.">${esc(concept)}</textarea></div>
-      <div><div class="label">${ik("task")}Taken bij goedkeuren</div>
+        <textarea id="concept" placeholder="${it.status === "handmatig" ? "Deze afzender gaat niet naar Claude. Typ hier zelf je antwoord." : "Nog geen concept. Laat Claude er een schrijven, of typ zelf."}">${esc(concept)}</textarea>
+        ${it.status === "handmatig" ? "" : `<div class="c-schrijf"${concept.trim() && !schrijft.has(it.id) ? " hidden" : ""}><button class="knop" id="c-claude"${schrijft.has(it.id) ? " disabled" : ""}>${ik("sparkle")}${schrijft.has(it.id) ? "Claude schrijft…" : "Concept laten schrijven"}</button></div>`}</div>
+      <div><div class="label">${ik("task")}Taken uit deze mail</div>
         <div class="takenlijst" style="gap:6px">${bewerkTaken(it).map((t, i) => `
-          <div class="tk-rij"><textarea class="groei" rows="1" data-tk="${i}" data-veld="omschrijving" placeholder="Wat moet er gebeuren?">${esc(t.omschrijving)}</textarea>
+          <div class="tk-rij${t.antwoord ? " tk-antwoord" : ""}">${t.antwoord ? `<span class="tk-ik" title="Vervalt als je nu antwoordt met In Mail zetten of Verzenden">${ik("reply")}</span>` : ""}<textarea class="groei" rows="1" data-tk="${i}" data-veld="omschrijving" placeholder="Wat moet er gebeuren?">${esc(t.omschrijving)}</textarea>
+            <input type="number" class="tk-min" min="15" max="480" step="15" data-tk="${i}" data-veld="minuten" value="${esc(String(t.minuten || ""))}" placeholder="min" aria-label="Minuten" title="Geschatte minuten">
             <input type="date" data-tk="${i}" data-veld="deadline" value="${esc(t.deadline || "")}" aria-label="Deadline">
             <button class="ikoon rood" data-tkweg="${i}" title="Taak weghalen">${ik("x")}</button></div>`).join("")}
-          <div class="tk-erbij"><button class="knop klein" data-tkerbij="1">+ Taak toevoegen</button></div></div></div>
+          <div class="tk-erbij"><button class="knop klein" data-tkerbij="1">+ Taak toevoegen</button>
+            <button class="knop klein" data-klaarzetten="${it.id}" title="Alle taken naar Planning, zonder nu te antwoorden. De mail en het concept blijven bij de taken.">${ik("calendar")}Taken klaarzetten</button></div>
+          <div class="tk-uitleg">Antwoord je nu, dan vervalt de antwoordtaak en gaan de andere taken mee naar Planning.</div></div></div>
       ${it.agenda ? `<div class="melding info">${ik("calendar")}<div><b>Agendavoorstel</b><br>${esc(it.agenda)}</div></div>` : ""}
       <details class="origineel" data-orig="${it.id}"><summary>${ik("mail")}Oorspronkelijke mail</summary>${p.querySelector(`details[data-orig="${it.id}"]`)?.open ? mailWeergave(it.id, it.tekst) : ""}</details>
     </div>
@@ -1206,10 +1250,13 @@ async function bevestigTaak(){
   laad();
 }
 
-// taken bij goedkeuren: bewerkbare kopie per mail, blijft bewaard als de lijst ververst
+// taken uit een mail: bewerkbare kopie per mail, blijft bewaard als de lijst ververst
 const bewerkt = {};
 function bewerkTaken(it){
-  if (!bewerkt[it.id]) bewerkt[it.id] = it.taken.map(t => ({omschrijving: t.omschrijving, deadline: t.deadline || ""}));
+  if (!bewerkt[it.id]) bewerkt[it.id] = [
+    {omschrijving: `${it.actie === "delegeren" ? "Doorsturen" : "Beantwoorden"}: ${it.onderwerp}`,
+     deadline: it.deadline || "", minuten: 15, antwoord: true},
+    ...it.taken.map(t => ({omschrijving: t.omschrijving, deadline: t.deadline || "", minuten: t.minuten || ""}))];
   return bewerkt[it.id];
 }
 // tekstvakken die meegroeien met hun inhoud (taken, taaktitel)
@@ -1224,6 +1271,7 @@ document.addEventListener("keydown", ev => {
 }, true);
 document.addEventListener("input", ev => {
   if (ev.target.matches && ev.target.matches("textarea.groei")) rekVelden(ev.target.parentElement);
+  if (ev.target.id === "concept"){ const k = document.querySelector(".c-schrijf"); if (k && !document.getElementById("c-claude")?.disabled) k.hidden = !!ev.target.value.trim(); }
   const d = ev.target.dataset;
   if (d.tk === undefined || staat.open === null) return;
   bewerkt[staat.open][Number(d.tk)][d.veld] = ev.target.value;
@@ -1271,10 +1319,12 @@ document.addEventListener("click", async ev => {
   const d = t.dataset;
   if (d.tkweg !== undefined && staat.open !== null){ bewerkt[staat.open].splice(Number(d.tkweg), 1); return teken(); }
   if (d.tkerbij && staat.open !== null){
-    bewerkt[staat.open].push({omschrijving: "", deadline: ""}); teken();
-    const velden = document.querySelectorAll('#paneel input[data-veld="omschrijving"]');
+    bewerkt[staat.open].push({omschrijving: "", deadline: "", minuten: ""}); teken();
+    const velden = document.querySelectorAll('#paneel [data-veld="omschrijving"]');
     return velden[velden.length - 1]?.focus();
   }
+  if (t.id === "c-claude") return schrijfConcept(Number(document.getElementById("paneel").dataset.id));
+  if (d.klaarzetten) return zetTakenKlaar(Number(d.klaarzetten));
   if (d.opbergen){ ev.stopPropagation(); return openKiezer(Number(d.opbergen), t); }
   if (d.bulkmap){ const ids = [...staat.gekozen]; if (ids.length) return openKiezer(ids[0], t, ids); return; }
   if (d.maaktaak){ ev.stopPropagation(); return openTaak(Number(d.maaktaak)); }

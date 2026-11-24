@@ -391,17 +391,78 @@ def keur_goed(store: Store, bronnen: dict, item_id: int, concept: str | None,
                                                message_id=item["thread_id"]))
     if taken is None:   # niet aangepast: de taken zoals Claude ze voorstelde
         taken = json.loads(item["taken"] or "[]")
-    taken = [{"omschrijving": t["omschrijving"].strip(), "deadline": (t.get("deadline") or None)}
-             for t in taken if (t.get("omschrijving") or "").strip()]
+    taken = [t for t in schone_taken(taken) if not t["antwoord"]]   # je antwoordt nu, dus die taak vervalt
     if taken:
         store.voeg_taken_toe(item_id, item["project"], taken)
-        meldingen.append(f"{len(taken)} taak/taken toegevoegd")
+        meldingen.append("1 taak toegevoegd" if len(taken) == 1 else f"{len(taken)} taken toegevoegd")
     melding = "; ".join(meldingen) or "goedgekeurd zonder concept of taken"
     store.zet_status(item_id, "verzonden" if verzonden else "goedgekeurd", concept=concept, opmerking=melding)
     if concept:
         store.zet_eigen_antwoord(item_id, concept)
     store.log(item_id, "VERZONDEN na bevestigde klik" if verzonden else "concept in Mail gezet")
     return melding
+
+
+def schone_taken(taken: list[dict]) -> list[dict]:
+    """Taken uit de app of van Claude: lege weg, minuten tussen 15 en 480, 'antwoord' voor de antwoordtaak."""
+    schoon = []
+    for t in taken:
+        tekst = (t.get("omschrijving") or "").strip()
+        if not tekst:
+            continue
+        try:
+            minuten = int(t.get("minuten") or 0) or None
+        except (TypeError, ValueError):
+            minuten = None
+        if minuten is not None:
+            minuten = max(15, min(480, minuten))
+        schoon.append({"omschrijving": tekst, "deadline": (t.get("deadline") or None), "minuten": minuten,
+                       "antwoord": bool(t.get("antwoord"))})
+    return schoon
+
+
+def zet_taken_klaar(store: Store, bronnen: dict, item_id: int, concept: str | None, taken: list[dict],
+                    vlag: int | None = None) -> tuple[str, list[int]]:
+    """Taken uit een mail naar je planning, zonder nu te antwoorden. Het concept blijft bij de mail,
+    zodat Beantwoorden in Planning het klaar heeft staan. Alleen na een klik."""
+    item = store.item(item_id)
+    if item is None:
+        raise ValueError(f"Item {item_id} bestaat niet")
+    if item["status"] not in ("wacht", "fout", "handmatig"):
+        raise ValueError("deze mail is al afgehandeld")
+    taken = schone_taken(taken)
+    if not taken:
+        raise ValueError("er staan geen taken in de lijst")
+    factor, n = store.tijdfactor(item["project"])
+    for t in taken:   # je eigen ervaring met schattingen in dit project
+        if t["minuten"] and n >= 3 and abs(factor - 1) >= 0.1:
+            t["minuten"] = max(15, min(480, round(t["minuten"] * factor / 15) * 15))
+    if concept is not None:
+        store.zet_concept(item_id, concept.strip())
+    ids = store.voeg_taken_toe(item_id, item["project"], taken)
+    store.bewaar_vorige_status(item_id, item["status"])
+    store.zet_status(item_id, "taak", opmerking="taken klaargezet; mail blijft in de inbox")
+    store.log(item_id, f"{len(ids)} taken klaargezet")
+    melding = ("1 taak" if len(ids) == 1 else f"{len(ids)} taken") + " klaargezet in Planning"
+    if vlag is not None:
+        fout = markeer_mail(store, bronnen, item_id, True, vlag)
+        if fout:
+            melding += f"; {fout}"
+    return melding, ids
+
+
+def zet_taken_klaar_terug(store: Store, bronnen: dict, item_id: int, taak_ids: list[int],
+                          vlag: int | None = None) -> str:
+    """Ongedaan maken van Taken klaarzetten: taken weg (zolang ze open en niet ingepland zijn), mail terug."""
+    item = store.item(item_id)
+    if item is None or item["status"] != "taak":
+        raise ValueError("deze mail staat niet meer als taak")
+    eigen = {t["id"] for t in store.open_taken() if t["item_id"] == item_id}
+    store.verwijder_open_taken([i for i in taak_ids if i in eigen])
+    store.zet_status(item_id, item["vorige_status"] or "wacht")
+    if vlag is not None and not any(t["item_id"] == item_id for t in store.open_taken()):
+        markeer_mail(store, bronnen, item_id, False, vlag)
+    return "Terug in Te doen"
 
 
 def markeer_gedaan(store: Store, item_id: int) -> str:

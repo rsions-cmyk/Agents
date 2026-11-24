@@ -122,8 +122,10 @@ class ClaudeLLM:
             "maar nooit de inhoud. Staan ze er niet bij, onderteken dan niet; de eigenaar voegt een handtekening toe. "
             "Verzin geen feiten, data of afspraken die niet in de mail of de instructies staan. Ontbreekt informatie, "
             "zet dan [AANVULLEN: ...] in het concept.\n"
-            "Zet concrete vervolgstappen in 'taken', een afspraakvoorstel in 'agenda_voorstel', en beslissingen die "
-            "alleen de eigenaar kan nemen in 'vragen_aan_jou'.\n\n"
+            "Zet concrete vervolgstappen in 'taken', elk met een realistische schatting van de minuten eigen werk "
+            "(lezen, nadenken, schrijven, overleggen; geen wachttijd op anderen), afgerond op 15. Het beantwoorden "
+            "van deze mail zelf hoort niet in 'taken'; dat regelt de app. Zet een afspraakvoorstel in "
+            "'agenda_voorstel', en beslissingen die alleen de eigenaar kan nemen in 'vragen_aan_jou'.\n\n"
             f"{VEILIGHEID}\n\n<projectinstructies>\n{self.cfg.project_instructies[sortering.project]}\n</projectinstructies>"
         )
         stijl = ""
