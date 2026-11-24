@@ -2,6 +2,8 @@
 
 Een zelfgebouwde slimme thermostaat voor een cv-ketel met OpenTherm. Een ESP32 met een OpenTherm-adapter regelt de ketel. Een oude telefoon aan de muur (hier een iPhone 12 mini) toont de bedieningspagina.
 
+<img src="voorbeeld.png" width="300" alt="De bedieningspagina op een iPhone 12 mini">
+
 De regeling draait op de ESP32. Valt de telefoon of de wifi uit, dan blijft de verwarming werken. Home Assistant is niet nodig. Heb je het wel, dan verschijnt de thermostaat daar vanzelf.
 
 ## Wat het doet
