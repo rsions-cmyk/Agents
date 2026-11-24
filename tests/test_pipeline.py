@@ -903,3 +903,49 @@ def test_melding_bij_belangrijke_afzender(omgeving, monkeypatch):
     assert handler.bewaak_belangrijk() == 1
     assert meldingen and "Agenda board meeting" in meldingen[0][1]
     assert handler.bewaak_belangrijk() == 0                                 # niet twee keer
+
+
+def test_mappenlijst_inbox_eerst_en_systeemmappen_weg(monkeypatch):
+    from mailagent.sources import applemail
+    from mailagent.sources.applemail import AppleMailBron
+
+    uitvoer = "\n".join(["Inbox", "Inbox/ISTTE", "Inbox/ISTTE/2027", "Inbox/Archive", "Archive", "Archive/ISTTE oud",
+                         "Coaching", "Deleted Items", "Deleted Items/weg", "Sent Items", "Junk Email", "Postvak UIT",
+                         "Conversation History", "Inbox/Tasks"]) + "\n"
+    monkeypatch.setattr(applemail, "_osascript", lambda script, *a: uitvoer)
+    bron = AppleMailBron("buas", "Exchange", "Inbox", "Archive", "Deleted Items")
+    assert bron.mappenlijst() == ["Inbox/Archive", "Inbox/ISTTE", "Inbox/ISTTE/2027", "Inbox/Tasks",
+                                  "Coaching", "Archive/ISTTE oud"]
+    assert bron.nieuw_pad("Reviews 2027") == "Inbox/Reviews 2027"
+    gmail = AppleMailBron("google", "Google", "INBOX", "[Gmail]/All Mail", "[Gmail]/Trash")
+    assert gmail.nieuw_pad("Reviews 2027") == "Reviews 2027"
+
+
+def test_nieuwe_map_maken_en_opbergen(omgeving):
+    import threading
+    import urllib.request
+    from http.server import HTTPServer
+    from mailagent.web import maak_handler
+
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    a = store.items(status="wacht")[0]["id"]
+    server = HTTPServer(("127.0.0.1", 0), maak_handler(cfg, store, bronnen, NepLLM))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    basis = f"http://127.0.0.1:{server.server_port}"
+    try:
+        token = urllib.request.urlopen(basis + "/").read().decode().split('const TOKEN = "')[1].split('"')[0]
+
+        def post(actie, body):
+            req = urllib.request.Request(basis + "/api/" + actie, data=json.dumps(body).encode(), method="POST",
+                                         headers={"Content-Type": "application/json", "X-Token": token})
+            return json.loads(urllib.request.urlopen(req).read())
+
+        assert post("mappen", {"id": a})["nieuw_kan"] is True
+        j = post("map-maken", {"id": a, "naam": "Reviews 2027"})
+        assert j["ok"] and j["pad"] == "Reviews 2027"
+        assert "Reviews 2027" in post("mappen", {"id": a})["mappen"]
+        assert post("verplaats", {"ids": [a], "doel": "map:Reviews 2027"})["ok"]
+        assert store.item(a)["status"] == "opgeborgen"
+    finally:
+        server.shutdown()

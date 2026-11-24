@@ -1904,31 +1904,63 @@ async function openKiezer(id, anker, ids){
   const boven = r.top > innerHeight * 0.55;
   el.style.left = Math.max(16, Math.min(innerWidth - el.offsetWidth - 16, r.left - 40)) + "px";
   if (boven) el.style.bottom = (innerHeight - r.top + 8) + "px"; else el.style.top = (r.bottom + 8) + "px";
-  kiezer = {id, ids: ids && ids.length ? ids : [id], mappen: [], voorstellen: [], zoek: "", index: 0, el};
+  kiezer = {id, ids: ids && ids.length ? ids : [id], mappen: [], voorstellen: [], zoek: "", index: 0, el, inbox: "", archief: "", nieuwKan: false};
   el.querySelector("input").focus();
   const j = await stil("mappen", {id});
   if (!kiezer || kiezer.id !== id) return;
   if (!j.ok){ sluitKiezer(); return toast(j.melding, true); }
   kiezer.mappen = j.mappen; kiezer.voorstellen = j.voorstellen;
+  kiezer.inbox = j.inbox || ""; kiezer.archief = j.archief || ""; kiezer.nieuwKan = !!j.nieuw_kan;
   tekenKiezer();
 }
+function kiezerGroep(m){
+  const l = m.toLowerCase(), inbox = (kiezer.inbox || "").toLowerCase(), arch = (kiezer.archief || "").split("/").pop().toLowerCase();
+  if (inbox && l.startsWith(inbox + "/")) return "In je inbox";
+  if (arch && l.startsWith(arch + "/")) return "In het archief";
+  return "Andere mappen";
+}
 function kiezerOpties(){
-  const z = kiezer.zoek.trim().toLowerCase();
+  const ruw = kiezer.zoek.trim(), z = ruw.toLowerCase();
   const voorstel = z ? [] : kiezer.voorstellen;
   const rest = kiezer.mappen.filter(m => !z || m.toLowerCase().includes(z)).filter(m => !voorstel.some(v => v.map === m));
-  return [...voorstel.map(v => ({map: v.map, waarom: v.reden, voorstel: true})), ...rest.map(m => ({map: m}))];
+  const opties = [...voorstel.map(v => ({map: v.map, waarom: v.reden, voorstel: true})), ...rest.map(m => ({map: m, groep: kiezerGroep(m)}))];
+  // geen map met precies deze naam? Dan kun je hem maken
+  const bestaat = kiezer.mappen.some(m => m.toLowerCase() === z || m.split("/").pop().toLowerCase() === z);
+  if (z && kiezer.nieuwKan && !bestaat) opties.push({nieuw: ruw.replace(/^\/+|\/+$/g, "")});
+  return opties;
 }
 function tekenKiezer(){
   const opties = kiezerOpties();
   kiezer.index = Math.min(kiezer.index, Math.max(0, opties.length - 1));
-  const regel = (o, i) => { const delen = o.map.split("/"), naam = delen.pop();
+  const inbox = (kiezer.inbox || "").toLowerCase();
+  const regel = (o, i) => {
+    if (o.nieuw) return `<button class="optie nieuw${i === kiezer.index ? " actief" : ""}" data-nieuwemap="${esc(o.nieuw)}">${ik("folder")}<span>Nieuwe map <b>${esc(o.nieuw)}</b>${kiezer.inbox && !kiezer.archief.startsWith("[Gmail]") ? ` <span class="pad">in je inbox</span>` : ""}</span></button>`;
+    let delen = o.map.split("/");
+    if (inbox && delen.length > 1 && delen[0].toLowerCase() === inbox) delen = delen.slice(1);   // 'Inbox/' hoef je niet te zien
+    const naam = delen.pop();
     return `<button class="optie${i === kiezer.index ? " actief" : ""}" data-map="${esc(o.map)}">${ik("folder")}<span>${esc(naam)}${delen.length ? ` <span class="pad">${esc(delen.join(" / "))}</span>` : ""}</span>${o.waarom ? `<span class="waarom">${esc(o.waarom)}</span>` : ""}</button>`; };
-  const nVoorstel = opties.filter(o => o.voorstel).length;
-  kiezer.el.querySelector(".opties").innerHTML = !opties.length ? `<div class="leeg2">Geen map gevonden</div>` :
-    (nVoorstel ? `<div class="kop2">Voorstel</div>` + opties.slice(0, nVoorstel).map(regel).join("") + `<div class="kop2">Alle mappen</div>` : "")
-    + opties.slice(nVoorstel).map((o, i) => regel(o, i + nVoorstel)).join("");
-  if (!kiezer.el.querySelector(".voet")) kiezer.el.insertAdjacentHTML("beforeend", `<div class="voet"><span><kbd>↑</kbd><kbd>↓</kbd> <kbd>↵</kbd> <kbd>Esc</kbd></span><button class="knop klein" id="kiezer-vernieuw" title="Mappen opnieuw ophalen uit Mail">Vernieuwen</button></div>`);
+  const groepen = new Set(opties.filter(o => o.groep).map(o => o.groep));
+  let html = "", vorige = null;
+  opties.forEach((o, i) => {
+    if (o.voorstel && i === 0) html += `<div class="kop2">Voorstel</div>`;
+    if (!o.voorstel && !o.nieuw){
+      const kop = groepen.size > 1 ? o.groep : (opties.some(x => x.voorstel) ? "Alle mappen" : null);
+      if (kop && kop !== vorige){ html += `<div class="kop2">${esc(kop)}</div>`; vorige = kop; }
+    }
+    if (o.nieuw) html += `<div class="kop2">Maken</div>`;
+    html += regel(o, i);
+  });
+  kiezer.el.querySelector(".opties").innerHTML = opties.length ? html : `<div class="leeg2">Geen map gevonden</div>`;
+  if (!kiezer.el.querySelector(".voet")) kiezer.el.insertAdjacentHTML("beforeend", `<div class="voet"><span><kbd>↑</kbd><kbd>↓</kbd> <kbd>↵</kbd> <kbd>Esc</kbd> · typ een naam voor een nieuwe map</span><button class="knop klein" id="kiezer-vernieuw" title="Mappen opnieuw ophalen uit Mail">Vernieuwen</button></div>`);
   kiezer.el.querySelector(".optie.actief")?.scrollIntoView({block:"nearest"});
+}
+async function maakMap(naam){
+  const id = kiezer.id, ids = kiezer.ids;
+  kiezer.el.querySelector(".opties").innerHTML = `<div class="leeg2">Map maken in Mail…</div>`;
+  const j = await stil("map-maken", {id, naam});
+  if (!j.ok){ toast(j.melding, true); if (kiezer) tekenKiezer(); return; }
+  sluitKiezer();
+  verplaats(ids, "map:" + j.pad);
 }
 function sluitKiezer(){ if (kiezer){ kiezer.el.remove(); kiezer = null; } }
 function kiesMap(map){
@@ -1941,14 +1973,15 @@ document.addEventListener("keydown", ev => {
   const opties = kiezerOpties();
   if (ev.key === "ArrowDown"){ ev.preventDefault(); ev.stopImmediatePropagation(); kiezer.index = Math.min(opties.length - 1, kiezer.index + 1); return tekenKiezer(); }
   if (ev.key === "ArrowUp"){ ev.preventDefault(); ev.stopImmediatePropagation(); kiezer.index = Math.max(0, kiezer.index - 1); return tekenKiezer(); }
-  if (ev.key === "Enter"){ ev.preventDefault(); ev.stopImmediatePropagation(); if (opties[kiezer.index]) kiesMap(opties[kiezer.index].map); return; }
+  if (ev.key === "Enter"){ ev.preventDefault(); ev.stopImmediatePropagation(); const o = opties[kiezer.index];
+    if (o) o.nieuw ? maakMap(o.nieuw) : kiesMap(o.map); return; }
   if (ev.key === "Escape"){ ev.preventDefault(); ev.stopImmediatePropagation(); return sluitKiezer(); }
   if (ev.target.id === "kiezer-zoek") ev.stopImmediatePropagation();   // typen in het zoekveld triggert geen sneltoetsen
 }, true);
 document.addEventListener("mousedown", ev => {
   if (!kiezer) return;
   const o = ev.target.closest(".kiezer .optie");
-  if (o){ ev.preventDefault(); return kiesMap(o.dataset.map); }
+  if (o){ ev.preventDefault(); return o.dataset.nieuwemap !== undefined ? maakMap(o.dataset.nieuwemap) : kiesMap(o.dataset.map); }
   if (ev.target.closest("#kiezer-vernieuw")){ ev.preventDefault(); const id = kiezer.id; kiezer.el.querySelector(".opties").innerHTML = `<div class="leeg2">Mappen laden…</div>`;
     stil("mappen", {id, vernieuw: true}).then(j => { if (kiezer && j.ok){ kiezer.mappen = j.mappen; kiezer.voorstellen = j.voorstellen; tekenKiezer(); } }); return; }
   if (!ev.target.closest(".kiezer")) sluitKiezer();

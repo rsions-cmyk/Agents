@@ -393,32 +393,55 @@ end run
 
 
 SCRIPT_MAPPEN = r'''
+on paden(mb, voorvoegsel, diepte)
+    tell application "Mail" to set naam to name of mb
+    set pad to voorvoegsel & naam
+    set uit to pad & linefeed
+    if diepte < 6 then
+        try
+            tell application "Mail" to set kinderen to every mailbox of mb
+            repeat with k in kinderen
+                set uit to uit & my paden(k, pad & "/", diepte + 1)
+            end repeat
+        end try
+    end if
+    return uit
+end paden
+
 on run argv
     set accountNaam to item 1 of argv
     set uitvoer to ""
-    tell application "Mail"
-        set alle to every mailbox of account accountNaam
-        repeat with mb in alle
-            set pad to name of mb
-            set huidig to mb
-            repeat 6 times
-                try
-                    set ouder to container of huidig
-                    if class of ouder is not mailbox then exit repeat
-                    set pad to (name of ouder) & "/" & pad
-                    set huidig to ouder
-                on error
-                    exit repeat
-                end try
-            end repeat
-            set uitvoer to uitvoer & pad & linefeed
-        end repeat
-    end tell
+    tell application "Mail" to set alle to every mailbox of account accountNaam
+    repeat with mb in alle
+        -- vanaf de mappen bovenaan, met al hun submappen (ook die in je Inbox)
+        set bovenaan to true
+        try
+            tell application "Mail"
+                if class of (container of mb) is mailbox then set bovenaan to false
+            end tell
+        end try
+        if bovenaan then set uitvoer to uitvoer & my paden(mb, "", 1)
+    end repeat
     return uitvoer
 end run
 '''
 
-SYSTEEMMAPPEN = {"inbox", "outbox", "drafts", "concepten", "sent", "sent items", "sent mail", "verzonden items",
+SCRIPT_MAP_MAKEN = HULP + r'''
+on run argv
+    set accountNaam to item 1 of argv
+    set pad to item 2 of argv
+    tell application "Mail"
+        tell account accountNaam to make new mailbox with properties {name:pad}
+    end tell
+    delay 1
+    -- controleren dat hij er echt staat
+    set m to my zoekMap(accountNaam, pad)
+    return "ok"
+end run
+'''
+
+SYSTEEMMAPPEN = {"inbox", "postvak in", "postvak uit", "ongewenste e-mail", "verzonden",
+                 "outbox", "drafts", "concepten", "sent", "sent items", "sent mail", "verzonden items",
                  "deleted items", "verwijderde items", "trash", "junk", "junk email", "spam", "conflicts",
                  "local failures", "server failures", "sync issues", "rss feeds", "rss subscriptions",
                  "rss-abonnementen", "conversation history", "snoozed", "gepland", "notes", "tasks", "journal",
@@ -581,19 +604,42 @@ class AppleMailBron:
         return _osascript(SCRIPT_BRON, self.account, self.mailbox, bron_id, message_id or "", self.mappen["archief"])
 
     def mappenlijst(self) -> list[str]:
-        """Mappen in dit account waar je mail in kunt opbergen, als pad (bijv. 'Projecten/ENTER÷IFITT')."""
+        """Mappen waar je mail in kunt opbergen, als pad: eerst die in je Inbox ('Inbox/ISTTE'), dan de rest,
+        submappen van het archief als laatste. Systeemmappen tellen alleen bovenaan mee, zodat een eigen
+        submap die toevallig 'Archive' of 'Tasks' heet gewoon in de lijst staat."""
         uit = _osascript(SCRIPT_MAPPEN, self.account)
+        inbox = self.mailbox.lower()
+        archief = self.mappen["archief"].split("/")[-1].lower()
+        weg_bovenaan = SYSTEEMMAPPEN | {inbox, archief, self.mappen["prullenbak"].split("/")[-1].lower()}
+        nooit_onder = {self.mappen["prullenbak"].split("/")[-1].lower(), "deleted items", "verwijderde items", "trash",
+                       "junk", "junk email", "ongewenste e-mail", "spam", "sent items", "verzonden items", "sent",
+                       "drafts", "concepten", "outbox", "postvak uit", "conversation history", "sync issues"}
         paden = []
         for pad in uit.splitlines():
-            pad = pad.strip()
-            laatste = pad.split("/")[-1].strip().lower()
-            if not pad or laatste in SYSTEEMMAPPEN or pad.lower().startswith(("[gmail]", "[google mail]")):
+            pad = pad.strip().strip("/")
+            if not pad or pad.lower().startswith(("[gmail]", "[google mail]")):
                 continue
-            if laatste in {self.mailbox.lower(), self.mappen["archief"].split("/")[-1].lower(),
-                           self.mappen["prullenbak"].split("/")[-1].lower()}:
+            delen = [d.strip().lower() for d in pad.split("/")]
+            if len(delen) == 1 and delen[0] in weg_bovenaan:
+                continue
+            if delen[0] in nooit_onder:
                 continue
             paden.append(pad)
-        return sorted(set(paden), key=str.lower)
+
+        def volgorde(p: str):
+            eerste = p.split("/")[0].lower()
+            return (0 if eerste == inbox else 2 if eerste == archief else 1, p.lower())
+        return sorted(set(paden), key=volgorde)
+
+    def nieuw_pad(self, naam: str) -> str:
+        """Waar een nieuwe map komt: in je Inbox (Exchange), of bovenaan (Gmail-labels)."""
+        naam = naam.strip().strip("/")
+        if self.mappen["archief"].startswith("[Gmail]") or naam.lower().startswith(self.mailbox.lower() + "/"):
+            return naam
+        return f"{self.mailbox}/{naam}"
+
+    def maak_map(self, pad: str) -> None:
+        _osascript(SCRIPT_MAP_MAKEN, self.account, pad)
 
     def verplaats(self, bron_ids: list[str], doel: str) -> dict[str, str | None]:
         """Verplaatst berichten naar archief, prullenbak of 'map:<pad>'. Niets wordt definitief verwijderd."""

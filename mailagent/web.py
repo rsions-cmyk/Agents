@@ -494,7 +494,25 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                         with mail_slot:
                             mappen_cache[it["bron"]] = bron.mappenlijst()
                     mappen = mappen_cache[it["bron"]]
-                    return self._json({"ok": True, "mappen": mappen, "voorstellen": map_voorstellen(store, it, mappen)})
+                    return self._json({"ok": True, "mappen": mappen, "voorstellen": map_voorstellen(store, it, mappen),
+                                       "inbox": getattr(bron, "mailbox", ""),
+                                       "archief": getattr(bron, "mappen", {}).get("archief", ""),
+                                       "nieuw_kan": hasattr(bron, "maak_map")})
+                elif actie == "map-maken":
+                    it = store.item(int(v["id"]))
+                    bron = bronnen.get(it["bron"]) if it else None
+                    naam = (v.get("naam") or "").strip().strip("/")
+                    if bron is None or not hasattr(bron, "maak_map"):
+                        return self._json({"ok": False, "melding": "Een nieuwe map maken kan niet voor deze bron"})
+                    if not naam or len(naam) > 120:
+                        return self._json({"ok": False, "melding": "Geef de map een naam"})
+                    pad = bron.nieuw_pad(naam)
+                    bestaand = mappen_cache.get(it["bron"]) or []
+                    if pad.lower() not in {m.lower() for m in bestaand}:
+                        with mail_slot:
+                            bron.maak_map(pad)
+                        mappen_cache[it["bron"]] = bestaand + [pad]
+                    return self._json({"ok": True, "pad": pad, "melding": f"Map '{naam}' gemaakt"})
                 elif actie == "terugzetten":
                     with mail_slot:
                         melding = zet_terug(store, bronnen, [int(x) for x in v.get("ids", [])])

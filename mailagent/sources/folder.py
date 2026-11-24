@@ -102,7 +102,13 @@ class MapBron:
             self.vlaggen.pop(bron_id, None)
 
     def mappenlijst(self) -> list[str]:
-        return ["Projecten/ENTER÷IFITT", "ISTTE", "Reviews & tijdschriften", "BUas intern"]
+        return ["Projecten/ENTER÷IFITT", "ISTTE", "Reviews & tijdschriften", "BUas intern"] + getattr(self, "nieuwe_mappen", [])
+
+    def nieuw_pad(self, naam: str) -> str:
+        return naam.strip().strip("/")
+
+    def maak_map(self, pad: str) -> None:
+        self.nieuwe_mappen = getattr(self, "nieuwe_mappen", []) + [pad]
 
     def terugzetten(self, message_ids: list[str], van: str) -> dict[str, str]:
         import email as _email
