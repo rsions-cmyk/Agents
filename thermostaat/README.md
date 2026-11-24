@@ -22,7 +22,7 @@ De regeling draait op de ESP32. Valt de telefoon of de wifi uit, dan blijft de v
 | ESP32-bordje | ESP32 DevKit (esp32dev) | ongeveer € 8 |
 | OpenTherm-adapter | adapter van Ihor Melnyk, of de Master OpenTherm Shield van DIYLESS | € 25 tot € 35 |
 | Temperatuursensor | SHT40 op een los bordje (I2C) | een paar euro |
-| Bewegingssensor | HC-SR501 of de kleinere AM312 (PIR) | een paar euro |
+| Bewegingssensor | HC-SR501 (PIR) | een paar euro |
 | Verbindingsklemmen | 2 stuks met 3 openingen, bijvoorbeeld Wago 221-413 | een paar euro |
 | Voeding | USB-lader van 5 V met kabel | n.v.t. |
 | Kastje en draadjes | | een paar euro |
@@ -37,7 +37,7 @@ De bouwinstructie met tekeningen per stap staat in `bouwinstructie.html`.
 4. De adapter en de SHT40 hebben allebei 3,3 V en GND nodig, en de ESP32 heeft maar één 3V3-pin. Verbind de 3V3-pin en een GND-pin daarom elk met een verbindingsklem.
 5. Verbind de adapter met de ESP32: IN naar GPIO16 (RX2), OUT naar GPIO17 (TX2), VCC naar de 3V3-klem en GND naar de GND-klem. Vraagt je adapter 5 V, gebruik dan VIN.
 6. Verbind de SHT40: SDA naar GPIO21, SCL naar GPIO22, VCC naar de 3V3-klem, GND naar de GND-klem.
-7. Verbind de bewegingssensor: OUT naar GPIO27, GND naar de GND-pin aan de andere kant van het bordje. De HC-SR501 krijgt 5 V (de VIN-pin van de ESP32 als die via USB gevoed wordt), de AM312 3,3 V. Richt de sensor op de plek waar mensen langslopen.
+7. Verbind de bewegingssensor: OUT naar GPIO27, GND naar de GND-pin aan de andere kant van het bordje. VCC gaat naar VIN, dat 5 V geeft als de ESP32 via USB gevoed wordt. Het signaal op OUT is 3,3 V en dus veilig voor de ESP32. Richt de sensor op de plek waar mensen langslopen.
 8. Hang de temperatuursensor waar je oude thermostaat hing, op ongeveer 1,5 meter en onder het kastje. De ESP32 wordt een beetje warm en die warmte stijgt op.
 
 Andere pinnen? Pas ze bovenaan `thermostaat.yaml` aan, onder `substitutions`.
