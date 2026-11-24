@@ -123,7 +123,8 @@ class Store:
                              ("oordeel", "INTEGER"), ("later", "INTEGER DEFAULT 0"),
                              ("soort", "TEXT"),           # 'antwoord' voor de taak 'Beantwoorden: …'
                              ("lijkt_klaar", "TEXT"),     # waarom de app denkt dat de taak al gedaan is
-                             ("bewijs", "TEXT")):         # Message-ID van het verstuurde antwoord dat is bekeken
+                             ("bewijs", "TEXT"),          # Message-ID van het verstuurde antwoord dat is bekeken
+                             ("deadline_in_agenda", "TEXT")):   # datum van de deadline-afspraak in je agenda
             if kolom not in kolommen:
                 self.db.execute(f"ALTER TABLE taken ADD COLUMN {kolom} {soort}")
         self.db.execute("UPDATE taken SET soort='antwoord' WHERE soort IS NULL "
@@ -133,7 +134,7 @@ class Store:
             self.db.execute("ALTER TABLE items ADD COLUMN eigen_antwoord TEXT")
         if "vorige_status" not in itemkolommen:
             self.db.execute("ALTER TABLE items ADD COLUMN vorige_status TEXT")
-        for kolom in ("lijkt_beantwoord", "bewijs"):   # al beantwoord vanaf een ander apparaat?
+        for kolom in ("lijkt_beantwoord", "bewijs", "deadline_in_agenda"):   # al beantwoord? deadline in agenda?
             if kolom not in itemkolommen:
                 self.db.execute(f"ALTER TABLE items ADD COLUMN {kolom} TEXT")
         if "verwijzingen" not in {r["name"] for r in self.db.execute("PRAGMA table_info(mails)")}:
@@ -261,6 +262,11 @@ class Store:
         self.db.commit()
 
     # --- al beantwoord, belangrijke afzenders, wacht op antwoord, meldingen ---
+    def zet_deadline_in_agenda(self, soort: str, rij_id: int, dag: str) -> None:
+        tabel = "taken" if soort == "taak" else "items"
+        self.db.execute(f"UPDATE {tabel} SET deadline_in_agenda=? WHERE id=?", (dag, rij_id))
+        self.db.commit()
+
     def zet_lijkt_beantwoord(self, item_id: int, reden: str | None, bewijs: str) -> None:
         self.db.execute("UPDATE items SET lijkt_beantwoord=?, bewijs=? WHERE id=?", (reden, bewijs, item_id))
         self.db.commit()

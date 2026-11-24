@@ -44,6 +44,7 @@ class Config:
     opvolgen_werkdagen: int = 3
     meldingen_aan: bool = True
     meldingen_minuten: int = 15
+    ochtend_aan: bool = True
 
     @property
     def db_pad(self) -> Path:
@@ -107,6 +108,7 @@ def laad(pad: str | Path = "config.yaml") -> Config:
         opvolgen_werkdagen=int((ruw.get("opvolgen") or {}).get("werkdagen", 3)),
         meldingen_aan=bool((ruw.get("meldingen") or {}).get("aan", True)),
         meldingen_minuten=max(5, int((ruw.get("meldingen") or {}).get("elke_minuten", 15))),
+        ochtend_aan=bool((ruw.get("meldingen") or {}).get("ochtend", True)),
     )
 
 

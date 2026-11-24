@@ -220,6 +220,10 @@ def plan_bestaande_taak(store: Store, agenda, taak_id: int, start: datetime, min
     t = store.taak(taak_id)
     if t is None:
         raise ValueError("taak niet gevonden")
+    if t["gepland"]:
+        raise ValueError("deze taak staat al in je agenda")   # geen dubbele afspraken
+    if t["klaar"]:
+        raise ValueError("deze taak is al afgevinkt")
     stappen = json.loads(t["stappen"] or "[]")
     notities = "\n".join(f"- {s}" for s in stappen)
     if t["item_id"]:
@@ -653,6 +657,141 @@ def _sluit_wacht_op(store: Store) -> int:
                 opgelost += 1
                 break
     return opgelost
+
+
+def voorstellen_voor(agenda, cfg: Config, taken: list, vanaf: datetime) -> dict[int, str]:
+    """Per taak het eerste vrije moment (vóór de deadline als die er is), zonder dat voorstellen botsen."""
+    from datetime import date as _date
+    from .agenda import lees_werktijd, vrije_momenten
+    werk = lees_werktijd(cfg.agenda)
+    bezet = agenda.bezet(vanaf, vanaf + timedelta(days=werk.dagen_vooruit + 1))
+    gepland: list = []
+    uit = {}
+    for t in sorted(taken, key=lambda t: (t["deadline"] or "9999", t["id"])):
+        minuten = t["minuten"] or 30
+        try:
+            dl = _date.fromisoformat(t["deadline"]) if t["deadline"] else None
+        except ValueError:
+            dl = None
+        mom = vrije_momenten(bezet + gepland, minuten, vanaf, werk, dl, aantal=1)
+        if mom:
+            uit[t["id"]] = mom[0].isoformat(timespec="minutes")
+            gepland.append((mom[0], mom[0] + timedelta(minutes=minuten)))
+    return uit
+
+
+def deadline_in_agenda(store: Store, agenda, soort: str, rij_id: int) -> str:
+    """Deadline van een taak of mail als hele-dag-afspraak in je agenda. Alleen na een klik."""
+    from datetime import date as _date
+    if agenda is None:
+        raise ValueError("geen agenda gekoppeld")
+    if soort == "taak":
+        rij = store.taak(rij_id)
+        if rij is None:
+            raise ValueError("taak niet gevonden")
+        titel, item = rij["omschrijving"], store.item(rij["item_id"]) if rij["item_id"] else None
+    else:
+        rij = item = store.item(rij_id)
+        if rij is None:
+            raise ValueError("mail niet gevonden")
+        titel = rij["samenvatting"] or rij["onderwerp"]
+    if not rij["deadline"]:
+        raise ValueError("er is geen deadline")
+    if rij["deadline_in_agenda"]:
+        raise ValueError("deze deadline staat al in je agenda")
+    try:
+        dag = _date.fromisoformat(rij["deadline"])
+    except ValueError:
+        raise ValueError(f"deadline '{rij['deadline']}' is geen datum") from None
+    notities = f"Naar aanleiding van: {item['onderwerp']} ({item['van']})" if item is not None else ""
+    melding = agenda.maak_deadline(f"Deadline: {titel}", dag, notities)
+    store.zet_deadline_in_agenda(soort, rij_id, dag.isoformat())
+    return melding
+
+
+def ochtend(cfg: Config, store: Store, agenda=None) -> dict:
+    """Overzicht voor het begin van de dag: wat er vandaag staat, wat eraan komt en wat blijft liggen."""
+    from datetime import date as _date
+    from .agenda import lees_werktijd
+    nu_ = datetime.now().astimezone()
+    vandaag = nu_.date()
+    over_week = vandaag + timedelta(days=7)
+    werkdagen = lees_werktijd(cfg.agenda).dagen
+    open_ = store.open_taken()
+
+    def datum(s):
+        try:
+            return _date.fromisoformat((s or "")[:10])
+        except ValueError:
+            return None
+
+    ingepland = [{"id": t["id"], "omschrijving": t["omschrijving"], "gepland": t["gepland"], "minuten": t["minuten"] or 30}
+                 for t in open_ if t["gepland"] and datum(t["gepland"]) == vandaag]
+    ingepland.sort(key=lambda t: t["gepland"])
+    deadlines = []
+    for t in open_:
+        d = datum(t["deadline"])
+        if d and d <= over_week:
+            deadlines.append({"soort": "taak", "id": t["id"], "titel": t["omschrijving"], "deadline": d.isoformat(),
+                              "ingepland": bool(t["gepland"]), "in_agenda": bool(t["deadline_in_agenda"]),
+                              "te_laat": d < vandaag})
+    te_doen = [store.item(r["id"]) for st in ("wacht", "fout", "handmatig") for r in store.items(status=st)]
+    for it in te_doen:
+        d = datum(it["deadline"])
+        if d and d <= over_week:
+            deadlines.append({"soort": "mail", "id": it["id"], "titel": it["onderwerp"] or it["samenvatting"],
+                              "deadline": d.isoformat(), "ingepland": False, "in_agenda": bool(it["deadline_in_agenda"]),
+                              "te_laat": d < vandaag})
+    deadlines.sort(key=lambda d: d["deadline"])
+    grens = plus_werkdagen(vandaag, 0, werkdagen)
+    for _ in range(2):                    # twee werkdagen terug
+        grens -= timedelta(days=1)
+        while grens.isoweekday() not in werkdagen:
+            grens -= timedelta(days=1)
+    blijft_liggen = [{"id": it["id"], "van": it["van"], "onderwerp": it["onderwerp"],
+                      "dagen": (vandaag - datum(it["datum"])).days}
+                     for it in te_doen if datum(it["datum"]) and datum(it["datum"]) < grens]
+    blijft_liggen.sort(key=lambda x: -x["dagen"])
+    zonder_moment = [t for t in open_ if not t["gepland"] and not t["later"] and datum(t["deadline"])
+                     and datum(t["deadline"]) <= over_week]
+    afspraken = []
+    if agenda is not None and hasattr(agenda, "afspraken"):
+        try:
+            begin = datetime.combine(vandaag, datetime.min.time()).astimezone()
+            afspraken = [{"titel": a["titel"], "start": a["start"].isoformat(timespec="minutes"),
+                          "heledag": a["heledag"]} for a in agenda.afspraken(begin, begin + timedelta(days=1))
+                         if not a.get("vrij")]
+            afspraken.sort(key=lambda a: a["start"])
+        except Exception as e:
+            log.warning("ochtendoverzicht: agenda niet te lezen: %s", e)
+    wacht = [w for w in store.wacht_op_lijst("wacht") if w["herinner_op"] <= vandaag.isoformat()]
+    gedaan = sum(1 for t in open_ if t["lijkt_klaar"]) + sum(1 for it in te_doen if it["lijkt_beantwoord"])
+    belangrijk = sum(1 for it in te_doen if is_belangrijk(cfg, store, it["van"]))
+    return {"datum": vandaag.isoformat(), "afspraken": afspraken, "ingepland": ingepland, "deadlines": deadlines[:8],
+            "blijft_liggen": blijft_liggen[:5], "blijft_liggen_n": len(blijft_liggen),
+            "zonder_moment": [t["id"] for t in zonder_moment], "wacht_op": len(wacht), "lijkt_gedaan": gedaan,
+            "belangrijk": belangrijk}
+
+
+def ochtend_tekst(o: dict) -> str:
+    """Eén of twee zinnen voor de melding om 07:45."""
+    delen = []
+    tijden = [a for a in o["afspraken"] if not a["heledag"]]
+    if tijden:
+        delen.append(f"{len(tijden)} afspraken, eerste om {tijden[0]['start'][11:16]}")
+    if o["ingepland"]:
+        delen.append(f"{len(o['ingepland'])} taken ingepland")
+    if o["deadlines"]:
+        delen.append(f"{len(o['deadlines'])} deadlines deze week")
+    if o["belangrijk"]:
+        delen.append(f"{o['belangrijk']} van belangrijke afzenders")
+    if o["blijft_liggen_n"]:
+        delen.append(f"{o['blijft_liggen_n']} mails liggen al twee werkdagen")
+    if o["wacht_op"]:
+        delen.append(f"{o['wacht_op']} keer geen antwoord")
+    if o["lijkt_gedaan"]:
+        delen.append(f"{o['lijkt_gedaan']} lijken al gedaan")
+    return ", ".join(delen) + "." if delen else "Niets dringends vandaag."
 
 
 def schone_taken(taken: list[dict]) -> list[dict]:

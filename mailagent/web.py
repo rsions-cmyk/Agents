@@ -30,7 +30,8 @@ from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
 from .opmaak import externe_afbeeldingen, html_uit_bron, veilig
-from .pipeline import RondeBezig, afzender_adres, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
+from .pipeline import RondeBezig, afzender_adres, deadline_in_agenda, ochtend, voorstellen_voor, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
+from .melding import meld
 from .store import Store
 
 APP_HTML = Path(__file__).with_name("static") / "app.html"
@@ -38,7 +39,7 @@ APP_HTML = Path(__file__).with_name("static") / "app.html"
 
 def item_dict(rij, volledig: bool = False) -> dict:
     d = {k: rij[k] for k in ("id", "project", "actie", "prioriteit", "deadline", "samenvatting",
-                             "status", "van", "onderwerp", "datum", "lijkt_beantwoord")}
+                             "status", "van", "onderwerp", "datum", "lijkt_beantwoord", "deadline_in_agenda")}
     if volledig:
         d.update({
             "reden": rij["reden"], "concept": rij["concept"] or "", "agenda": rij["agenda"],
@@ -111,6 +112,7 @@ def verzamel(cfg: Config, store: Store, ophalen: dict) -> dict:
         "vandaag_afgehandeld": store.vandaag_afgehandeld(),
         "volgende_ronde": volgende_ronde(cfg),
         "wacht_op": [dict(w) for w in store.wacht_op_lijst("wacht")],
+        "ochtend": ochtend(cfg, store),
         "belangrijk": [{"adres": a, "vast": True} for a in cfg.belangrijk]
                       + [{"adres": r["adres"], "naam": r["naam"], "vast": False} for r in store.belangrijke()],
     }
@@ -545,16 +547,22 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                     open_ = [t for t in store.open_taken() if not t["gepland"] and not t["later"]]
                     voorstellen = {}
                     if ag is not None:
-                        werk = lees_werktijd(cfg.agenda)
-                        morgen = (datetime.now().astimezone() + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
-                        bezet = ag.bezet(morgen, morgen + timedelta(days=werk.dagen_vooruit))
-                        gepland: list = []
-                        for t in open_:
-                            mom = vrije_momenten(bezet + gepland, t["minuten"] or 30, morgen, werk, aantal=1)
-                            if mom:
-                                voorstellen[t["id"]] = mom[0].isoformat(timespec="minutes")
-                                gepland.append((mom[0], mom[0] + timedelta(minutes=t["minuten"] or 30)))
+                        morgen = datetime.combine(date.today() + timedelta(days=1), datetime.min.time()).astimezone()
+                        voorstellen = voorstellen_voor(ag, cfg, open_, morgen)
                     return self._json({"ok": True, "voorstellen": voorstellen, "agenda_fout": fout})
+                elif actie == "deadline-voorstellen":
+                    ag, fout = agenda()
+                    if ag is None:
+                        return self._json({"ok": False, "melding": fout or "geen agenda gekoppeld"})
+                    ids = set(ochtend(cfg, store)["zonder_moment"])
+                    taken = [t for t in store.open_taken() if t["id"] in ids]
+                    return self._json({"ok": True, "voorstellen": voorstellen_voor(ag, cfg, taken, datetime.now().astimezone())})
+                elif actie == "deadline-agenda":
+                    ag, fout = agenda()
+                    if ag is None:
+                        return self._json({"ok": False, "melding": fout or "geen agenda gekoppeld"})
+                    with mail_slot:
+                        melding = deadline_in_agenda(store, ag, "taak" if v.get("soort") == "taak" else "mail", int(v["id"]))
                 elif actie == "regels-toevoegen":
                     adressen = [a.strip().lower() for a in v.get("adressen", []) if a.strip()]
                     for a in adressen:
@@ -579,16 +587,6 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
     Handler.bewaak_belangrijk = staticmethod(bewaak_belangrijk)
     Handler.start_bewaking = staticmethod(start_bewaking)
     return Handler
-
-
-def meld(titel: str, tekst: str) -> None:
-    """Melding in het Berichtencentrum van je Mac."""
-    script = 'on run argv\ndisplay notification (item 2 of argv) with title (item 1 of argv) sound name "Glass"\nend run'
-    try:
-        subprocess.run(["osascript", "-e", script, titel[:120], tekst[:200]], check=False, timeout=20,
-                       capture_output=True)
-    except (OSError, subprocess.TimeoutExpired):
-        pass
 
 
 def serveer(cfg: Config, store: Store, bronnen: dict, llm_factory) -> None:

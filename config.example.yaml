@@ -141,3 +141,4 @@ opvolgen:
 meldingen:
   aan: true
   elke_minuten: 15
+  ochtend: true          # na de eerste ronde op een werkdag één melding met je dag

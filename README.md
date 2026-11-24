@@ -29,6 +29,10 @@ Na elke run staat er een overzicht per project in `data/overzicht.md`.
 
 **Wacht op antwoord.** De app leest elke ronde je verzonden mail van de afgelopen week. Vraag je iets (Claude beoordeelt dat, alleen bij mail met een vraag of verzoek), dan komt die mail op de lijst. Komt er na drie werkdagen geen antwoord, dan staat hij bovenaan Te doen, met Open in Mail, Nog 3 werkdagen en Geregeld. Instellen bij `opvolgen:`.
 
+**Vandaag.** Bovenaan Te doen staat elke dag een overzicht: je afspraken en ingeplande taken, de deadlines van de komende week, mail die al twee werkdagen of langer ligt, mail van belangrijke afzenders, antwoorden die uitblijven en wat al gedaan lijkt. Taken met een deadline die nog geen moment hebben, plan je daar met één klik in (vóór de deadline, zonder botsingen). Na de eerste ronde op een werkdag krijg je één melding met je dag (`meldingen: ochtend:`).
+
+**Deadlines in je agenda.** Bij een taak of mail met een deadline zet "In agenda" een hele-dag-afspraak op die dag, met slotje, die niet als bezet telt, met een herinnering de dag ervoor om 09:00.
+
 **De mail blijft aan de taak vast.** Een taak gemaakt vanuit een mail houdt die mail erbij: in Taken zie je afzender en onderwerp, met "Open" (opent de mail in Apple Mail) en "Beantwoorden" (antwoord typen of door Claude laten schrijven, en openen in Apple Mail). De mail wordt niet gearchiveerd, tenzij je dat aanvinkt. Ook gearchiveerd blijft hij gekoppeld.
 
 **Zichtbaar in Mail.** Een mail met een taak krijgt in Apple Mail een gekleurde vlag (standaard blauw; in Outlook een opvolgvlag, in Gmail een ster). Afvinken haalt de vlag weg, tenzij er nog een andere open taak bij die mail hoort. Hernoem de vlagkleur in Apple Mail eenmalig naar "Ingepland". Instellen of uitzetten: `markeren:` in `config.yaml`.

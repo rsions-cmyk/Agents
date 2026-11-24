@@ -972,3 +972,87 @@ def test_afbeeldingen_ingesloten_en_op_verzoek():
     assert "cdn.example/bg.png" in open_
     assert "tracker.example" not in open_                                # pixel blijft weg
     assert "192.168.1.1" not in open_ and "localhost:8765" not in open_  # nooit je eigen netwerk
+
+
+class NepAgenda2:
+    def __init__(self):
+        self.afspraken, self.deadlines = [], []
+    def bezet(self, van, tot):
+        return []
+    def maak_afspraak(self, titel, start, eind, notities):
+        self.afspraken.append((titel, start, eind))
+        return "ingepland"
+    def maak_deadline(self, titel, dag, notities):
+        self.deadlines.append((titel, dag))
+        return "deadline in je agenda"
+
+
+def test_ochtendoverzicht_en_deadlines(omgeving, monkeypatch):
+    from datetime import date, datetime, timedelta
+    from mailagent import cli, melding
+    from mailagent.pipeline import (deadline_in_agenda, ochtend, ochtend_tekst, plan_bestaande_taak,
+                                    voorstellen_voor, zet_taken_klaar)
+
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    vandaag = date.today()
+    morgen = (vandaag + timedelta(days=1)).isoformat()
+    it = store.items(status="wacht")[0]
+    zet_taken_klaar(store, bronnen, it["id"], "c", [{"omschrijving": "Rapport lezen", "deadline": morgen, "minuten": 60},
+                                                     {"omschrijving": "Ooit", "deadline": "2030-01-01"}])
+    oud = store.items(status="wacht")[0]                                   # een mail die al ruim een week ligt
+    store.db.execute("UPDATE mails SET datum=? WHERE sleutel=?",
+                     ((datetime.now().astimezone() - timedelta(days=9)).isoformat(), oud["sleutel"]))
+    store.db.commit()
+    o = ochtend(cfg, store)
+    titels = [d["titel"] for d in o["deadlines"]]
+    assert "Rapport lezen" in titels and "Ooit" not in titels              # alleen de komende week
+    rapport = next(t for t in store.open_taken() if t["omschrijving"] == "Rapport lezen")
+    assert o["zonder_moment"] == [rapport["id"]]
+    assert o["blijft_liggen_n"] >= 1 and o["blijft_liggen"][0]["dagen"] >= 9
+    assert "deadlines deze week" in ochtend_tekst(o)
+
+    ag = NepAgenda2()
+    vs = voorstellen_voor(ag, cfg, [rapport], datetime.now().astimezone())
+    assert rapport["id"] in vs
+    plan_bestaande_taak(store, ag, rapport["id"], datetime.fromisoformat(vs[rapport["id"]]), 60)
+    with pytest.raises(ValueError):                                         # nooit twee keer inplannen
+        plan_bestaande_taak(store, ag, rapport["id"], datetime.fromisoformat(vs[rapport["id"]]), 60)
+    assert len(ag.afspraken) == 1
+
+    assert "agenda" in deadline_in_agenda(store, ag, "taak", rapport["id"])
+    assert ag.deadlines == [("Deadline: Rapport lezen", date.fromisoformat(morgen))]
+    with pytest.raises(ValueError):
+        deadline_in_agenda(store, ag, "taak", rapport["id"])                # al in de agenda
+    assert next(d for d in ochtend(cfg, store)["deadlines"] if d["titel"] == "Rapport lezen")["in_agenda"]
+
+    # ochtendmelding: één keer per dag, alleen 's ochtends op werkdagen
+    meldingen = []
+    monkeypatch.setattr(melding, "meld", lambda titel, tekst: meldingen.append(tekst))
+    monkeypatch.setattr("mailagent.agenda.maak_agenda", lambda cfg: (None, "geen"))
+    class Klok(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 11, 25, 7, 50)                            # woensdag
+    monkeypatch.setattr("datetime.datetime", Klok)
+    cli.ochtendmelding(cfg, store)
+    cli.ochtendmelding(cfg, store)
+    assert len(meldingen) == 1
+
+
+def test_vrije_momenten_bij_zomertijd(monkeypatch):
+    import time
+    from datetime import date, datetime
+    from mailagent.agenda import Werktijd, vrije_momenten
+
+    monkeypatch.setenv("TZ", "Europe/Amsterdam")
+    time.tzset()
+    try:
+        nu = datetime(2027, 3, 26, 8, 0).astimezone()                       # vrijdag, nog wintertijd (+01:00)
+        m = vrije_momenten([], 60, nu, Werktijd(), aantal=2)
+        maandag = m[1]
+        assert maandag.date() == date(2027, 3, 29) and maandag.hour == 9    # na de omschakeling nog steeds 09:00
+        assert maandag.utcoffset().total_seconds() == 7200                  # zomertijd
+    finally:
+        monkeypatch.delenv("TZ")
+        time.tzset()

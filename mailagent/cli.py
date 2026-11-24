@@ -142,6 +142,7 @@ def main(argv: list[str] | None = None) -> int:
         for naam, n in res.items():
             print(f"{naam}: " + ("ophalen mislukt (zie log)" if n < 0 else f"{n} nieuwe mail(s) verwerkt"
                                  + (f", nog {rest[naam]} te gaan" if rest.get(naam) else "")))
+        ochtendmelding(cfg, store)
         (cfg.data_dir / "overzicht.md").write_text(overzicht(cfg, store), encoding="utf-8")
         return 1 if any(n < 0 for n in res.values()) else 0
 
@@ -150,6 +151,23 @@ def main(argv: list[str] | None = None) -> int:
         serveer(cfg, store, bronnen, lambda: maak_llm(cfg))
         return 0
     return 0
+
+
+def ochtendmelding(cfg, store) -> None:
+    """Na de eerste ronde van de dag (vóór 11:00): één melding met je dag. Eén keer per dag."""
+    from datetime import datetime
+    from .agenda import maak_agenda
+    from .melding import meld
+    from .pipeline import ochtend, ochtend_tekst
+    nu = datetime.now()
+    if not cfg.ochtend_aan or nu.hour >= 11 or nu.isoweekday() > 5:
+        return
+    sleutel = f"ochtend:{nu.date().isoformat()}"
+    if store.is_gemeld(sleutel):
+        return
+    ag, _ = maak_agenda(cfg)
+    meld("Je dag", ochtend_tekst(ochtend(cfg, store, ag)))
+    store.zet_gemeld(sleutel)
 
 
 if __name__ == "__main__":

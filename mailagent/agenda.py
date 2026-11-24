@@ -60,10 +60,16 @@ def vrije_momenten(bezet: list[tuple[datetime, datetime]], minuten: int, nu: dat
     bezet = sorted(bezet)
     gevonden: list[datetime] = []
     dag = nu.date()
+    # in de tijdzone van deze Mac rekent elke dag met zijn eigen offset, zodat 09:00 ook na de overgang
+    # naar zomer- of wintertijd 09:00 blijft; een andere vaste tijdzone (tests) blijft zoals hij is
+    lokaal = nu.utcoffset() == datetime.now().astimezone().utcoffset() or nu.tzinfo is None
+
+    def om(d, t):
+        return datetime.combine(d, t).astimezone() if lokaal else datetime.combine(d, t, tzinfo=nu.tzinfo)
     while dag <= laatste_dag and len(gevonden) < aantal:
         if dag.isoweekday() in werk.dagen:
-            start = datetime.combine(dag, werk.begin, tzinfo=nu.tzinfo)
-            eind_dag = datetime.combine(dag, werk.eind, tzinfo=nu.tzinfo)
+            start = om(dag, werk.begin)
+            eind_dag = om(dag, werk.eind)
             if dag == nu.date():
                 start = max(start, _volgend_kwartier(nu + timedelta(minutes=30)))
             t = start
@@ -80,6 +86,7 @@ def vrije_momenten(bezet: list[tuple[datetime, datetime]], minuten: int, nu: dat
 class Agenda(Protocol):
     def bezet(self, van: datetime, tot: datetime) -> list[tuple[datetime, datetime]]: ...
     def maak_afspraak(self, titel: str, start: datetime, eind: datetime, notities: str) -> str: ...
+    def maak_deadline(self, titel: str, dag: date, notities: str) -> str: ...
 
 
 class AppleAgenda:
@@ -210,6 +217,26 @@ class AppleAgenda:
         if self.prive:
             extra.append("privé" if slot else "niet privé: deze agenda laat dat niet toe")
         return f"ingepland in '{self.kalender_naam}' op {nl_moment(start)}" + (f" ({', '.join(extra)})" if extra else "")
+
+    def maak_deadline(self, titel: str, dag: date, notities: str) -> str:
+        """Deadline als hele-dag-afspraak: telt niet als bezet, met slotje, herinnering de dag ervoor om 09:00."""
+        ev = self.EK.EKEvent.eventWithEventStore_(self.store)
+        ev.setTitle_(titel)
+        begin = datetime.combine(dag, time(0, 0)).astimezone()
+        ev.setAllDay_(True)
+        ev.setStartDate_(self._nsdate(begin))
+        ev.setEndDate_(self._nsdate(begin))
+        ev.setNotes_(notities)
+        kalender = self._kalender()
+        ev.setCalendar_(kalender)
+        ev.setAvailability_(self.EK.EKEventAvailabilityFree)
+        ev.addAlarm_(self.EK.EKAlarm.alarmWithRelativeOffset_(-15 * 3600))   # 09:00 de dag ervoor
+        slot = self._maak_prive(ev, kalender) if self.prive else False
+        ok, fout = self.store.saveEvent_span_error_(ev, self.EK.EKSpanThisEvent, None)
+        if not ok:
+            raise RuntimeError(f"Deadline niet opgeslagen: {fout}")
+        return (f"deadline op {DAGEN[dag.weekday()]} {dag.day} {MAANDEN[dag.month - 1]} in je agenda, "
+                f"herinnering de dag ervoor om 09:00" + ("" if slot or not self.prive else "; niet privé"))
 
     def test_afspraak(self) -> tuple[object, dict]:
         """Testafspraak morgen 07:30 tot 07:45, om herinnering en slotje in Outlook te controleren."""
