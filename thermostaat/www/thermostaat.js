@@ -7,7 +7,8 @@
 (function () {
   "use strict";
 
-  var RUST_NA_MS = 60 * 1000; // na een minuut zonder aanraking: rustscherm (spaart het OLED-scherm)
+  var UIT_NA_BEWEGING_MS = 30 * 1000;  // scherm zwart 30 seconden nadat de bewegingssensor niets meer ziet
+  var UIT_NA_AANRAKING_MS = 60 * 1000; // zonder bewegingssensor: zwart een minuut na de laatste aanraking
   var VERZEND_NA_MS = 700;    // wachttijd na de laatste tik op plus of min
 
   // ---------------------------------------------------------------------------
@@ -71,12 +72,9 @@
     ".kop{margin-top:14px;color:var(--zacht);font-size:13px;text-transform:uppercase;letter-spacing:.5px}",
     ".sluit{width:100%;height:50px;margin-top:16px;border-radius:14px;border:0;background:var(--warm);",
     "color:#1b1b1b;font-size:17px;font-weight:600}",
-    // Rustscherm: zwart, alleen de temperatuur, elke minuut een stukje verschoven
+    // Rustscherm: helemaal zwart. Op een OLED-scherm staan de pixels dan uit.
     "#rust{position:fixed;left:0;top:0;right:0;bottom:0;background:#000;display:none}",
     "#rust.aan{display:block}",
-    "#rust div{position:absolute;color:#5a6670;font-size:64px;font-weight:200;font-variant-numeric:tabular-nums;",
-    "transition:left 2s,top 2s}",
-    "#rust span{display:block;font-size:16px;color:#3f4950;text-align:center;margin-top:4px}",
     "@media (orientation:landscape) and (max-height:500px){",
     ".nu{font-size:84px}.doel{margin-top:12px}.status{margin-top:10px}.info{margin:6px 0}}"
   ].join("");
@@ -125,7 +123,7 @@
     '  <div class="rij"><span>Eco vanaf</span><input type="time" data-tijd="Weekendavond"></div>',
     '  <button class="sluit" id="sluit">Klaar</button>',
     '</div></div>',
-    '<div id="rust"><div id="rusttemp">--<span id="rustdoel"></span></div></div>'
+    '<div id="rust"></div>'
   ].join("\n");
 
   // ---------------------------------------------------------------------------
@@ -191,19 +189,16 @@
     var doel = Date.now() < lokaalTot && lokaalDoel !== null ? lokaalDoel : getal(c.target_temperature);
 
     $("nu").innerHTML = isNaN(nu) ? "--" : komma(nu, 1) + "<small>°</small>";
-    $("rusttemp").firstChild.nodeValue = isNaN(nu) ? "--" : komma(nu, 1) + "°";
 
     var doelEl = $("doel");
     if (!aan) {
       doelEl.textContent = "uit";
       doelEl.className = "doelwaarde uit";
       $("doellabel").textContent = "verwarming staat uit";
-      $("rustdoel").textContent = "verwarming uit";
     } else {
       doelEl.textContent = isNaN(doel) ? "--" : komma(doel, 1) + "°";
       doelEl.className = "doelwaarde";
       $("doellabel").textContent = "ingesteld";
-      $("rustdoel").textContent = isNaN(doel) ? "" : "ingesteld " + komma(doel, 1) + "°";
     }
 
     var brandt = waarde("binary_sensor/Brander") === true;
@@ -297,6 +292,7 @@
       var oud = st[d.id] || {};
       for (var k in d) if (Object.prototype.hasOwnProperty.call(d, k)) oud[k] = d[k];
       st[d.id] = oud;
+      if (d.id === "binary_sensor/Beweging" && d.value === true) wordWakker();
       teken();
     });
   }
@@ -373,41 +369,41 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Rustscherm
+  // Scherm uit als er niemand is
+  // Zonder beweging en aanraking wordt de pagina helemaal zwart. Een bewegingssensor
+  // op de ESP32 (Beweging) zet hem weer aan. Zonder sensor werkt een tik op het scherm.
   // ---------------------------------------------------------------------------
 
-  var laatsteAanraking = Date.now();
+  var laatsteActiviteit = Date.now();
 
-  function verschuifRust() {
-    var el = $("rusttemp");
-    var b = window.innerWidth - 220, h = window.innerHeight - 120;
-    el.style.left = Math.max(10, Math.round(Math.random() * b)) + "px";
-    el.style.top = Math.max(10, Math.round(Math.random() * h)) + "px";
+  function rustAan() { return $("rust").className === "aan"; }
+
+  function wordWakker() {
+    laatsteActiviteit = Date.now();
+    if (rustAan()) $("rust").className = "";
   }
 
-  function wakker(e) {
-    var rust = $("rust");
-    if (rust.className === "aan") {
+  function getikt(e) {
+    if (rustAan()) {
       // De eerste tik maakt alleen wakker en bedient niets.
-      rust.className = "";
       if (e && e.cancelable) e.preventDefault();
       if (e) e.stopPropagation();
     }
-    laatsteAanraking = Date.now();
+    wordWakker();
   }
-  $("rust").addEventListener("touchstart", wakker);
-  $("rust").addEventListener("click", wakker);
-  document.addEventListener("touchstart", function () { laatsteAanraking = Date.now(); }, true);
-  document.addEventListener("click", function () { laatsteAanraking = Date.now(); }, true);
+  $("rust").addEventListener("touchstart", getikt);
+  $("rust").addEventListener("click", getikt);
+  document.addEventListener("touchstart", function () { laatsteActiviteit = Date.now(); }, true);
+  document.addEventListener("click", function () { laatsteActiviteit = Date.now(); }, true);
 
   setInterval(function () {
-    var open = $("blad").className === "open";
-    if (!open && Date.now() - laatsteAanraking > RUST_NA_MS && $("rust").className !== "aan") {
-      verschuifRust();
-      $("rust").className = "aan";
-    }
-  }, 5000);
-  setInterval(function () { if ($("rust").className === "aan") verschuifRust(); }, 60000);
+    var nu = Date.now();
+    if (waarde("binary_sensor/Beweging") === true) laatsteActiviteit = nu;
+    var heeftSensor = st["binary_sensor/Beweging"] !== undefined;
+    var wacht = heeftSensor ? UIT_NA_BEWEGING_MS : UIT_NA_AANRAKING_MS;
+    var bladOpen = $("blad").className === "open";
+    if (!bladOpen && !rustAan() && nu - laatsteActiviteit > wacht) $("rust").className = "aan";
+  }, 1000);
 
   // ---------------------------------------------------------------------------
 

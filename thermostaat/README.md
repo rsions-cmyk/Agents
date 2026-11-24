@@ -13,7 +13,7 @@ De regeling draait op de ESP32. Valt de telefoon of de wifi uit, dan blijft de v
 - Laat aanvoertemperatuur, waterdruk en luchtvochtigheid zien, en waarschuwt bij lage waterdruk of een storing van de ketel.
 - Noodstand: geeft de kamersensor 5 minuten geen waarde, dan vraagt de ESP32 een vaste aanvoertemperatuur van 35 °C, zodat het huis niet afkoelt.
 - Warm tapwater blijft altijd aan.
-- Na een minuut zonder aanraking wordt het scherm zwart met alleen de temperatuur, die elke minuut een stukje verschuift. Dat beperkt inbranden van het OLED-scherm.
+- Het scherm is zwart zolang er niemand is. Een bewegingssensor bij de telefoon zet het aan zodra iemand langsloopt, en 30 seconden nadat de sensor niets meer ziet, wordt het weer zwart. Op een OLED-scherm staan zwarte pixels uit, dus het scherm brandt niet in en verbruikt bijna niets. Zonder bewegingssensor gaat het scherm aan als je het aanraakt.
 
 ## Wat je nodig hebt
 
@@ -22,6 +22,7 @@ De regeling draait op de ESP32. Valt de telefoon of de wifi uit, dan blijft de v
 | ESP32-bordje | ESP32 DevKit (esp32dev) | ongeveer € 8 |
 | OpenTherm-adapter | adapter van Ihor Melnyk, of de Master OpenTherm Shield van DIYLESS | € 25 tot € 35 |
 | Temperatuursensor | SHT40 op een los bordje (I2C) | een paar euro |
+| Bewegingssensor | HC-SR501 of de kleinere AM312 (PIR) | een paar euro |
 | Voeding | USB-lader van 5 V met kabel | n.v.t. |
 | Kastje en draadjes | | een paar euro |
 
@@ -32,7 +33,8 @@ De regeling draait op de ESP32. Valt de telefoon of de wifi uit, dan blijft de v
 3. Sluit de twee thermostaatdraden aan op de OpenTherm-kant van de adapter. Bij OpenTherm maakt de volgorde van de twee draden niet uit.
 4. Verbind de adapter met de ESP32: IN naar GPIO16, OUT naar GPIO17, plus voeding en massa volgens de handleiding van de adapter.
 5. Verbind de SHT40: SDA naar GPIO21, SCL naar GPIO22, VCC naar 3,3 V, GND naar GND.
-6. Hang de sensor waar je oude thermostaat hing, niet direct boven de ESP32. De ESP32 wordt een beetje warm en dat vertekent de meting.
+6. Verbind de bewegingssensor: OUT naar GPIO27, GND naar GND. De HC-SR501 krijgt 5 V (de VIN-pin van de ESP32 als die via USB gevoed wordt), de AM312 3,3 V. Richt de sensor op de plek waar mensen langslopen.
+7. Hang de temperatuursensor waar je oude thermostaat hing, niet direct boven de ESP32. De ESP32 wordt een beetje warm en dat vertekent de meting.
 
 Andere pinnen? Pas ze bovenaan `thermostaat.yaml` aan, onder `substitutions`.
 

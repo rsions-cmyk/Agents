@@ -13,6 +13,7 @@ substitutions:
   ot_out_pin: GPIO17     # OpenTherm-adapter, signaal van de ESP32 naar de ketel
   i2c_sda: GPIO21        # SHT40
   i2c_scl: GPIO22        # SHT40
+  pir_pin: GPIO27        # bewegingssensor (HC-SR501 of AM312)
 
   # Aanvoertemperatuur die de ketel mag leveren (°C).
   # Wordt het huis bij strenge vorst niet warm genoeg, verhoog dan aanvoer_max naar 70.
@@ -146,6 +147,19 @@ binary_sensor:
     fault_indication:
       name: Storing
       id: ketelstoring
+
+  # Bewegingssensor bij de telefoon. Zodra iemand langsloopt, gaat het scherm aan.
+  - platform: gpio
+    name: Beweging
+    id: beweging
+    device_class: motion
+    pin:
+      number: ${pir_pin}
+      mode:
+        input: true
+        pulldown: true
+    filters:
+      - delayed_off: 15s
 
   - platform: template
     name: Sensorstoring

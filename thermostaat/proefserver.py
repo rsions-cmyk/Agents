@@ -46,6 +46,7 @@ toestand = {
     "waterdruk": 1.6,
     "storing": False,
     "sensorstoring": False,
+    "beweging": False,
 }
 
 
@@ -76,6 +77,7 @@ def entiteiten() -> list[dict]:
         {"id": "binary_sensor/Warmwater", "value": False},
         {"id": "binary_sensor/Storing", "value": t["storing"]},
         {"id": "binary_sensor/Sensorstoring", "value": t["sensorstoring"]},
+        {"id": "binary_sensor/Beweging", "value": t["beweging"]},
         {"id": "number/Comfort", "value": f"{t['comfort']:.1f}"},
         {"id": "number/Eco", "value": f"{t['eco']:.1f}"},
         {"id": "switch/Schema", "value": t["schema"]},
@@ -166,11 +168,11 @@ class Afhandeling(BaseHTTPRequestHandler):
                 t["tijden"][stukken[1]] = args["value"]
             elif stukken[:2] == ["switch", "Schema"]:
                 t["schema"] = stukken[2] == "turn_on"
-            # Om meldingen te testen: POST /proef/waterdruk?value=0.8, /proef/storing, /proef/sensorstoring
+            # Om te testen: POST /proef/waterdruk?value=0.8, /proef/storing, /proef/sensorstoring, /proef/beweging
             elif stukken[0] == "proef":
                 if stukken[1] == "waterdruk":
                     t["waterdruk"] = float(args["value"])
-                elif stukken[1] in ("storing", "sensorstoring"):
+                elif stukken[1] in ("storing", "sensorstoring", "beweging"):
                     t[stukken[1]] = not t[stukken[1]]
             else:
                 self.stuur(404)
