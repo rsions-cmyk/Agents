@@ -196,6 +196,11 @@ details.origineel pre{white-space:pre-wrap;font:13px/1.5 -apple-system,sans-seri
 .tk-erbij{display:flex;gap:8px;flex-wrap:wrap}
 .tk-uitleg{font-size:12px;color:var(--zacht)}
 .c-schrijf{margin-top:8px}
+.afbeeldingbalk{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 8px;padding:8px 10px;border-radius:9px;
+  background:var(--vlak2);font-size:12.5px;color:var(--zacht)}
+.afbeeldingbalk svg{width:15px;height:15px;flex:none}
+.afbeeldingbalk span{flex:1;min-width:200px}
+.afbeeldingbalk.stil{background:none;padding:2px 0}
 .lijktgedaan{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;padding:8px 10px;border-radius:9px;
   background:var(--ok-zacht);font-size:13px}
 .lijktgedaan>svg{color:var(--ok);width:16px;height:16px;flex:none}
@@ -771,26 +776,33 @@ function tekenVoortgang(){
 }
 
 // ---------------- mail tonen: opgemaakt (HTML, veilig) of als tekst ----------------
-const htmlCache = {};          // id -> veilige html | {fout}
+const htmlCache = {};          // id -> {html, geblokkeerd, extern, altijd, adres} | "laden" | {fout}
 let weergave = "opgemaakt";
 try { weergave = localStorage.getItem("mailagent-weergave") || "opgemaakt"; } catch(e){}
 const attr = s => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 
+function laadHtml(id, afbeeldingen){
+  htmlCache[id] = "laden";
+  stil("mail-html", {id, afbeeldingen: !!afbeeldingen}).then(j => { htmlCache[id] = j.ok ? j : {fout: j.melding}; ververs(id); });
+}
 function mailWeergave(id, tekst){
   const h = htmlCache[id];
-  if (weergave === "opgemaakt" && h === undefined){
-    htmlCache[id] = "laden";
-    stil("mail-html", {id}).then(j => { htmlCache[id] = j.ok ? j.html : {fout: j.melding}; ververs(id); });
-  }
-  const opgemaakt = weergave === "opgemaakt" && typeof h === "string" && h !== "laden";
+  if (weergave === "opgemaakt" && h === undefined) laadHtml(id, false);
+  const opgemaakt = weergave === "opgemaakt" && h && typeof h === "object" && h.html !== undefined;
   const status = weergave !== "opgemaakt" ? "" : h === "laden" || h === undefined ? "opmaak laden…" : h && h.fout ? esc(h.fout) : "";
+  const balk = !opgemaakt ? "" : h.geblokkeerd ? `<div class="afbeeldingbalk">${ik("eye")}<span>${h.geblokkeerd === 1 ? "1 afbeelding" : h.geblokkeerd + " afbeeldingen"} tegengehouden. Laden laat de afzender zien dat je de mail opende.</span>
+      <button class="knop klein" data-afbladen="${id}">Laden</button>
+      ${h.adres ? `<button class="knop klein" data-afbaltijd="${id}" data-adres="${esc(h.adres)}" data-aan="1">Altijd voor ${esc(h.adres)}</button>` : ""}</div>`
+    : h.altijd ? `<div class="afbeeldingbalk stil"><span>Afbeeldingen van ${esc(h.adres)} laden altijd.</span>
+      <button class="knop klein" data-afbaltijd="${id}" data-adres="${esc(h.adres)}" data-aan="0">Niet meer</button></div>` : "";
   return `<div class="mailweergave" id="mw-${id}">
     <div class="weergavekeuze"><div class="segment">
       <button class="${weergave === "opgemaakt" ? "aan" : ""}" data-weergave="opgemaakt">Opgemaakt</button>
       <button class="${weergave === "tekst" ? "aan" : ""}" data-weergave="tekst">Tekst</button></div>
       <span class="meta">${status}</span>
       <button class="knop klein" data-mailopen="${id}" style="margin-left:auto" title="Deze mail openen in Apple Mail">${ik("mail")}Open in Mail</button></div>
-    ${opgemaakt ? `<iframe class="mailframe" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" srcdoc="${attr(h)}" title="Mail"></iframe>`
+    ${balk}
+    ${opgemaakt ? `<iframe class="mailframe" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" srcdoc="${attr(h.html)}" title="Mail"></iframe>`
                 : `<div class="leesvlak">${tekst === null ? `<span class="meta">Mail laden…</span>` : esc(tekst || "(geen tekst)")}</div>`}
   </div>`;
 }
@@ -1986,6 +1998,19 @@ document.addEventListener("mousedown", ev => {
     stil("mappen", {id, vernieuw: true}).then(j => { if (kiezer && j.ok){ kiezer.mappen = j.mappen; kiezer.voorstellen = j.voorstellen; tekenKiezer(); } }); return; }
   if (!ev.target.closest(".kiezer")) sluitKiezer();
 }, true);
+document.addEventListener("click", async ev => {
+  const l = ev.target.closest("[data-afbladen]");
+  if (l){ laadHtml(Number(l.dataset.afbladen), true); return ververs(Number(l.dataset.afbladen)); }
+  const a = ev.target.closest("[data-afbaltijd]");
+  if (a){
+    const id = Number(a.dataset.afbaltijd), aan = a.dataset.aan === "1";
+    const j = await stil("afbeeldingen-altijd", {adres: a.dataset.adres, aan});
+    toast(j.melding, !j.ok);
+    // andere mails van dezelfde afzender opnieuw laten opmaken
+    Object.keys(htmlCache).forEach(k => { const h = htmlCache[k]; if (h && h.adres === a.dataset.adres) delete htmlCache[k]; });
+    laadHtml(id, aan); return ververs(id);
+  }
+});
 document.addEventListener("click", ev => {
   const b = ev.target.closest("[data-weergave]");
   if (!b) return;

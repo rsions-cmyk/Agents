@@ -949,3 +949,26 @@ def test_nieuwe_map_maken_en_opbergen(omgeving):
         assert store.item(a)["status"] == "opgeborgen"
     finally:
         server.shutdown()
+
+
+def test_afbeeldingen_ingesloten_en_op_verzoek():
+    import base64
+    from mailagent.opmaak import externe_afbeeldingen, html_uit_bron, veilig
+
+    png = base64.b64encode(b"\x89PNG\r\n\x1a\nnep").decode()
+    bron = ("From: a@b.nl\nSubject: x\nMIME-Version: 1.0\nContent-Type: multipart/related; boundary=RR\n\n"
+            "--RR\nContent-Type: text/html; charset=utf-8\n\n"
+            "<p>Logo:</p><img src=\"cid:logo123@buas\"><img src=\"https://cdn.example/foto.jpg\" width=\"600\">"
+            "<img src=\"https://tracker.example/p.gif\" width=\"1\" height=\"1\"><img src=\"http://192.168.1.1/x.png\">"
+            "<img src=\"http://localhost:8765/api/data\"><div style=\"background:url('https://cdn.example/bg.png')\">x</div>\n"
+            f"--RR\nContent-Type: image/png\nContent-ID: <logo123@buas>\nContent-Transfer-Encoding: base64\n\n{png}\n--RR--\n")
+    ruw = html_uit_bron(bron)
+    assert "data:image/png;base64," in ruw and "cid:" not in ruw          # ingesloten logo staat erin
+    dicht = veilig(ruw)
+    assert "data:image/png" in dicht and "cdn.example" not in dicht      # standaard: alleen het logo
+    assert externe_afbeeldingen(ruw) == 3                                # foto, LAN, localhost; pixel telt niet
+    open_ = veilig(ruw, extern=True)
+    assert "https://cdn.example/foto.jpg" in open_ and "img-src data: https: http:" in open_
+    assert "cdn.example/bg.png" in open_
+    assert "tracker.example" not in open_                                # pixel blijft weg
+    assert "192.168.1.1" not in open_ and "localhost:8765" not in open_  # nooit je eigen netwerk

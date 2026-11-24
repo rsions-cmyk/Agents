@@ -29,7 +29,7 @@ from .agenda import lees_werktijd, maak_agenda, vrije_momenten
 from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
-from .opmaak import html_uit_bron, veilig
+from .opmaak import externe_afbeeldingen, html_uit_bron, veilig
 from .pipeline import RondeBezig, afzender_adres, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
 from .store import Store
 
@@ -471,9 +471,14 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                     return self._json({"ok": True, "mail": item_dict(it, True)})
                 elif actie == "mail-html":
                     i = int(v["id"])
+                    it = store.item(i)
+                    if it is None:
+                        return self._json({"ok": False, "melding": "Mail niet gevonden"})
+                    adres = afzender_adres(it["van"] or "")
+                    altijd = bool(adres) and store.afbeeldingen_ok(adres)
+                    extern = bool(v.get("afbeeldingen")) or altijd
                     if i not in html_cache:
-                        it = store.item(i)
-                        bron = bronnen.get(it["bron"]) if it else None
+                        bron = bronnen.get(it["bron"])
                         if bron is None or not hasattr(bron, "bron"):
                             return self._json({"ok": False, "melding": "Geen opgemaakte versie beschikbaar"})
                         with mail_slot:
@@ -481,8 +486,19 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                         h = html_uit_bron(ruw)
                         if h is None:
                             return self._json({"ok": False, "melding": "Geen opgemaakte versie gevonden"})
-                        html_cache[i] = veilig(h)
-                    return self._json({"ok": True, "html": html_cache[i]})
+                        html_cache[i] = h          # ruwe HTML (met ingesloten afbeeldingen); veilig maken per verzoek
+                        while len(html_cache) > 60:   # niet eindeloos groeien
+                            html_cache.pop(next(iter(html_cache)))
+                    h = html_cache[i]
+                    return self._json({"ok": True, "html": veilig(h, extern=extern), "extern": extern, "altijd": altijd,
+                                       "geblokkeerd": 0 if extern else externe_afbeeldingen(h), "adres": adres})
+                elif actie == "afbeeldingen-altijd":
+                    adres = (v.get("adres") or "").strip().lower()
+                    if not adres:
+                        return self._json({"ok": False, "melding": "Geen afzender"})
+                    store.zet_afbeeldingen_ok(adres, bool(v.get("aan", True)))
+                    melding = (f"Afbeeldingen van {adres} laden voortaan meteen" if v.get("aan", True)
+                               else f"Afbeeldingen van {adres} worden weer tegengehouden")
                 elif actie == "mappen":
                     it = store.item(int(v["id"]))
                     if it is None:

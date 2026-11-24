@@ -88,6 +88,10 @@ CREATE TABLE IF NOT EXISTS wacht_op (
     antwoord TEXT,                     -- sleutel van het antwoord dat binnenkwam
     aangemaakt TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS afbeeldingen_ok (
+    adres TEXT PRIMARY KEY,      -- afzender van wie externe afbeeldingen altijd mogen laden
+    aangemaakt TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS gemeld (
     sleutel TEXT PRIMARY KEY,
     tijd TEXT NOT NULL
@@ -307,6 +311,16 @@ class Store:
     def inkomend_sinds(self, sinds: str) -> list[sqlite3.Row]:
         return self.db.execute("SELECT sleutel, van, onderwerp, datum, verwijzingen FROM mails WHERE datum>?",
                                (sinds,)).fetchall()
+
+    def afbeeldingen_ok(self, adres: str) -> bool:
+        return self.db.execute("SELECT 1 FROM afbeeldingen_ok WHERE adres=?", (adres.lower(),)).fetchone() is not None
+
+    def zet_afbeeldingen_ok(self, adres: str, aan: bool) -> None:
+        if aan:
+            self.db.execute("INSERT OR IGNORE INTO afbeeldingen_ok(adres, aangemaakt) VALUES (?,?)", (adres.lower(), nu()))
+        else:
+            self.db.execute("DELETE FROM afbeeldingen_ok WHERE adres=?", (adres.lower(),))
+        self.db.commit()
 
     def is_gemeld(self, sleutel: str) -> bool:
         return self.db.execute("SELECT 1 FROM gemeld WHERE sleutel=?", (sleutel,)).fetchone() is not None
