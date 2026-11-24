@@ -1,0 +1,310 @@
+# Slimme thermostaat voor een OpenTherm-ketel.
+# ESP32 + OpenTherm-adapter + SHT40-temperatuursensor.
+# De regeling draait op de ESP32 zelf. De telefoon aan de muur is alleen het scherm.
+#
+# Flashen: esphome run thermostaat.yaml
+# Controleren zonder flashen: esphome config thermostaat.yaml
+
+substitutions:
+  naam: thermostaat
+
+  # Pinnen. Pas deze aan als je adapter of bordje anders is aangesloten.
+  ot_in_pin: GPIO16      # OpenTherm-adapter, signaal van de ketel naar de ESP32
+  ot_out_pin: GPIO17     # OpenTherm-adapter, signaal van de ESP32 naar de ketel
+  i2c_sda: GPIO21        # SHT40
+  i2c_scl: GPIO22        # SHT40
+
+  # Aanvoertemperatuur die de ketel mag leveren (°C).
+  # Wordt het huis bij strenge vorst niet warm genoeg, verhoog dan aanvoer_max naar 70.
+  aanvoer_min: "20"
+  aanvoer_max: "60"
+
+  # Noodstand: aanvoertemperatuur als de kamersensor geen waarde meer geeft.
+  # Zo blijft het huis matig warm in plaats van af te koelen.
+  noodstand_aanvoer: "35"
+
+esphome:
+  name: ${naam}
+  friendly_name: Thermostaat
+
+esp32:
+  board: esp32dev
+
+logger:
+
+# Home Assistant is niet nodig. reboot_timeout: 0s zorgt ervoor dat de ESP32
+# niet herstart als er geen Home Assistant verbinding maakt.
+api:
+  reboot_timeout: 0s
+  encryption:
+    key: !secret api_sleutel
+
+# Updates via wifi, versleuteld met dezelfde sleutel als de api.
+ota:
+  - platform: esphome
+    encryption:
+
+wifi:
+  ssid: !secret wifi_naam
+  password: !secret wifi_wachtwoord
+  # Zonder wifi blijft de ESP32 gewoon regelen. Niet herstarten.
+  reboot_timeout: 0s
+  # Valt de wifi weg of is het wachtwoord fout, dan maakt de ESP32 een eigen netwerk.
+  ap:
+    ssid: Thermostaat-instellen
+    password: !secret ap_wachtwoord
+
+captive_portal:
+
+# De bedieningspagina voor de telefoon. www/thermostaat.js vervangt de standaardpagina.
+web_server:
+  port: 80
+  version: 3
+  js_url: ""
+  js_include: www/thermostaat.js
+  # Geen firmware-upload via de webpagina. Updates gaan alleen versleuteld via esphome run.
+  ota: false
+
+time:
+  - platform: sntp
+    id: tijd
+    timezone: Europe/Amsterdam
+    # Elke minuut kijken of er een schakelmoment van het schema voorbij is.
+    # Na een herstart past de eerste controle het schema meteen toe.
+    on_time:
+      - seconds: 0
+        then:
+          - script.execute:
+              id: schema_toepassen
+              altijd: false
+
+# ---------------------------------------------------------------------------
+# OpenTherm
+# ---------------------------------------------------------------------------
+
+opentherm:
+  in_pin: ${ot_in_pin}
+  out_pin: ${ot_out_pin}
+  # Warm tapwater blijft aan. Zonder deze vlag leveren sommige ketels geen warm water.
+  dhw_enable: true
+  ch_enable: true
+
+output:
+  # De gewenste aanvoertemperatuur. De PID-regelaar stuurt een waarde tussen 0 en 1,
+  # die hier wordt omgerekend naar aanvoer_min tot aanvoer_max.
+  # Bij 0 vraagt de thermostaat geen warmte (zero_means_zero).
+  - platform: opentherm
+    t_set:
+      id: t_set
+      min_value: ${aanvoer_min}
+      max_value: ${aanvoer_max}
+      zero_means_zero: true
+
+i2c:
+  sda: ${i2c_sda}
+  scl: ${i2c_scl}
+
+sensor:
+  - platform: sht4x
+    temperature:
+      name: Kamertemperatuur
+      id: kamer
+      filters:
+        # Geeft de sensor 5 minuten niets, dan telt de waarde als onbekend
+        # en gaat de noodstand aan.
+        - timeout: 5min
+    humidity:
+      name: Luchtvochtigheid
+      id: vocht
+    update_interval: 30s
+
+  - platform: opentherm
+    t_boiler:
+      name: Aanvoer
+      id: aanvoer
+    t_ret:
+      name: Retour
+      id: retour
+    rel_mod_level:
+      name: Modulatie
+      id: modulatie
+    ch_pressure:
+      name: Waterdruk
+      id: waterdruk
+
+binary_sensor:
+  - platform: opentherm
+    flame_on:
+      name: Brander
+      id: brander
+    ch_active:
+      name: Verwarming
+      id: cv_actief
+    dhw_active:
+      name: Warmwater
+      id: warmwater_actief
+    fault_indication:
+      name: Storing
+      id: ketelstoring
+
+  - platform: template
+    name: Sensorstoring
+    id: sensorstoring
+    lambda: return std::isnan(id(kamer).state);
+
+# ---------------------------------------------------------------------------
+# Regeling
+# ---------------------------------------------------------------------------
+
+climate:
+  - platform: pid
+    name: Thermostaat
+    id: thermostaat
+    sensor: kamer
+    humidity_sensor: vocht
+    default_target_temperature: 20
+    heat_output: t_set
+    visual:
+      min_temperature: 10
+      max_temperature: 25
+      temperature_step: 0.5
+    # Beginwaarden. Schiet de temperatuur steeds voorbij de ingestelde waarde,
+    # verlaag dan kp. Blijft het huis structureel te koud, verhoog dan ki.
+    control_parameters:
+      kp: 0.3
+      ki: 0.0005
+      kd: 0
+
+interval:
+  # Noodstand: zonder kamertemperatuur kan de PID-regelaar niet rekenen en zet hij
+  # de warmtevraag op 0. Dan vragen we zelf een vaste, lage aanvoertemperatuur.
+  - interval: 60s
+    then:
+      - lambda: |-
+          if (std::isnan(id(kamer).state) &&
+              id(thermostaat).mode == climate::CLIMATE_MODE_HEAT) {
+            const float laag = ${aanvoer_min};
+            const float hoog = ${aanvoer_max};
+            const float nood = ${noodstand_aanvoer};
+            id(t_set).set_level((nood - laag) / (hoog - laag));
+            ESP_LOGW("noodstand", "Geen kamertemperatuur, aanvoer vast op %.0f °C", nood);
+          }
+
+# ---------------------------------------------------------------------------
+# Weekschema
+# Tussen het ochtend- en het avondtijdstip geldt de comforttemperatuur,
+# daarbuiten de ecotemperatuur. Zaterdag en zondag hebben eigen tijden.
+# Zet je de temperatuur met de hand, dan blijft die staan tot het volgende
+# schakelmoment.
+# ---------------------------------------------------------------------------
+
+number:
+  - platform: template
+    name: Comfort
+    id: comfort
+    unit_of_measurement: °C
+    min_value: 10
+    max_value: 25
+    step: 0.5
+    initial_value: 20
+    optimistic: true
+    restore_value: true
+    on_value:
+      - script.execute:
+          id: schema_toepassen
+          altijd: true
+
+  - platform: template
+    name: Eco
+    id: eco
+    unit_of_measurement: °C
+    min_value: 10
+    max_value: 25
+    step: 0.5
+    initial_value: 16.5
+    optimistic: true
+    restore_value: true
+    on_value:
+      - script.execute:
+          id: schema_toepassen
+          altijd: true
+
+datetime:
+  - platform: template
+    type: time
+    name: Ochtend
+    id: ochtend
+    initial_value: "06:30:00"
+    optimistic: true
+    restore_value: true
+  - platform: template
+    type: time
+    name: Avond
+    id: avond
+    initial_value: "22:30:00"
+    optimistic: true
+    restore_value: true
+  - platform: template
+    type: time
+    name: Weekendochtend
+    id: weekendochtend
+    initial_value: "08:00:00"
+    optimistic: true
+    restore_value: true
+  - platform: template
+    type: time
+    name: Weekendavond
+    id: weekendavond
+    initial_value: "23:00:00"
+    optimistic: true
+    restore_value: true
+
+switch:
+  - platform: template
+    name: Schema
+    id: schema_aan
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    on_turn_on:
+      - script.execute:
+          id: schema_toepassen
+          altijd: true
+
+globals:
+  # Welk deel van het schema als laatste is toegepast: -1 onbekend, 0 eco, 1 comfort.
+  - id: laatste_blok
+    type: int
+    restore_value: false
+    initial_value: "-1"
+
+script:
+  - id: schema_toepassen
+    mode: queued
+    parameters:
+      altijd: bool
+    then:
+      - lambda: |-
+          if (!id(schema_aan).state) return;
+          auto nu = id(tijd).now();
+          if (!nu.is_valid()) return;
+
+          // day_of_week: zondag = 1, zaterdag = 7
+          const bool weekend = nu.day_of_week == 1 || nu.day_of_week == 7;
+          auto *begin = weekend ? id(weekendochtend) : id(ochtend);
+          auto *eind = weekend ? id(weekendavond) : id(avond);
+
+          const int minuut = nu.hour * 60 + nu.minute;
+          const int van = begin->hour * 60 + begin->minute;
+          const int tot = eind->hour * 60 + eind->minute;
+          const int blok = (minuut >= van && minuut < tot) ? 1 : 0;
+
+          if (!altijd && blok == id(laatste_blok)) return;
+          id(laatste_blok) = blok;
+
+          const float doel = blok == 1 ? id(comfort).state : id(eco).state;
+          if (std::isnan(doel)) return;
+          auto call = id(thermostaat).make_call();
+          call.set_target_temperature(doel);
+          call.perform();
+          ESP_LOGI("schema", "%s: %.1f °C", blok == 1 ? "comfort" : "eco", doel);
+
