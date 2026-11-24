@@ -727,3 +727,62 @@ def test_concept_laten_schrijven_wordt_bewaard(omgeving):
         assert store.item(a)["concept"] == j["concept"]                         # blijft na herladen staan
     finally:
         server.shutdown()
+
+
+def test_afspraak_met_herinnering_en_slotje():
+    """EventKit nagebootst: herinnering 15 min vooraf en privé via de waarde die het account opgeeft."""
+    from datetime import datetime, timedelta
+    from mailagent.agenda import AppleAgenda
+
+    class Bron:
+        def __init__(self, kan):
+            self.kan = kan
+        def respondsToSelector_(self, sel):
+            return self.kan
+        def supportsPrivateEvents(self):
+            return True
+        def preferredEventPrivateValue(self):
+            return 2
+
+    class Kalender:
+        def __init__(self, kan):
+            self.bron = Bron(kan)
+        def source(self):
+            return self.bron
+
+    class Afspraak:
+        def __init__(self):
+            self.alarmen, self.niveau = [], 0
+        def __getattr__(self, naam):          # setTitle_, setNotes_, setCalendar_ …
+            return lambda *a: None
+        def respondsToSelector_(self, sel):
+            return True
+        def addAlarm_(self, a):
+            self.alarmen.append(a)
+        def alarms(self):
+            return self.alarmen
+        def allowsPrivacyLevelModifications(self):
+            return True
+        def setPrivacyLevel_(self, n):
+            self.niveau = n
+        def privacyLevel(self):
+            return self.niveau
+
+    gemaakt = []
+    EK = SimpleNamespace(
+        EKEvent=SimpleNamespace(eventWithEventStore_=lambda st: gemaakt.append(Afspraak()) or gemaakt[-1]),
+        EKAlarm=SimpleNamespace(alarmWithRelativeOffset_=lambda s: ("alarm", s)), EKSpanThisEvent=0)
+    ag = object.__new__(AppleAgenda)
+    ag.EK, ag.NS = EK, SimpleNamespace(NSDate=SimpleNamespace(dateWithTimeIntervalSince1970_=lambda t: t))
+    ag.kalender_naam, ag.herinnering_minuten, ag.prive = "Calendar", 15, True
+    ag.store = SimpleNamespace(saveEvent_span_error_=lambda ev, span, fout: (True, None))
+    start = datetime(2026, 11, 25, 10, 0).astimezone()
+
+    ag._kalender = lambda: Kalender(True)
+    melding = ag.maak_afspraak("Taak", start, start + timedelta(minutes=30), "")
+    assert gemaakt[-1].alarmen == [("alarm", -900)] and gemaakt[-1].niveau == 2
+    assert "herinnering 15 min vooraf" in melding and "privé" in melding
+
+    ag._kalender = lambda: Kalender(False)          # account zonder privé-afspraken: wel opslaan, geen slotje
+    melding = ag.maak_afspraak("Taak", start, start + timedelta(minutes=30), "")
+    assert gemaakt[-1].niveau == 0 and "niet privé" in melding

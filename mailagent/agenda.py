@@ -85,11 +85,13 @@ class Agenda(Protocol):
 class AppleAgenda:
     """macOS-agenda via EventKit (pip install pyobjc-framework-EventKit)."""
 
-    def __init__(self, kalender: str, account: Optional[str] = None, bezet_agendas: Optional[list[str]] = None):
+    def __init__(self, kalender: str, account: Optional[str] = None, bezet_agendas: Optional[list[str]] = None,
+                 herinnering_minuten: Optional[int] = 15, prive: bool = True):
         import EventKit  # alleen op macOS beschikbaar
         import Foundation
         self.EK, self.NS = EventKit, Foundation
         self.kalender_naam, self.account = kalender, account
+        self.herinnering_minuten, self.prive = herinnering_minuten, prive
         # "Account/Kalender" of alleen "Kalender"; leeg = alle agenda's tellen mee als bezet
         self.bezet_agendas = [b.strip() for b in (bezet_agendas or []) if b.strip()]
         self.store = EventKit.EKEventStore.alloc().init()
@@ -161,17 +163,70 @@ class AppleAgenda:
     def bezet(self, van: datetime, tot: datetime) -> list[tuple[datetime, datetime]]:
         return [(a["start"], a["eind"]) for a in self.afspraken(van, tot) if not a["heledag"] and not a["vrij"]]
 
-    def maak_afspraak(self, titel: str, start: datetime, eind: datetime, notities: str) -> str:
+    def _maak_prive(self, ev, kalender) -> bool:
+        """Afspraak privé maken (slotje in Outlook): collega's zien alleen dat je bezet bent.
+
+        EventKit heeft hier geen officiële functie voor. De app Agenda gebruikt een verborgen
+        instelling (privacyLevel); het account zelf zegt welke waarde 'privé' is. Lukt het niet,
+        dan wordt de afspraak gewoon opgeslagen, zonder slotje."""
+        try:
+            bron = kalender.source()
+            if not (ev.respondsToSelector_("setPrivacyLevel:") and bron.respondsToSelector_("supportsPrivateEvents")
+                    and bron.respondsToSelector_("preferredEventPrivateValue")):
+                return False
+            if not bron.supportsPrivateEvents():
+                return False
+            if ev.respondsToSelector_("allowsPrivacyLevelModifications") and not ev.allowsPrivacyLevelModifications():
+                return False
+            waarde = int(bron.preferredEventPrivateValue())
+            if not waarde:
+                return False
+            ev.setPrivacyLevel_(waarde)
+            return int(ev.privacyLevel()) == waarde
+        except Exception:
+            return False
+
+    def _nieuwe_afspraak(self, titel: str, start: datetime, eind: datetime, notities: str):
         ev = self.EK.EKEvent.eventWithEventStore_(self.store)
         ev.setTitle_(titel)
         ev.setStartDate_(self._nsdate(start))
         ev.setEndDate_(self._nsdate(eind))
         ev.setNotes_(notities)
-        ev.setCalendar_(self._kalender())
+        kalender = self._kalender()
+        ev.setCalendar_(kalender)
+        if self.herinnering_minuten:
+            ev.addAlarm_(self.EK.EKAlarm.alarmWithRelativeOffset_(-60 * int(self.herinnering_minuten)))
+        slot = self._maak_prive(ev, kalender) if self.prive else False
         ok, fout = self.store.saveEvent_span_error_(ev, self.EK.EKSpanThisEvent, None)
         if not ok:
             raise RuntimeError(f"Afspraak niet opgeslagen: {fout}")
-        return f"ingepland in '{self.kalender_naam}' op {nl_moment(start)}"
+        return ev, slot
+
+    def maak_afspraak(self, titel: str, start: datetime, eind: datetime, notities: str) -> str:
+        _, slot = self._nieuwe_afspraak(titel, start, eind, notities)
+        extra = []
+        if self.herinnering_minuten:
+            extra.append(f"herinnering {self.herinnering_minuten} min vooraf")
+        if self.prive:
+            extra.append("privé" if slot else "niet privé: deze agenda laat dat niet toe")
+        return f"ingepland in '{self.kalender_naam}' op {nl_moment(start)}" + (f" ({', '.join(extra)})" if extra else "")
+
+    def test_afspraak(self) -> tuple[object, dict]:
+        """Testafspraak morgen 07:30 tot 07:45, om herinnering en slotje in Outlook te controleren."""
+        morgen = (datetime.now().astimezone() + timedelta(days=1)).replace(hour=7, minute=30, second=0, microsecond=0)
+        ev, slot = self._nieuwe_afspraak("Mailagent-test: slotje en herinnering", morgen, morgen + timedelta(minutes=15),
+                                         "Testafspraak van mailagent. Mag weg.")
+        info = {"start": morgen, "slot": slot, "herinneringen": len(ev.alarms() or [])}
+        try:
+            info["niveau"] = str(ev.privacyLevelString()) if ev.respondsToSelector_("privacyLevelString") else None
+        except Exception:
+            info["niveau"] = None
+        return ev, info
+
+    def verwijder(self, ev) -> None:
+        ok, fout = self.store.removeEvent_span_error_(ev, self.EK.EKSpanThisEvent, None)
+        if not ok:
+            raise RuntimeError(f"Afspraak niet verwijderd: {fout}")
 
 
 def maak_agenda(cfg) -> tuple[Optional[Agenda], Optional[str]]:
@@ -180,7 +235,10 @@ def maak_agenda(cfg) -> tuple[Optional[Agenda], Optional[str]]:
     if not ruw.get("kalender"):
         return None, "Geen agenda ingesteld (agenda: kalender: in config.yaml)"
     try:
-        return AppleAgenda(ruw["kalender"], ruw.get("account"), ruw.get("bezet")), None
+        herinnering = ruw.get("herinnering_minuten", 15)
+        return AppleAgenda(ruw["kalender"], ruw.get("account"), ruw.get("bezet"),
+                           herinnering_minuten=int(herinnering) if herinnering else None,
+                           prive=bool(ruw.get("prive", True))), None
     except ImportError:
         return None, "Agendakoppeling niet geïnstalleerd: .venv/bin/pip install pyobjc-framework-EventKit"
     except Exception as e:

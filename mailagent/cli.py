@@ -25,6 +25,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("login", help="eenmalig inloggen bij Outlook (Microsoft 365)")
     sub.add_parser("rondes-installeren", help="de vaste mailrondes uit config.yaml in launchd zetten")
     sub.add_parser("agendas", help="agenda's op deze Mac tonen, voor agenda: in config.yaml")
+    sub.add_parser("agenda-test", help="testafspraak maken om herinnering en slotje in Outlook te controleren")
     tb = sub.add_parser("test-bronnen", help="mail van het afgelopen etmaal tonen, zonder Claude en zonder iets op te slaan")
     tb.add_argument("--uren", type=int, default=24)
     args = ap.parse_args(argv)
@@ -70,6 +71,26 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         for account, naam, schrijfbaar in sorted(ag.kalenders()):
             print(f"  account: {account!r:28} kalender: {naam!r}" + ("" if schrijfbaar else "   (alleen lezen)"))
+        return 0
+
+    if args.opdracht == "agenda-test":
+        from .agenda import maak_agenda, nl_moment
+        ag, fout = maak_agenda(cfg)
+        if ag is None:
+            print(fout)
+            return 1
+        ev, info = ag.test_afspraak()
+        print(f"Testafspraak gemaakt: morgen {nl_moment(info['start'])}, 'Mailagent-test: slotje en herinnering'.")
+        print(f"  herinnering: {'ja, ' + str(ag.herinnering_minuten) + ' min vooraf' if info['herinneringen'] else 'nee'}")
+        print(f"  privé: {'ja' if info['slot'] else 'nee, deze agenda laat het niet toe'}"
+              + (f" (niveau {info['niveau']})" if info.get("niveau") else ""))
+        print("Kijk in Outlook (ook op het web of je telefoon) of de afspraak een slotje en een herinnering heeft.")
+        try:
+            input("Druk op Enter om de testafspraak weer te verwijderen…")
+        except EOFError:
+            pass
+        ag.verwijder(ev)
+        print("Testafspraak verwijderd.")
         return 0
 
     from .sources import maak_bronnen
