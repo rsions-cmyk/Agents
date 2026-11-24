@@ -23,18 +23,22 @@ De regeling draait op de ESP32. Valt de telefoon of de wifi uit, dan blijft de v
 | OpenTherm-adapter | adapter van Ihor Melnyk, of de Master OpenTherm Shield van DIYLESS | € 25 tot € 35 |
 | Temperatuursensor | SHT40 op een los bordje (I2C) | een paar euro |
 | Bewegingssensor | HC-SR501 of de kleinere AM312 (PIR) | een paar euro |
+| Verbindingsklemmen | 2 stuks met 3 openingen, bijvoorbeeld Wago 221-413 | een paar euro |
 | Voeding | USB-lader van 5 V met kabel | n.v.t. |
 | Kastje en draadjes | | een paar euro |
 
 ## Aansluiten
 
+De bouwinstructie met tekeningen per stap staat in `bouwinstructie.html`.
+
 1. Zoek in de handleiding van je ketel op welke twee klemmen voor OpenTherm zijn. Zit je oude thermostaat al op die klemmen, dan gebruik je dezelfde twee draden. Zit hij op aparte aan-uitklemmen, dan sluit je de adapter op de OpenTherm-klemmen aan.
 2. Haal de stekker van de ketel uit het stopcontact. Je werkt alleen aan de twee dunne thermostaatdraden. Aan de 230 V in de ketel kom je niet.
 3. Sluit de twee thermostaatdraden aan op de OpenTherm-kant van de adapter. Bij OpenTherm maakt de volgorde van de twee draden niet uit.
-4. Verbind de adapter met de ESP32: IN naar GPIO16, OUT naar GPIO17, plus voeding en massa volgens de handleiding van de adapter.
-5. Verbind de SHT40: SDA naar GPIO21, SCL naar GPIO22, VCC naar 3,3 V, GND naar GND.
-6. Verbind de bewegingssensor: OUT naar GPIO27, GND naar GND. De HC-SR501 krijgt 5 V (de VIN-pin van de ESP32 als die via USB gevoed wordt), de AM312 3,3 V. Richt de sensor op de plek waar mensen langslopen.
-7. Hang de temperatuursensor waar je oude thermostaat hing, niet direct boven de ESP32. De ESP32 wordt een beetje warm en dat vertekent de meting.
+4. De adapter en de SHT40 hebben allebei 3,3 V en GND nodig, en de ESP32 heeft maar één 3V3-pin. Verbind de 3V3-pin en een GND-pin daarom elk met een verbindingsklem.
+5. Verbind de adapter met de ESP32: IN naar GPIO16 (RX2), OUT naar GPIO17 (TX2), VCC naar de 3V3-klem en GND naar de GND-klem. Vraagt je adapter 5 V, gebruik dan VIN.
+6. Verbind de SHT40: SDA naar GPIO21, SCL naar GPIO22, VCC naar de 3V3-klem, GND naar de GND-klem.
+7. Verbind de bewegingssensor: OUT naar GPIO27, GND naar de GND-pin aan de andere kant van het bordje. De HC-SR501 krijgt 5 V (de VIN-pin van de ESP32 als die via USB gevoed wordt), de AM312 3,3 V. Richt de sensor op de plek waar mensen langslopen.
+8. Hang de temperatuursensor waar je oude thermostaat hing, op ongeveer 1,5 meter en onder het kastje. De ESP32 wordt een beetje warm en die warmte stijgt op.
 
 Andere pinnen? Pas ze bovenaan `thermostaat.yaml` aan, onder `substitutions`.
 
