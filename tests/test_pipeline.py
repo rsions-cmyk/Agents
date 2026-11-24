@@ -43,6 +43,12 @@ class NepLLM:
                           taken=[Taak(omschrijving="Opvolgen", deadline=sortering.deadline)],
                           agenda_voorstel=None, vragen_aan_jou="Akkoord?")
 
+    def taken_gedaan(self, onderwerp, taken, antwoord):
+        from mailagent.models import TaakOordeel, TakenOordeel
+        self.gezien.append(antwoord)
+        return TakenOordeel(taken=[TaakOordeel(taak_id=i, klaar=any(w in antwoord.lower() for w in t.lower().split()[:1]),
+                                               reden="test") for i, t in taken])
+
     def plan_taak(self, mail, tekst, project):
         from mailagent.models import Taakplan
         self.gezien.append(tekst)
@@ -786,3 +792,35 @@ def test_afspraak_met_herinnering_en_slotje():
     ag._kalender = lambda: Kalender(False)          # account zonder privé-afspraken: wel opslaan, geen slotje
     melding = ag.maak_afspraak("Taak", start, start + timedelta(minutes=30), "")
     assert gemaakt[-1].niveau == 0 and "niet privé" in melding
+
+
+def test_taken_lijken_gedaan_na_verstuurd_antwoord(omgeving):
+    from mailagent.pipeline import controleer_taken, zet_taken_klaar
+
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    it = next(r for r in store.items(status="wacht") if r["onderwerp"] == "Uitstel portfolio stage")
+    zet_taken_klaar(store, bronnen, it["id"], "concept", [
+        {"omschrijving": "Beantwoorden: Uitstel portfolio stage", "antwoord": True},
+        {"omschrijving": "Stagebedrijf mailen over de evaluatie"},
+        {"omschrijving": "Rooster aanpassen"}])
+    llm = NepLLM()
+    assert controleer_taken(cfg, store, bronnen, llm) == 0                 # nog niets verstuurd
+
+    verzonden = cfg.pad.parent / "mail" / "_verzonden"
+    verzonden.mkdir()
+    (verzonden / "antwoord.eml").write_text(
+        "From: docent@buas.nl\nTo: 123456@students.buas.nl\nSubject: Re: Uitstel portfolio stage\n"
+        "Date: Mon, 23 Nov 2026 10:00:00 +0100\nMessage-ID: <antw1@buas.nl>\nIn-Reply-To: <a1@students.buas.nl>\n\n"
+        "Hoi Sanne,\n\nStagebedrijf heb ik net gemaild. Je krijgt een week uitstel.\n\n"
+        "Op 20 nov 2026 schreef Sanne:\n> Mag ik een week uitstel? Mijn studentnummer is 123456.\n")
+    assert controleer_taken(cfg, store, bronnen, llm) == 2                 # antwoordtaak + stagebedrijf
+    taken = {t["omschrijving"]: t for t in store.open_taken()}
+    assert "beantwoord op 23-11" in taken["Beantwoorden: Uitstel portfolio stage"]["lijkt_klaar"]
+    assert taken["Stagebedrijf mailen over de evaluatie"]["lijkt_klaar"]
+    assert taken["Rooster aanpassen"]["lijkt_klaar"] is None                # niet in het antwoord
+    assert "Mag ik een week uitstel" not in llm.gezien[-1]                  # alleen je eigen tekst, geen citaat
+    assert len(store.open_taken()) == 3                                     # de app vinkt zelf niets af
+
+    store.wis_lijkt_klaar(taken["Stagebedrijf mailen over de evaluatie"]["id"])   # 'Nog niet'
+    assert controleer_taken(cfg, store, bronnen, llm) == 0                 # hetzelfde antwoord markeert niet opnieuw

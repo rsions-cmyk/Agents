@@ -32,7 +32,7 @@ def maak_bronnen(cfg: Config) -> dict[str, Bron]:
             from .applemail import AppleMailBron
             bronnen[naam] = AppleMailBron(naam, b["account"], b.get("mailbox", "Inbox"),
                                           b.get("archief", "Archive"), b.get("prullenbak", "Deleted Items"),
-                                          bool(b.get("allen_beantwoorden", False)))
+                                          bool(b.get("allen_beantwoorden", False)), b.get("verzonden"))
         elif soort == "outlook":
             from .outlook import OutlookBron
             bronnen[naam] = OutlookBron(naam, b["client_id"], b.get("tenant", "organizations"),

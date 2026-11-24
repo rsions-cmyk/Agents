@@ -95,9 +95,14 @@ class Store:
         # oudere databases bijwerken
         kolommen = {r["name"] for r in self.db.execute("PRAGMA table_info(taken)")}
         for kolom, soort in (("minuten", "INTEGER"), ("stappen", "TEXT"), ("gepland", "TEXT"), ("afgerond", "TEXT"),
-                             ("oordeel", "INTEGER"), ("later", "INTEGER DEFAULT 0")):
+                             ("oordeel", "INTEGER"), ("later", "INTEGER DEFAULT 0"),
+                             ("soort", "TEXT"),           # 'antwoord' voor de taak 'Beantwoorden: …'
+                             ("lijkt_klaar", "TEXT"),     # waarom de app denkt dat de taak al gedaan is
+                             ("bewijs", "TEXT")):         # Message-ID van het verstuurde antwoord dat is bekeken
             if kolom not in kolommen:
                 self.db.execute(f"ALTER TABLE taken ADD COLUMN {kolom} {soort}")
+        self.db.execute("UPDATE taken SET soort='antwoord' WHERE soort IS NULL "
+                        "AND (omschrijving LIKE 'Beantwoorden:%' OR omschrijving LIKE 'Doorsturen:%')")
         itemkolommen = {r["name"] for r in self.db.execute("PRAGMA table_info(items)")}
         if "eigen_antwoord" not in itemkolommen:
             self.db.execute("ALTER TABLE items ADD COLUMN eigen_antwoord TEXT")
@@ -207,11 +212,22 @@ class Store:
         ids = []
         for t in taken:
             cur = self.db.execute(
-                "INSERT INTO taken(item_id, project, omschrijving, deadline, aangemaakt, minuten) VALUES (?,?,?,?,?,?)",
-                (item_id, project, t["omschrijving"], t.get("deadline"), nu(), t.get("minuten")))
+                "INSERT INTO taken(item_id, project, omschrijving, deadline, aangemaakt, minuten, soort) VALUES (?,?,?,?,?,?,?)",
+                (item_id, project, t["omschrijving"], t.get("deadline"), nu(), t.get("minuten"),
+                 "antwoord" if t.get("antwoord") else None))
             ids.append(cur.lastrowid)
         self.db.commit()
         return ids
+
+    def zet_lijkt_klaar(self, taak_id: int, reden: str | None, bewijs: str) -> None:
+        """Markering 'lijkt gedaan' (reden) of alleen: dit antwoord is bekeken (reden None)."""
+        self.db.execute("UPDATE taken SET lijkt_klaar=?, bewijs=? WHERE id=?", (reden, bewijs, taak_id))
+        self.db.commit()
+
+    def wis_lijkt_klaar(self, taak_id: int) -> None:
+        """'Nog niet gedaan': markering weg; hetzelfde antwoord markeert de taak niet opnieuw."""
+        self.db.execute("UPDATE taken SET lijkt_klaar=NULL WHERE id=?", (taak_id,))
+        self.db.commit()
 
     def verwijder_open_taken(self, taak_ids: list[int]) -> int:
         """Alleen taken die nog open en niet ingepland zijn (voor ongedaan maken)."""

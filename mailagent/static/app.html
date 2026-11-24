@@ -196,6 +196,11 @@ details.origineel pre{white-space:pre-wrap;font:13px/1.5 -apple-system,sans-seri
 .tk-erbij{display:flex;gap:8px;flex-wrap:wrap}
 .tk-uitleg{font-size:12px;color:var(--zacht)}
 .c-schrijf{margin-top:8px}
+.lijktgedaan{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;padding:8px 10px;border-radius:9px;
+  background:var(--ok-zacht);font-size:13px}
+.lijktgedaan>svg{color:var(--ok);width:16px;height:16px;flex:none}
+.lijktgedaan>div{flex:1;min-width:180px}
+.controle{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-bottom:8px}
 .stappen-klein{margin:4px 0 0;padding-left:18px;color:var(--zacht);font-size:13px}
 .regels summary{cursor:pointer;color:var(--zacht);font-size:13px;padding:4px}
 
@@ -582,6 +587,17 @@ async function meteen(ids, naam, data, set = verborgen){
   return ok;
 }
 
+// Kijken of taken al gedaan zijn: de app zoekt in je verzonden mail
+let controleert = false;
+async function controleerTaken(){
+  if (controleert) return;
+  controleert = true; teken();
+  const j = await stil("taken-controleren", {});
+  controleert = false;
+  toast(j.melding, !j.ok);
+  laad();
+}
+
 // Concept laten schrijven voor een mail in Te doen die er nog geen heeft
 const schrijft = new Set();
 async function schrijfConcept(id){
@@ -888,6 +904,13 @@ function taakMail(t){
     <button class="knop" data-beantwoord="${t.id}" title="Antwoord schrijven">${ik("reply")}Beantwoorden</button></div>`;
 }
 
+function lijktGedaan(t){
+  if (!t.lijkt_klaar) return "";
+  return `<div class="lijktgedaan">${ik("check")}<div><b>Lijkt gedaan.</b> ${esc(t.lijkt_klaar)}</div>
+    <button class="knop klein goed" data-klaar="${t.id}">Afvinken</button>
+    <button class="knop klein" data-nietklaar="${t.id}">Nog niet</button></div>`;
+}
+
 function afgerondHTML(){
   const afgerond = filter(D.afgerond || [], true);
   return afgerond.length ? `<details class="regels"><summary>Afgerond (${afgerond.length})</summary><div class="lijst">${afgerond.map(t => `
@@ -908,6 +931,7 @@ function tekenTaken(items){
         ${t.minuten ? `<span class="chip">${ik("clock")}${duurTekst(t.minuten)}</span>` : ""}
         ${t.gepland ? `<span class="chip let">${ik("calendar")}${momentTekst(t.gepland, t.minuten)}</span>` : ""}
         ${t.deadline ? `<span class="chip">deadline ${esc(t.deadline)}</span>` : ""}</div>
+        ${lijktGedaan(t)}
         ${taakMail(t)}</div>
     </div>`).join("")}</div>` + lijstAfgerond;
 }
@@ -1324,6 +1348,19 @@ document.addEventListener("click", async ev => {
     return velden[velden.length - 1]?.focus();
   }
   if (t.id === "c-claude") return schrijfConcept(Number(document.getElementById("paneel").dataset.id));
+  if (t.id === "controleer") return controleerTaken();
+  if (d.nietklaar){ const j = await stil("taak-niet-klaar", {id: Number(d.nietklaar)}); toast(j.melding, !j.ok); return laad(); }
+  if (d.allesklaar){
+    const ids = filter(D.taken, true).filter(x => x.lijkt_klaar).map(x => x.id);
+    await animeerWeg(ids); ids.forEach(i => takenVerborgen.add(i)); teken();
+    for (const i of ids) await stil("taak-klaar", {id: i});
+    ids.forEach(i => takenVerborgen.delete(i));
+    toast(`${ids.length} taken afgevinkt`, false, {label: "Ongedaan maken", doe: async () => {
+      for (const i of ids) await stil("taak-heropen", {id: i});
+      toast("Taken teruggezet"); laad();
+    }});
+    return laad();
+  }
   if (d.klaarzetten) return zetTakenKlaar(Number(d.klaarzetten));
   if (d.opbergen){ ev.stopPropagation(); return openKiezer(Number(d.opbergen), t); }
   if (d.bulkmap){ const ids = [...staat.gekozen]; if (ids.length) return openKiezer(ids[0], t, ids); return; }
@@ -1598,9 +1635,13 @@ function tekenPlanning(){
         <span class="chip">${ik("clock")}${duurTekst(t.minuten || 30)}</span>
         ${plan ? `<span class="chip let">${ik("calendar")}${momentTekst(t.gepland, t.minuten)}</span>` : ""}
         ${t.deadline ? `<span class="chip">deadline ${esc(t.deadline)}</span>` : ""}</div>
+      ${lijktGedaan(t)}
       ${taakMail(t)}
     </div>`;
+  const gedaan = taken.filter(t => t.lijkt_klaar);
   const links = `<div class="kaarten">
+      <div class="controle">${gedaan.length > 1 ? `<button class="knop klein goed" data-allesklaar="1">${ik("check")}${gedaan.length} gedane taken afvinken</button>` : ""}
+        <button class="knop klein" id="controleer"${controleert ? " disabled" : ""} title="Kijkt in je verzonden mail of taken bij een mail al gedaan zijn">${ik("sparkle")}${controleert ? "Controleren…" : "Al gedaan? Controleren"}</button></div>
       <div class="groep-kop"><h2>Nog in te plannen · ${open.length}</h2><span class="meta" style="margin-left:auto">${open.length ? duurTekst(totaal) : ""}</span></div>
       ${open.length ? open.map(t => kaart(t, false)).join("") : `<div class="lijst"><div class="leeg" style="padding:30px"><b>Alles ingepland</b>Nieuwe taken verschijnen hier.</div></div>`}
       ${ingepland.length ? `<div class="groep-kop" style="margin-top:14px"><h2>Ingepland · ${ingepland.length}</h2></div>${ingepland.map(t => kaart(t, true)).join("")}` : ""}

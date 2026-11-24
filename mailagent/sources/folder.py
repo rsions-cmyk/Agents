@@ -58,6 +58,21 @@ class MapBron:
         self.laatste_uitkomst = "verzonden" if verzenden else "geplakt"
         return "verzonden" if verzenden else f"opgeslagen als {doel}"
 
+    def verzonden_sinds(self, sinds) -> list[dict]:
+        """Voor tests: .eml-bestanden in de submap _verzonden gelden als door jou verstuurde mail."""
+        uit = []
+        for f in sorted((self.pad / "_verzonden").glob("*.eml")):
+            msg = email.message_from_bytes(f.read_bytes(), policy=email.policy.default)
+            datum = parsedate_to_datetime(msg["Date"])
+            if sinds and datum <= sinds:
+                continue
+            deel = msg.get_body(preferencelist=("plain",))
+            uit.append({"message_id": str(msg["Message-ID"] or f.name), "aan": f"{msg['To'] or ''}, {msg['Cc'] or ''}".lower(),
+                        "onderwerp": str(msg["Subject"] or ""), "datum": datum,
+                        "in_reply_to": str(msg["In-Reply-To"] or ""), "references": str(msg["References"] or ""),
+                        "tekst": deel.get_content().strip() if deel else ""})
+        return uit
+
     def verplaats(self, bron_ids: list[str], doel: str) -> dict[str, str | None]:
         doelmap = self.pad / (f"_map_{doel[4:].replace('/', '_')}" if doel.startswith("map:") else f"_{doel}")
         doelmap.mkdir(exist_ok=True)

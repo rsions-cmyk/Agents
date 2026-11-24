@@ -28,7 +28,7 @@ from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
 from .opmaak import html_uit_bron, veilig
-from .pipeline import RondeBezig, afzender_adres, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
+from .pipeline import RondeBezig, afzender_adres, controleer_taken, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
 from .store import Store
 
 APP_HTML = Path(__file__).with_name("static") / "app.html"
@@ -303,6 +303,13 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                                 markeer_mail(Store(db_pad), bronnen, item_id, True, cfg.vlag_kleur)
                         threading.Thread(target=vlag, daemon=True).start()   # niet wachten op Apple Mail
                     return self._json({"ok": True, "melding": melding, "taken": ids})
+                elif actie == "taken-controleren":
+                    n = controleer_taken(cfg, store, bronnen, llm_factory(), slot=mail_slot)
+                    melding = ("Geen taken gevonden die al gedaan lijken" if not n else
+                               "1 taak lijkt al gedaan" if n == 1 else f"{n} taken lijken al gedaan")
+                elif actie == "taak-niet-klaar":
+                    store.wis_lijkt_klaar(int(v["id"]))
+                    melding = "Blijft open"
                 elif actie == "taken-terug":
                     item_id = int(v["id"])
                     melding = zet_taken_klaar_terug(store, bronnen, item_id, [int(x) for x in v.get("taken", [])])

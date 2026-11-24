@@ -122,3 +122,35 @@ SCHEMA_UITWERKING = {
     "required": ["concept_antwoord", "taken", "agenda_voorstel", "vragen_aan_jou"],
     "additionalProperties": False,
 }
+
+
+class TaakOordeel(BaseModel):
+    taak_id: int
+    klaar: bool
+    reden: str
+
+
+class TakenOordeel(BaseModel):
+    taken: list[TaakOordeel]
+
+
+SCHEMA_TAKEN_OORDEEL = {
+    "type": "object",
+    "properties": {
+        "taken": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "taak_id": {"type": "integer"},
+                    "klaar": {"type": "boolean", "description": "true alleen als de verstuurde tekst duidelijk laat zien dat de taak gedaan is"},
+                    "reden": {"type": "string", "description": "Eén korte zin, in het Nederlands"},
+                },
+                "required": ["taak_id", "klaar", "reden"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["taken"],
+    "additionalProperties": False,
+}

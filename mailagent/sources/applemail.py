@@ -225,6 +225,48 @@ end run
 '''
 
 
+SCRIPT_VERZONDEN = HULP + r'''
+on run argv
+    set accountNaam to item 1 of argv
+    set mapNaam to item 2 of argv
+    set secondenTerug to (item 3 of argv) as integer
+    set RS to character id 30
+    set US to character id 31
+    set uitvoer to ""
+    set mb to my zoekMap(accountNaam, mapNaam)
+    tell application "Mail"
+        set berichten to (every message of mb whose date sent > ((current date) - secondenTerug))
+        repeat with m in berichten
+            try
+                with timeout of 30 seconds
+                    set ontvangers to ""
+                    repeat with r in to recipients of m
+                        set ontvangers to ontvangers & (address of r) & ", "
+                    end repeat
+                    repeat with r in cc recipients of m
+                        set ontvangers to ontvangers & (address of r) & ", "
+                    end repeat
+                    set geleden to ((current date) - (date sent of m)) as integer
+                    set antwoordOp to ""
+                    try
+                        set antwoordOp to content of (first header of m whose name is "In-Reply-To")
+                    end try
+                    set verwijzingen to ""
+                    try
+                        set verwijzingen to content of (first header of m whose name is "References")
+                    end try
+                    set inhoud to content of m
+                    if (length of inhoud) > 4000 then set inhoud to text 1 thru 4000 of inhoud
+                    set uitvoer to uitvoer & (message id of m) & US & ontvangers & US & (subject of m) & US & (geleden as string) & US & antwoordOp & US & verwijzingen & US & inhoud & RS
+                end timeout
+            end try
+        end repeat
+    end tell
+    return uitvoer
+end run
+'''
+
+
 SCRIPT_MARKEER = HULP + r'''
 on run argv
     set accountNaam to item 1 of argv
@@ -393,10 +435,30 @@ def _osascript(script: str, *args: str) -> str:
 
 class AppleMailBron:
     def __init__(self, naam: str, account: str, mailbox: str = "Inbox",
-                 archief: str = "Archive", prullenbak: str = "Deleted Items", allen_beantwoorden: bool = False):
+                 archief: str = "Archive", prullenbak: str = "Deleted Items", allen_beantwoorden: bool = False,
+                 verzonden: str | None = None):
         self.naam, self.account, self.mailbox = naam, account, mailbox
         self.allen_beantwoorden = allen_beantwoorden
-        self.mappen = {"archief": archief, "prullenbak": prullenbak}
+        if verzonden is None:   # Gmail of Exchange, af te leiden uit de andere mappen
+            verzonden = "[Gmail]/Sent Mail" if archief.startswith("[Gmail]") or prullenbak.startswith("[Gmail]") else "Sent Items"
+        self.mappen = {"archief": archief, "prullenbak": prullenbak, "verzonden": verzonden}
+
+    def verzonden_sinds(self, sinds: datetime) -> list[dict]:
+        """Mail die je zelf verstuurde sinds `sinds`, vanaf elk apparaat (de map Verzonden synchroniseert)."""
+        nu = datetime.now().astimezone()
+        seconden = max(60, int((nu - sinds).total_seconds()))
+        uit = _osascript(SCRIPT_VERZONDEN, self.account, self.mappen["verzonden"], str(seconden))
+        berichten = []
+        for rec in uit.split(RS):
+            velden = rec.split(US)
+            if len(velden) < 7:
+                continue
+            mid, aan, onderwerp, geleden, antwoord_op, verwijzingen = velden[:6]
+            berichten.append({"message_id": mid.strip(), "aan": aan.lower(), "onderwerp": onderwerp,
+                              "datum": nu - timedelta(seconds=int(geleden or 0)),
+                              "in_reply_to": antwoord_op, "references": verwijzingen,
+                              "tekst": US.join(velden[6:]).strip()})
+        return berichten
 
     def lijst(self, sinds) -> list[tuple[str, datetime]]:
         """Alle berichten sinds `sinds` als (id, datum), oudste eerst. Snel: zonder inhoud."""

@@ -352,6 +352,12 @@ def run(cfg: Config, store: Store, bronnen: dict, llm: LLM, dagen: int | None = 
                 log.info("%s: nog %d mail(s) te gaan; de volgende ronde gaat verder", naam, rest)
             store.log(None, f"run {naam}: {len(mails)} van {totaal} verwerkt, nog {rest}")
             resultaat[naam] = nieuw
+        try:
+            gedaan = controleer_taken(cfg, store, bronnen, llm)
+            if gedaan:
+                log.info("%d taak/taken lijken al gedaan", gedaan)
+        except Exception as e:  # de controle mag de ronde niet laten mislukken
+            log.warning("taakcontrole mislukt: %s", e)
         return resultaat
 
 
@@ -401,6 +407,113 @@ def keur_goed(store: Store, bronnen: dict, item_id: int, concept: str | None,
         store.zet_eigen_antwoord(item_id, concept)
     store.log(item_id, "VERZONDEN na bevestigde klik" if verzonden else "concept in Mail gezet")
     return melding
+
+
+VOORVOEGSEL = re.compile(r"^\s*((re|aw|antw|fw|fwd|wg|doorst)\s*:\s*)+", re.IGNORECASE)
+DOORSTUREN = re.compile(r"^\s*(fw|fwd|wg|doorst)\s*:", re.IGNORECASE)
+CITAAT = re.compile(r"^\s*(>|Op .+ schreef|On .+ wrote|-{3,}\s*Original Message|Van:\s|From:\s|_{8,})", re.IGNORECASE | re.MULTILINE)
+
+
+def _kaal_onderwerp(onderwerp: str) -> str:
+    return VOORVOEGSEL.sub("", onderwerp or "").strip().lower()
+
+
+def _eigen_tekst(tekst: str) -> str:
+    """Alleen wat je zelf schreef: alles vanaf het geciteerde origineel valt weg."""
+    m = CITAAT.search(tekst or "")
+    return (tekst[:m.start()] if m else tekst or "").strip()[:3000]
+
+
+def zoek_antwoorden(item, verstuurd: list[dict]) -> list[dict]:
+    """Door jou verstuurde mail die een antwoord (of doorgestuurde versie) is op deze mail, oudste eerst.
+
+    Zeker: het Message-ID van de mail staat in In-Reply-To of References. Anders: zelfde onderwerp
+    (zonder Re:/Fw:) en verstuurd aan de afzender, of doorgestuurd."""
+    mid = (item["thread_id"] or "").strip().strip("<>").lower()
+    afzender = afzender_adres(item["van"] or "")
+    onderwerp = _kaal_onderwerp(item["onderwerp"])
+    na = datetime.fromisoformat(item["datum"])
+    treffers = []
+    for v in verstuurd:
+        if v["datum"] <= na:
+            continue
+        verwijst = f"{v['in_reply_to']} {v['references']}".lower()
+        zeker = bool(mid) and mid in verwijst
+        zelfde = bool(onderwerp) and _kaal_onderwerp(v["onderwerp"]) == onderwerp and (
+            afzender in v["aan"] or bool(DOORSTUREN.match(v["onderwerp"] or "")))
+        if zeker or zelfde:
+            treffers.append(v)
+    return sorted(treffers, key=lambda v: v["datum"])
+
+
+def controleer_taken(cfg: Config, store: Store, bronnen: dict, llm: LLM | None = None, slot=None) -> int:
+    """Kijkt of open taken bij een mail al gedaan zijn, aan de hand van mail die je daarna verstuurde.
+
+    De taak 'Beantwoorden: …' geldt als gedaan zodra er een antwoord is. Andere taken bij dezelfde
+    mail legt de app aan Claude voor, met alleen jouw eigen tekst. De app vinkt niets af: hij zet
+    'lijkt gedaan' met de reden, en jij vinkt af. Geeft het aantal nieuw gemarkeerde taken."""
+    from collections import defaultdict
+    from contextlib import nullcontext
+
+    per_item = defaultdict(list)
+    for t in store.open_taken():
+        if t["item_id"]:
+            per_item[t["item_id"]].append(t)
+    per_bron = defaultdict(list)
+    for item_id in per_item:
+        it = store.item(item_id)
+        if it is not None:
+            per_bron[it["bron"]].append(it)
+    nu_ = datetime.now().astimezone()
+    nieuw = 0
+    for bron_naam, items in per_bron.items():
+        bron = bronnen.get(bron_naam)
+        if bron is None or not hasattr(bron, "verzonden_sinds"):
+            continue
+        sinds = max(min(datetime.fromisoformat(it["datum"]) for it in items), nu_ - timedelta(days=30))
+        try:
+            with (slot or nullcontext()):
+                verstuurd = bron.verzonden_sinds(sinds)
+        except Exception as e:
+            log.warning("%s: verzonden mail niet te lezen: %s", bron_naam, e)
+            continue
+        for it in items:
+            antwoorden = zoek_antwoorden(it, verstuurd)
+            if not antwoorden:
+                continue
+            laatste = antwoorden[-1]
+            bewijs = laatste["message_id"]
+            ontvanger = laatste["aan"].split(",")[0].strip() or "de afzender"
+            wanneer = f"{laatste['datum'].astimezone():%d-%m %H:%M}"
+            te_vragen = []
+            for t in per_item[it["id"]]:
+                if t["bewijs"] == bewijs:
+                    continue          # al bekeken met dit antwoord (of door jou op 'nog niet' gezet)
+                if t["soort"] == "antwoord":
+                    soort = "doorgestuurd" if DOORSTUREN.match(laatste["onderwerp"] or "") else "beantwoord"
+                    store.zet_lijkt_klaar(t["id"], f"Je hebt deze mail {soort} op {wanneer} (aan {ontvanger})", bewijs)
+                    nieuw += 1
+                else:
+                    te_vragen.append(t)
+            mail = Email(bron=it["bron"], bron_id=it["bron_id"], van=it["van"] or "", aan=it["aan"] or "",
+                         onderwerp=it["onderwerp"] or "", datum=datetime.fromisoformat(it["datum"]), tekst="")
+            if not te_vragen or llm is None or not hasattr(llm, "taken_gedaan") or not mag_naar_claude(cfg, mail):
+                continue
+            eigen = "\n\n---\n\n".join(_eigen_tekst(v["tekst"]) for v in antwoorden)
+            try:
+                oordeel = llm.taken_gedaan(it["onderwerp"] or "", [(t["id"], t["omschrijving"]) for t in te_vragen],
+                                           anonimiseer(cfg, eigen))
+            except Exception as e:
+                log.warning("taakcontrole voor %s mislukt: %s", it["sleutel"], e)
+                continue
+            klaar = {o.taak_id: o.reden for o in oordeel.taken if o.klaar}
+            for t in te_vragen:
+                if t["id"] in klaar:
+                    store.zet_lijkt_klaar(t["id"], f"Je mail van {wanneer} aan {ontvanger}: {klaar[t['id']]}", bewijs)
+                    nieuw += 1
+                else:
+                    store.zet_lijkt_klaar(t["id"], None, bewijs)   # bekeken, niet gedaan
+    return nieuw
 
 
 def schone_taken(taken: list[dict]) -> list[dict]:
