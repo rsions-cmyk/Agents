@@ -1104,7 +1104,9 @@ def test_antwoordvenster_herkennen_en_meldingen(monkeypatch):
     assert titelstuk("Antw: AW: Re: budget 2027") == "budget 2027"
     # wachten op het venster in plaats van één vaste seconde, en pas daarna plakken
     assert "repeat with poging from 1 to 30" in SCRIPT_CONCEPT and "delay 1\n" not in SCRIPT_CONCEPT
-    assert SCRIPT_CONCEPT.index("if klaar then") < SCRIPT_CONCEPT.index('keystroke "v"')
+    assert SCRIPT_CONCEPT.index("if klaar then") < SCRIPT_CONCEPT.index("click mi")
+    assert "the clipboard to oudKlembord" not in SCRIPT_CONCEPT and "set oudKlembord" not in SCRIPT_CONCEPT   # klembord niet uitlezen
+    assert 'keystroke "v"' not in SCRIPT_CONCEPT
     gezien = []
     monkeypatch.setattr(applemail, "_osascript", lambda script, *a: gezien.append(a) or "klembord\tInbox\tbudget 2027")
     bron = AppleMailBron("buas", "Exchange")

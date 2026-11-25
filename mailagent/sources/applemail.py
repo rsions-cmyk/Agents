@@ -181,10 +181,8 @@ on run argv
     -- 1. Een echt antwoordvenster: Mail zet de oorspronkelijke mail er zelf in, met alle opmaak,
     --    en het bericht hoort bij het gesprek. De inhoud zetten via AppleScript werkt niet (venster wordt leeg),
     --    dus plakken we de concepttekst bovenaan.
-    set oudKlembord to missing value
-    try
-        set oudKlembord to the clipboard
-    end try
+    -- je oude klembord niet uitlezen: nieuwere macOS-versies vragen dan toestemming of tonen een balk.
+    -- Je concept blijft na afloop op het klembord staan, zodat je het zo nodig zelf nog eens plakt.
     set the clipboard to conceptTekst
     -- hoeveel vensters Mail nu heeft, om straks het nieuwe antwoordvenster te herkennen
     set voor to -1
@@ -207,8 +205,8 @@ on run argv
     try
         tell application "System Events"
             tell process "Mail"
+                set frontmost to true
                 repeat with poging from 1 to 30
-                    set frontmost to true
                     try
                         set titel to name of front window
                         set nieuw to (voor < 0) or ((count of windows) > voor)
@@ -225,7 +223,27 @@ on run argv
             end tell
             if klaar then
                 delay 0.4
-                keystroke "v" using command down
+                -- plakken via het menu Wijzig > Plak (in elke taal: het menu-item met ⌘V), niet met een
+                -- toetsaanslag; die kan op nieuwere macOS-versies de Schrijfhulpmiddelen oproepen
+                set geplakt to false
+                tell process "Mail"
+                    set frontmost to true
+                    repeat with nr in {4, 3, 5, 2, 6}
+                        try
+                            repeat with mi in (menu items of menu 1 of menu bar item (contents of nr) of menu bar 1)
+                                try
+                                    if (value of attribute "AXMenuItemCmdChar" of mi) is "V" and (value of attribute "AXMenuItemCmdModifiers" of mi) is 0 then
+                                        click mi
+                                        set geplakt to true
+                                        exit repeat
+                                    end if
+                                end try
+                            end repeat
+                        end try
+                        if geplakt then exit repeat
+                    end repeat
+                end tell
+                if not geplakt then key code 9 using command down   -- terugval: de toets V met ⌘
             end if
         end tell
     on error foutTekst
@@ -247,11 +265,6 @@ on run argv
         try
             tell application "Mail" to send antwoord
             set uitkomst to "verzonden"
-        end try
-    end if
-    if oudKlembord is not missing value then
-        try
-            set the clipboard to oudKlembord
         end try
     end if
     return uitkomst
