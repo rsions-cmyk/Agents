@@ -134,6 +134,21 @@ end zoekMap
 '''
 
 
+def wie_vraagt_toegang() -> str:
+    """Welk programma toestemming voor Toegankelijkheid nodig heeft: de terminal waarin de app draait,
+    of Python zelf als de app op de achtergrond draait (launchd)."""
+    import os
+    import sys
+    tp = os.environ.get("TERM_PROGRAM", "")
+    if tp == "Apple_Terminal":
+        return "Terminal"
+    if tp.lower().startswith("iterm"):
+        return "iTerm"
+    if tp == "vscode":
+        return "Visual Studio Code"
+    return f"Python ({os.path.realpath(sys.executable)})"
+
+
 def titelstuk(onderwerp: str) -> str:
     """Stuk van het onderwerp waaraan je het antwoordvenster herkent: zonder Re:, AW:, Antw: of Fw: ervoor,
     want Mail zet daar zelf 'Re: ' voor (en voegt ze soms samen)."""
@@ -184,10 +199,11 @@ on run argv
     -- je oude klembord niet uitlezen: nieuwere macOS-versies vragen dan toestemming of tonen een balk.
     -- Je concept blijft na afloop op het klembord staan, zodat je het zo nodig zelf nog eens plakt.
     set the clipboard to conceptTekst
-    -- hoeveel vensters Mail nu heeft, om straks het nieuwe antwoordvenster te herkennen
+    -- hoeveel vensters Mail nu heeft, om straks het nieuwe antwoordvenster te herkennen.
+    -- Dat vraagt Mail zelf; daar is geen toestemming voor Toegankelijkheid voor nodig.
     set voor to -1
     try
-        tell application "System Events" to set voor to count of windows of process "Mail"
+        tell application "Mail" to set voor to count of windows
     end try
     tell application "Mail"
         activate
@@ -202,56 +218,53 @@ on run argv
     set fragment to item 10 of argv
     set klaar to false
     set titel to ""
+    repeat with poging from 1 to 30
+        try
+            tell application "Mail"
+                set titel to name of front window
+                set nieuw to (voor < 0) or ((count of windows) > voor)
+            end tell
+            -- na ruim 4 seconden ook zonder extra venster (Mail opent antwoorden soms als tabblad)
+            if fragment is "" then
+                if nieuw then set klaar to true
+            else if titel contains fragment and (nieuw or poging > 14) then
+                set klaar to true
+            end if
+            if klaar then exit repeat
+        end try
+        delay 0.3
+    end repeat
+    if not klaar then return "klembord" & tab & titel & tab & fragment
+    -- 3. Plakken via het menu Wijzig > Plak (in elke taal: het menu-item met ⌘V). Dit is het enige
+    --    deel dat toestemming voor Toegankelijkheid nodig heeft.
+    delay 0.4
     try
+        set geplakt to false
         tell application "System Events"
             tell process "Mail"
                 set frontmost to true
-                repeat with poging from 1 to 30
+                repeat with nr in {4, 3, 5, 2, 6}
                     try
-                        set titel to name of front window
-                        set nieuw to (voor < 0) or ((count of windows) > voor)
-                        -- na ruim 4 seconden ook zonder extra venster (Mail opent antwoorden soms als tabblad)
-                        if fragment is "" then
-                            if nieuw then set klaar to true
-                        else if titel contains fragment and (nieuw or poging > 14) then
-                            set klaar to true
-                        end if
-                        if klaar then exit repeat
+                        repeat with mi in (menu items of menu 1 of menu bar item (contents of nr) of menu bar 1)
+                            try
+                                if (value of attribute "AXMenuItemCmdChar" of mi) is "V" and (value of attribute "AXMenuItemCmdModifiers" of mi) is 0 then
+                                    click mi
+                                    set geplakt to true
+                                    exit repeat
+                                end if
+                            end try
+                        end repeat
                     end try
-                    delay 0.3
+                    if geplakt then exit repeat
                 end repeat
             end tell
-            if klaar then
-                delay 0.4
-                -- plakken via het menu Wijzig > Plak (in elke taal: het menu-item met ⌘V), niet met een
-                -- toetsaanslag; die kan op nieuwere macOS-versies de Schrijfhulpmiddelen oproepen
-                set geplakt to false
-                tell process "Mail"
-                    set frontmost to true
-                    repeat with nr in {4, 3, 5, 2, 6}
-                        try
-                            repeat with mi in (menu items of menu 1 of menu bar item (contents of nr) of menu bar 1)
-                                try
-                                    if (value of attribute "AXMenuItemCmdChar" of mi) is "V" and (value of attribute "AXMenuItemCmdModifiers" of mi) is 0 then
-                                        click mi
-                                        set geplakt to true
-                                        exit repeat
-                                    end if
-                                end try
-                            end repeat
-                        end try
-                        if geplakt then exit repeat
-                    end repeat
-                end tell
-                if not geplakt then key code 9 using command down   -- terugval: de toets V met ⌘
-            end if
+            if not geplakt then key code 9 using command down   -- terugval: de toets V met ⌘
         end tell
-    on error foutTekst
-        return "geen-toegang" & tab & foutTekst
+    on error foutTekst number foutNr
+        return "geen-toegang" & tab & foutTekst & " (" & foutNr & ")"
     end try
-    if not klaar then return "klembord" & tab & titel & tab & fragment
     delay 0.8
-    -- 3. Controleren in DIT antwoord (het bericht dat reply teruggaf, niet een ander open venster)
+    -- 4. Controleren in DIT antwoord (het bericht dat reply teruggaf, niet een ander open venster)
     --    of je tekst erin staat. Lukt dat niet, dan blijft je tekst op het klembord staan.
     set controle to item 9 of argv
     set gecontroleerd to false
@@ -620,9 +633,9 @@ class AppleMailBron:
         if hoe == "geplakt":
             return "antwoord staat klaar in Apple Mail, met je tekst boven de oorspronkelijke mail; versturen doe je zelf"
         if hoe == "geen-toegang":
-            return ("Antwoord geopend, maar plakken mag nog niet. Je tekst staat op het klembord: klik in het antwoord "
-                    "en druk op ⌘V. Zelf plakken lukt na toestemming in Systeeminstellingen, Privacy en beveiliging, "
-                    "Toegankelijkheid (zet daar Terminal of Python aan)")
+            return ("Antwoord geopend, maar de app mag nog niet plakken. Je tekst staat op het klembord: klik in het "
+                    f"antwoord en druk op ⌘V. Zelf plakken lukt als je {wie_vraagt_toegang()} aanzet in "
+                    "Systeeminstellingen > Privacy en beveiliging > Toegankelijkheid, en die daarna opnieuw start")
         return ("Antwoord geopend, maar het venster kwam niet op tijd vooraan, dus ik heb niet geplakt. Je tekst staat "
                 "op het klembord: klik in het antwoord en druk op ⌘V")
 

@@ -1113,3 +1113,16 @@ def test_antwoordvenster_herkennen_en_meldingen(monkeypatch):
     melding = bron.maak_concept("12", "Beste Jan,\n\nPrima.", "Re: budget 2027", "jan@x.nl")
     assert gezien[0][-1] == "budget 2027"                                  # het onderwerp zonder Re:
     assert "klembord" in melding and "⌘V" in melding and bron.laatste_uitkomst == "klembord"
+
+
+def test_geen_toegang_noemt_het_programma(monkeypatch):
+    from mailagent.sources import applemail
+    from mailagent.sources.applemail import SCRIPT_CONCEPT, AppleMailBron
+
+    # het venster herkennen vraagt Mail zelf (geen toestemming nodig); alleen plakken gaat via System Events
+    deel = SCRIPT_CONCEPT[SCRIPT_CONCEPT.index("repeat with poging"):SCRIPT_CONCEPT.index('if not klaar then return "klembord"')]
+    assert "System Events" not in deel and 'tell application "Mail"' in deel
+    monkeypatch.setenv("TERM_PROGRAM", "Apple_Terminal")
+    monkeypatch.setattr(applemail, "_osascript", lambda script, *a: "geen-toegang\tosascript is not allowed assistive access. (-1719)")
+    melding = AppleMailBron("buas", "Exchange").maak_concept("12", "Prima.", "Meeting minutes", "jan@x.nl")
+    assert "Terminal aanzet" in melding and "Toegankelijkheid" in melding and "⌘V" in melding
