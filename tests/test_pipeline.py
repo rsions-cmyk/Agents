@@ -49,6 +49,10 @@ class NepLLM:
         return TakenOordeel(taken=[TaakOordeel(taak_id=i, klaar=any(w in antwoord.lower() for w in t.lower().split()[:1]),
                                                reden="test") for i, t in taken])
 
+    def herinnering(self, aan, onderwerp, tekst, werkdagen):
+        self.gezien.append(tekst)
+        return f"Hoi, even een herinnering over: {onderwerp}"
+
     def verwacht_antwoord(self, mails):
         from mailagent.models import Verwachting, Verwachtingen
         self.gezien.extend(m["tekst"] for m in mails)
@@ -1056,3 +1060,37 @@ def test_vrije_momenten_bij_zomertijd(monkeypatch):
     finally:
         monkeypatch.delenv("TZ")
         time.tzset()
+
+
+def test_wacht_op_paneel_tekst_sindsdien_en_herinnering(omgeving):
+    import threading
+    import urllib.request
+    from http.server import HTTPServer
+    from mailagent.pipeline import controleer_uitgaand
+    from mailagent.web import maak_handler
+
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    _verstuur(cfg, "vraag.eml",
+              "From: docent@buas.nl\nTo: chair@istte.org\nSubject: Begroting 2027\n"
+              "Date: Thu, 19 Nov 2026 11:00:00 +0100\nMessage-ID: <vraag9@buas.nl>\n\n"
+              "Beste Csanad,\n\nKun je de begroting voor 2027 voor vrijdag sturen?\n\nOp 18 nov schreef iemand:\n> oud\n")
+    controleer_uitgaand(cfg, store, bronnen, NepLLM())
+    w = store.wacht_op_lijst("wacht")[0]
+    assert "begroting voor 2027" in w["tekst"] and "> oud" not in w["tekst"]   # wat je schreef, zonder citaat
+    server = HTTPServer(("127.0.0.1", 0), maak_handler(cfg, store, bronnen, NepLLM))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    basis = f"http://127.0.0.1:{server.server_port}"
+    try:
+        token = urllib.request.urlopen(basis + "/").read().decode().split('const TOKEN = "')[1].split('"')[0]
+        data = json.loads(urllib.request.urlopen(urllib.request.Request(basis + "/api/data", headers={"X-Token": token})).read())
+        rij = next(x for x in data["wacht_op"] if x["id"] == w["id"])
+        # de Board Chair mailde op 20 nov over iets anders: dat staat erbij
+        assert rij["sindsdien"] and rij["sindsdien"][0]["onderwerp"] == "Agenda board meeting December"
+        req = urllib.request.Request(basis + "/api/wacht-herinnering", data=json.dumps({"id": w["id"]}).encode(),
+                                     method="POST", headers={"Content-Type": "application/json", "X-Token": token})
+        j = json.loads(urllib.request.urlopen(req).read())
+        assert j["ok"] and "Begroting 2027" in j["concept"]
+        assert store.wacht_op(w["id"])["concept"] == j["concept"]                 # bewaard
+    finally:
+        server.shutdown()

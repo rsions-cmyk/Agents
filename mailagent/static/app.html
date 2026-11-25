@@ -229,6 +229,13 @@ details.origineel pre{white-space:pre-wrap;font:13px/1.5 -apple-system,sans-seri
 .groep-kop h2 svg{width:15px;height:15px;vertical-align:-2px;margin-right:6px;color:var(--let)}
 details.regels summary svg{width:14px;height:14px;vertical-align:-2px;margin-right:6px}
 .wachtrij .ikoon svg{width:18px;height:18px}
+.wachtrij{cursor:pointer}
+.wacht-av{display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;flex:none;
+  background:var(--let-zacht);color:var(--let)}
+.wacht-av svg{width:20px;height:20px}
+.sinds{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:13px}
+.sinds span{flex:1;min-width:0}
+#w-concept{min-height:120px}
 .stappen-klein{margin:4px 0 0;padding-left:18px;color:var(--zacht);font-size:13px}
 .regels summary{cursor:pointer;color:var(--zacht);font-size:13px;padding:4px}
 
@@ -450,7 +457,8 @@ body.slepen iframe{pointer-events:none}
 .app.ingeklapt .zij{padding:16px 8px;align-items:center}
 .app.ingeklapt .navtekst,.app.ingeklapt .nav-kop,.app.ingeklapt .status{display:none}
 .app.ingeklapt .logo{flex-direction:column;gap:10px;padding:4px 0 14px}
-.app.ingeklapt .logo .inklap{margin:0}
+.app.ingeklapt .logo .blok{display:none}          /* ingeklapt: de knop staat bovenaan, waar het logo stond */
+.app.ingeklapt .logo .inklap{margin:0;width:40px;height:36px;order:-1}
 .app.ingeklapt .nav{justify-content:center;width:44px;height:38px;padding:0;position:relative}
 .app.ingeklapt .nav .tel{position:absolute;top:2px;right:0;font-size:10px;min-width:16px;padding:0 4px;line-height:16px}
 .app.ingeklapt .knop-ophalen{width:44px;padding:10px 0}
@@ -480,6 +488,16 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
 
 /* voet met acties: links afhandelen, rechts antwoorden */
 .voet-acties{justify-content:space-between;flex-wrap:wrap;gap:8px}
+#paneel{container-type:inline-size;container-name:paneel}
+.p-voet{flex-wrap:wrap;row-gap:8px}
+.p-voet .knop{white-space:nowrap}
+.p-voet .knop.bevestig{white-space:normal;text-align:left}
+@container paneel (max-width: 660px){
+  .p-voet .knop:not(.goed) .lbl, .p-voet .knop kbd{display:none}   /* smal: alleen iconen, uitleg via de tooltip */
+}
+@container paneel (max-width: 380px){
+  .p-voet .knop.goed .lbl{display:none}
+}
 .voet-acties .groepje{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .voet-acties .groepje:last-child{margin-left:auto}
 .knop.ikoonknop{padding:8px 10px}
@@ -776,6 +794,11 @@ function teken(){
     if (staat.lees !== null) return tekenLees(staat.lees);
     return drieKolommen() ? tekenLeegPaneel() : sluitPaneel();
   }
+  if (staat.tab === "te_doen" && staat.wacht != null){
+    const w = (D.wacht_op || []).find(x => x.id === staat.wacht);
+    if (w) return tekenWachtPaneel(w);
+    staat.wacht = null;
+  }
   if (staat.open !== null){
     const it = [...D.zelf, ...D.wacht].find(i => i.id === staat.open);
     if (it) return tekenPaneel(it);
@@ -866,12 +889,12 @@ function tekenLees(id){
       ${mailWeergave(id, m ? m.tekst : null)}
     </div>
     <div class="p-voet">
-      <button class="knop" data-maaktaak="${id}" title="Taak maken (T)">${ik("calendar")}Taak<kbd>T</kbd></button>
-      <button class="knop" data-opbergen="${id}" title="Opbergen in een map (V)">${ik("folder")}Opbergen<kbd>V</kbd></button>
+      <button class="knop" data-maaktaak="${id}" title="Taak maken (T)">${ik("calendar")}<span class="lbl">Taak</span><kbd>T</kbd></button>
+      <button class="knop" data-opbergen="${id}" title="Opbergen in een map (V)">${ik("folder")}<span class="lbl">Opbergen</span><kbd>V</kbd></button>
       <button class="knop" data-een="overslaan" data-id="${id}" title="Afzender voortaan overslaan">${ik("ban")}</button>
       <span style="flex:1"></span>
       <button class="knop" data-een="prullenbak" data-id="${id}" title="Naar prullenbak (#)">${ik("trash")}<kbd>#</kbd></button>
-      <button class="knop goed" data-een="archief" data-id="${id}" title="Archiveren (E)">${ik("archive")}Archiveren<kbd>E</kbd></button>
+      <button class="knop goed" data-een="archief" data-id="${id}" title="Archiveren (E)">${ik("archive")}<span class="lbl">Archiveren</span><kbd>E</kbd></button>
     </div>`;
   p.classList.add("open"); p.setAttribute("aria-hidden","false");
   if (!drieKolommen()) document.getElementById("dek").classList.add("open");
@@ -984,17 +1007,89 @@ function tekenWachtOp(){
   const nu = lijst.filter(w => w.herinner_op <= vandaag), loopt = lijst.filter(w => w.herinner_op > vandaag);
   if (!lijst.length) return "";
   const naam = w => esc((w.aan || "").split(",")[0].trim() || "de ontvanger");
-  const rij = (w, open) => `<div class="rij wachtrij" style="cursor:default">
+  const rij = (w, open) => `<div class="rij wachtrij${staat.wacht === w.id ? " gekozen" : ""}" data-wacht="${w.id}" tabindex="0">
       <span class="ikoon" style="color:var(--let)">${ik("wacht")}</span>
       <div class="midden"><div class="regel1"><span class="van">${esc(w.onderwerp || "(geen onderwerp)")}</span><span class="datum">${kortDatum(w.verstuurd)}</span></div>
         <div class="samenvatting">Aan ${naam(w)}${w.wat ? ` · wacht op: ${esc(w.wat)}` : ""}${open ? "" : ` · komt terug op ${kortDatum(w.herinner_op)}`}</div>
-        ${open ? `<div class="chips" style="margin-top:6px">
-          <button class="knop klein" data-wachtopen="${w.id}">${ik("mail")}Open in Mail</button>
-          <button class="knop klein" data-wachtlater="${w.id}">Nog 3 werkdagen</button>
-          <button class="knop klein" data-wachtklaar="${w.id}">${ik("check")}Geregeld</button></div>` : `<button class="knop klein" data-wachtklaar="${w.id}" title="Niet meer bijhouden">${ik("x")}</button>`}
+        ${w.sindsdien && w.sindsdien.length ? `<div class="chips"><span class="chip">${ik("mail")}sindsdien mail van ${naam(w)}</span></div>` : ""}
       </div></div>`;
   return (nu.length ? `<div class="groep-kop"><h2>${ik("wacht")}Wacht op antwoord · ${nu.length}</h2></div><div class="lijst" style="margin-bottom:14px">${nu.map(w => rij(w, true)).join("")}</div>` : "")
     + (loopt.length ? `<details class="regels wachtloopt"><summary>Je wacht op ${loopt.length} antwoord${loopt.length === 1 ? "" : "en"}</summary><div class="lijst">${loopt.map(w => rij(w, false)).join("")}</div></details>` : "");
+}
+
+// Paneel bij 'wacht op antwoord': wat je vroeg, wat er sindsdien kwam, en een herinnering
+const wachtSchrijft = new Set();
+function werkdagenSinds(iso){
+  const dagen = new Set((D.werktijd && D.werktijd.dagen) || [1, 2, 3, 4, 5]);
+  const d = new Date(iso.slice(0, 10) + "T12:00"), vandaag = new Date(isoDag(new Date()) + "T12:00");
+  let n = 0;
+  while (d < vandaag){ d.setDate(d.getDate() + 1); if (dagen.has(d.getDay() || 7)) n++; }
+  return n;
+}
+function tekenWachtPaneel(w){
+  const p = document.getElementById("paneel");
+  const sig = JSON.stringify(["wacht", w, wachtSchrijft.has(w.id), drieKolommen()]);
+  if (p.dataset.sig === sig && p.classList.contains("open")) return;
+  const oud = document.getElementById("w-concept");
+  const concept = oud && Number(oud.dataset.wachtid) === w.id && !wachtSchrijft.has(-w.id) ? oud.value : (w.concept || "");
+  wachtSchrijft.delete(-w.id);
+  p.dataset.sig = sig; p.dataset.id = ""; p.dataset.lees = ""; p.dataset.sleutel = "";
+  const naam = esc((w.aan || "").split(",")[0].trim() || "de ontvanger");
+  const nu = w.herinner_op <= isoDag(new Date()), n = werkdagenSinds(w.verstuurd);
+  const bezig = wachtSchrijft.has(w.id);
+  p.innerHTML = `
+    <div class="p-kop"><span class="avatar wacht-av">${ik("wacht")}</span>
+      <div style="min-width:0"><h2>${esc(w.onderwerp || "(geen onderwerp)")}</h2>
+        <div class="van">Aan ${esc((w.aan || "").replace(/[,\s]+$/, "").replace(/,\s*,/g, ","))} · verstuurd ${datum(w.verstuurd)}</div>
+        <div class="chips">${nu ? `<span class="chip let">${ik("wacht")}${n === 1 ? "1 werkdag" : n + " werkdagen"} geen antwoord</span>`
+          : `<span class="chip">${ik("clock")}komt terug op ${kortDatum(w.herinner_op)}</span>`}</div></div>
+      <button class="ikoon sluit-mail" id="sluit" title="Sluiten (Esc)">${ik("x")}</button></div>
+    <div class="p-inhoud">
+      ${w.wat ? `<div class="melding info">${ik("sparkle")}<div><b>Je wacht op:</b> ${esc(w.wat)}</div></div>` : ""}
+      ${w.sindsdien && w.sindsdien.length ? `<div class="melding">${ik("mail")}<div><b>Sindsdien kwam er mail van ${naam}</b>. Misschien staat het antwoord in een ander gesprek.
+        ${w.sindsdien.map(m => `<div class="sinds"><span>${esc(m.onderwerp || "(geen onderwerp)")} · ${datum(m.datum)}</span>
+          ${m.item && ["wacht", "fout", "handmatig"].includes(m.status) ? `<button class="knop klein" data-openmail="${m.item}">Bekijk</button>` : ""}</div>`).join("")}
+        <div style="margin-top:8px"><button class="knop klein" data-wachtklaar="${w.id}">${ik("check")}Daar zat het antwoord in</button></div></div></div>` : ""}
+      <div><div class="label">${ik("forward")}Wat je schreef</div>
+        <div class="leesvlak">${w.tekst ? esc(w.tekst) : `<span class="meta">De tekst van deze mail is nog niet bewaard. Dat gebeurt bij de volgende ronde; tot dan open je hem in Mail.</span>`}</div></div>
+      <div><div class="label">${ik("reply")}Herinnering</div>
+        <textarea id="w-concept" data-wachtid="${w.id}" placeholder="Laat Claude een korte herinnering schrijven, of typ zelf.">${esc(concept)}</textarea>
+        <div class="c-schrijf"><button class="knop" id="w-claude" data-wachtid="${w.id}"${bezig || !w.tekst ? " disabled" : ""}>${ik("sparkle")}${bezig ? "Claude schrijft…" : concept.trim() ? "Opnieuw laten schrijven" : "Herinnering laten schrijven"}</button></div></div>
+    </div>
+    <div class="p-voet">
+      <button class="knop" data-wachtopen="${w.id}" title="De mail die je stuurde openen in Apple Mail">${ik("mail")}<span class="lbl">Open in Mail</span></button>
+      <button class="knop" data-wachtlater="${w.id}" title="Nog drie werkdagen wachten">${ik("clock")}<span class="lbl">Nog 3 werkdagen</span></button>
+      <button class="knop" data-wachtklaar="${w.id}" title="Geregeld: van de lijst">${ik("check")}<span class="lbl">Geregeld</span></button>
+      <span style="flex:1"></span>
+      <button class="knop goed" id="w-kopieer" data-wachtid="${w.id}" title="Herinnering naar je klembord en je mail openen in Mail. Kies daar Allen beantwoorden en plak met ⌘V.">${ik("forward")}<span class="lbl">Kopiëren en openen in Mail</span></button>
+    </div>`;
+  p.classList.add("open"); p.setAttribute("aria-hidden", "false");
+  if (!drieKolommen()) document.getElementById("dek").classList.add("open");
+}
+
+async function schrijfHerinnering(id){
+  wachtSchrijft.add(id); teken();
+  const j = await stil("wacht-herinnering", {id});
+  wachtSchrijft.delete(id);
+  if (!j.ok){ toast(j.melding, true); return teken(); }
+  const w = (D.wacht_op || []).find(x => x.id === id); if (w) w.concept = j.concept;
+  wachtSchrijft.add(-id);          // het nieuwe concept gebruiken in plaats van wat er stond
+  teken();
+}
+
+async function kopieerHerinnering(id){
+  const veld = document.getElementById("w-concept"), tekst = veld ? veld.value.trim() : "";
+  if (!tekst) return toast("Schrijf eerst een herinnering, of laat Claude er een schrijven", true);
+  if (/\[\s*AANVULLEN/i.test(tekst)) return toast("Vul eerst de plek met [AANVULLEN: …] in", true);
+  let gekopieerd = false;
+  try { await navigator.clipboard.writeText(tekst); gekopieerd = true; }
+  catch(e){ veld.select(); try { gekopieerd = document.execCommand("copy"); } catch(e2){} }
+  if (!gekopieerd) return toast("Kopiëren lukte niet; selecteer de tekst en kopieer met ⌘C", true);
+  await stil("wacht-concept", {id, concept: tekst});
+  const o = await stil("wacht-openen", {id});
+  const l = await stil("wacht-later", {id, werkdagen: 3});
+  toast(`Herinnering staat op je klembord. ${o.ok ? "Kies in Mail Allen beantwoorden en plak met ⌘V." : o.melding} ${l.ok ? l.melding + "." : ""}`, !o.ok);
+  laad();
 }
 
 function tekenBelangrijk(){
@@ -1227,11 +1322,11 @@ function tekenPaneel(it){
         <button class="knop ikoonknop" data-opbergen="${it.id}" title="Opbergen in een map (V)">${ik("folder")}<kbd>V</kbd></button>
         <button class="knop ikoonknop" data-een="archief" data-id="${it.id}" title="Archiveren zonder antwoord (E)">${ik("archive")}<kbd>E</kbd></button>
         <button class="knop ikoonknop" id="afwijzen" title="Afwijzen: het voorstel klopt niet (X)">${ik("x")}<kbd>X</kbd></button>
-        <button class="knop" id="gedaan" title="Gedaan: geen antwoord nodig. Daarna kun je de mail archiveren of opbergen (D; Shift+D kiest meteen een map)">${ik("check")}Gedaan<kbd>D</kbd></button>
+        <button class="knop" id="gedaan" title="Gedaan: geen antwoord nodig. Daarna kun je de mail archiveren of opbergen (D; Shift+D kiest meteen een map)">${ik("check")}<span class="lbl">Gedaan</span><kbd>D</kbd></button>
       </div>
       <div class="groepje">
-        <button class="knop" id="goedkeuren" title="Antwoord met deze tekst klaarzetten in Apple Mail; je verstuurt daar zelf (⌘↵)">${ik("reply")}In Mail zetten<kbd>⌘↵</kbd></button>
-        <button class="knop goed" id="verzenden" title="Meteen versturen; tweede klik bevestigt (⇧⌘↵)">${ik("forward")}Verzenden<kbd>⇧⌘↵</kbd></button>
+        <button class="knop" id="goedkeuren" title="Antwoord met deze tekst klaarzetten in Apple Mail; je verstuurt daar zelf (⌘↵)">${ik("reply")}<span class="lbl">In Mail zetten</span><kbd>⌘↵</kbd></button>
+        <button class="knop goed" id="verzenden" title="Meteen versturen; tweede klik bevestigt (⇧⌘↵)">${ik("forward")}<span class="lbl">Verzenden</span><kbd>⇧⌘↵</kbd></button>
       </div>
     </div>`;
   p.classList.add("open"); p.setAttribute("aria-hidden","false");
@@ -1435,6 +1530,13 @@ document.addEventListener("keydown", ev => {
   // Enter in een taakveld maakt geen nieuwe regel; Shift+Enter wel
   if (ev.key === "Enter" && !ev.shiftKey && !ev.metaKey && !ev.ctrlKey && ev.target.matches && ev.target.matches("textarea.groei")){ ev.preventDefault(); ev.target.blur(); }
 }, true);
+document.addEventListener("change", ev => {
+  if (ev.target.id === "w-concept"){
+    const id = Number(ev.target.dataset.wachtid), w = (D.wacht_op || []).find(x => x.id === id);
+    if (w) w.concept = ev.target.value;
+    stil("wacht-concept", {id, concept: ev.target.value});
+  }
+});
 document.addEventListener("input", ev => {
   if (ev.target.matches && ev.target.matches("textarea.groei")) rekVelden(ev.target.parentElement);
   if (ev.target.id === "concept"){ const k = document.querySelector(".c-schrijf"); if (k && !document.getElementById("c-claude")?.disabled) k.hidden = !!ev.target.value.trim(); }
@@ -1443,10 +1545,10 @@ document.addEventListener("input", ev => {
   bewerkt[staat.open][Number(d.tk)][d.veld] = ev.target.value;
 });
 
-function openPaneel(id){ staat.open = id; staat.geenAuto = false; taak = null; antwoord = null; teken();
+function openPaneel(id){ staat.open = id; staat.wacht = null; staat.geenAuto = false; taak = null; antwoord = null; teken();
   document.querySelector(`.rij[data-open="${id}"]`)?.scrollIntoView({block:"nearest"}); }
 function sluitPaneel(){
-  staat.open = null; taak = null; antwoord = null;
+  staat.open = null; staat.wacht = null; taak = null; antwoord = null;
   if (staat.tab === "opruimen") staat.lees = null;
   document.querySelectorAll(".rij.gekozen[data-open]").forEach(r => r.classList.remove("gekozen"));
   document.getElementById("dek").classList.remove("open");
@@ -1503,6 +1605,9 @@ document.addEventListener("click", async ev => {
     for (const [id, start] of Object.entries(vs)) if (await planTaakIn(Number(id), start)) n++;
     toast(n === 1 ? "1 taak ingepland" : `${n} taken ingepland`); return laad();
   }
+  if (d.wacht && t.classList.contains("rij")){ staat.wacht = Number(d.wacht); staat.open = null; taak = null; antwoord = null; return teken(); }
+  if (t.id === "w-claude") return schrijfHerinnering(Number(d.wachtid));
+  if (t.id === "w-kopieer") return kopieerHerinnering(Number(d.wachtid));
   if (t.id === "controleer") return controleerTaken();
   if (d.vandaagdicht){ try { localStorage.setItem("mailagent-vandaag-dicht", isoDag(new Date())); } catch(e){} return teken(); }
   if (d.vandaagopen){ try { localStorage.removeItem("mailagent-vandaag-dicht"); } catch(e){} return teken(); }
@@ -1622,7 +1727,7 @@ document.addEventListener("click", async ev => {
       // eerste klik: bevestigen met de ontvanger in beeld; na 5 seconden weer terug
       const it = [...D.zelf, ...D.wacht].find(x => x.id === id), naam = it ? afzender(it.van).naam : "de afzender";
       t.classList.add("bevestig"); t.innerHTML = `${ik("forward")}Klik nogmaals: verzenden aan ${esc(naam)}`;
-      clearTimeout(t._terug); t._terug = setTimeout(() => { if (t.isConnected){ t.classList.remove("bevestig"); t.innerHTML = `${ik("forward")}Verzenden<kbd>⇧⌘↵</kbd>`; } }, 5000);
+      clearTimeout(t._terug); t._terug = setTimeout(() => { if (t.isConnected){ t.classList.remove("bevestig"); t.innerHTML = `${ik("forward")}<span class="lbl">Verzenden</span><kbd>⇧⌘↵</kbd>`; } }, 5000);
       return;
     }
     const data = {id, concept, taken: (bewerkt[id] || null), verzenden: true};

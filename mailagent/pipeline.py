@@ -601,7 +601,10 @@ def _nieuwe_wacht_op(cfg: Config, store: Store, llm, bron_naam: str, verstuurd: 
     kandidaten = []
     for v in verstuurd:
         mid = v["message_id"]
-        if not mid or store.wacht_op_bekend(mid) or not v["aan"].strip(" ,"):
+        if mid and store.wacht_op_bekend(mid):
+            store.vul_wacht_tekst(mid, _eigen_tekst(v["tekst"]))   # oudere regels kregen nog geen tekst
+            continue
+        if not mid or not v["aan"].strip(" ,"):
             continue
         if all(re.search(r"no-?reply|donotreply|niet-?beantwoorden", a) for a in v["aan"].split(",") if a.strip()):
             continue          # op een no-reply-adres komt geen antwoord
@@ -630,8 +633,10 @@ def _nieuwe_wacht_op(cfg: Config, store: Store, llm, bron_naam: str, verstuurd: 
             o = per_nr.get(i)
             verwacht = bool(o and o.verwacht_antwoord)
             terug = plus_werkdagen(v["datum"].astimezone(), cfg.opvolgen_werkdagen, werkdagen)
-            store.nieuw_wacht_op(bron_naam, v["message_id"], v["aan"], v["onderwerp"], v["datum"].isoformat(),
-                                 (o.wat if o else None), terug.isoformat(), status="wacht" if verwacht else "geen")
+            aan = ", ".join(a.strip() for a in v["aan"].split(",") if a.strip())
+            store.nieuw_wacht_op(bron_naam, v["message_id"], aan, v["onderwerp"], v["datum"].isoformat(),
+                                 (o.wat if o else None), terug.isoformat(), status="wacht" if verwacht else "geen",
+                                 tekst=_eigen_tekst(v["tekst"]))
             nieuw += verwacht
     return nieuw
 

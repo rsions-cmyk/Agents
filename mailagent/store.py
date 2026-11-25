@@ -137,6 +137,10 @@ class Store:
         for kolom in ("lijkt_beantwoord", "bewijs", "deadline_in_agenda"):   # al beantwoord? deadline in agenda?
             if kolom not in itemkolommen:
                 self.db.execute(f"ALTER TABLE items ADD COLUMN {kolom} TEXT")
+        wachtkolommen = {r["name"] for r in self.db.execute("PRAGMA table_info(wacht_op)")}
+        for kolom in ("tekst", "concept"):   # wat je schreef, en een herinnering die Claude voorstelde
+            if kolom not in wachtkolommen:
+                self.db.execute(f"ALTER TABLE wacht_op ADD COLUMN {kolom} TEXT")
         if "verwijzingen" not in {r["name"] for r in self.db.execute("PRAGMA table_info(mails)")}:
             self.db.execute("ALTER TABLE mails ADD COLUMN verwijzingen TEXT")   # In-Reply-To en References
         # mail met een open taak hoort niet meer in Beoordelen (oudere versies lieten hem staan)
@@ -291,10 +295,21 @@ class Store:
         return self.db.execute("SELECT 1 FROM wacht_op WHERE message_id=?", (message_id,)).fetchone() is not None
 
     def nieuw_wacht_op(self, bron: str, message_id: str, aan: str, onderwerp: str, verstuurd: str,
-                       wat: str | None, herinner_op: str, status: str = "wacht") -> None:
+                       wat: str | None, herinner_op: str, status: str = "wacht", tekst: str | None = None) -> None:
         self.db.execute("INSERT OR IGNORE INTO wacht_op(bron, message_id, aan, onderwerp, verstuurd, wat, herinner_op, "
-                        "status, aangemaakt) VALUES (?,?,?,?,?,?,?,?,?)",
-                        (bron, message_id, aan, onderwerp, verstuurd, wat, herinner_op, status, nu()))
+                        "status, aangemaakt, tekst) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                        (bron, message_id, aan, onderwerp, verstuurd, wat, herinner_op, status, nu(),
+                         tekst if status == "wacht" else None))
+        self.db.commit()
+
+    def vul_wacht_tekst(self, message_id: str, tekst: str) -> None:
+        """Tekst aanvullen voor wat al op de lijst stond voordat de app die bewaarde."""
+        self.db.execute("UPDATE wacht_op SET tekst=? WHERE message_id=? AND status='wacht' AND (tekst IS NULL OR tekst='')",
+                        (tekst, message_id))
+        self.db.commit()
+
+    def zet_wacht_concept(self, wacht_id: int, concept: str) -> None:
+        self.db.execute("UPDATE wacht_op SET concept=? WHERE id=?", (concept, wacht_id))
         self.db.commit()
 
     def wacht_op_lijst(self, status: str = "wacht") -> list[sqlite3.Row]:

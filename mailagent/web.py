@@ -91,6 +91,30 @@ def volgende_ronde(cfg: Config) -> str | None:
     return None
 
 
+def wacht_dict(store: Store, w) -> dict:
+    """Een regel 'wacht op antwoord', met mail die sindsdien van dezelfde mensen kwam (misschien in een andere draad)."""
+    d = dict(w)
+    ontvangers = {a.strip().lower() for a in (w["aan"] or "").split(",") if a.strip()}
+    sindsdien = []
+    try:
+        na = datetime.fromisoformat(w["verstuurd"])
+    except ValueError:
+        na = None
+    if na is not None and ontvangers:
+        for m in store.inkomend_sinds((na - timedelta(days=1)).isoformat()):
+            try:
+                if datetime.fromisoformat(m["datum"]) <= na:
+                    continue
+            except ValueError:
+                continue
+            if afzender_adres(m["van"] or "") in ontvangers:
+                it = store.db.execute("SELECT id, status FROM items WHERE sleutel=?", (m["sleutel"],)).fetchone()
+                sindsdien.append({"onderwerp": m["onderwerp"], "datum": m["datum"], "van": m["van"],
+                                  "item": it["id"] if it else None, "status": it["status"] if it else None})
+    d["sindsdien"] = sorted(sindsdien, key=lambda x: x["datum"], reverse=True)[:3]
+    return d
+
+
 def verzamel(cfg: Config, store: Store, ophalen: dict) -> dict:
     werk = lees_werktijd(cfg.agenda)
     tellingen = {p: len(store.items(status="wacht", project=p)) for p in cfg.projecten}
@@ -111,7 +135,7 @@ def verzamel(cfg: Config, store: Store, ophalen: dict) -> dict:
         "agenda_aan": bool((cfg.agenda or {}).get("kalender")),
         "vandaag_afgehandeld": store.vandaag_afgehandeld(),
         "volgende_ronde": volgende_ronde(cfg),
-        "wacht_op": [dict(w) for w in store.wacht_op_lijst("wacht")],
+        "wacht_op": [wacht_dict(store, w) for w in store.wacht_op_lijst("wacht")],
         "ochtend": ochtend(cfg, store),
         "belangrijk": [{"adres": a, "vast": True} for a in cfg.belangrijk]
                       + [{"adres": r["adres"], "naam": r["naam"], "vast": False} for r in store.belangrijke()],
@@ -389,6 +413,28 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                         terug = plus_werkdagen(date.today(), dagen, lees_werktijd(cfg.agenda).dagen)
                         store.zet_wacht_op(w["id"], herinner_op=terug.isoformat())
                         melding = f"Komt terug op {terug:%d-%m}"
+                elif actie == "wacht-herinnering":
+                    w = store.wacht_op(int(v["id"]))
+                    if w is None:
+                        return self._json({"ok": False, "melding": "Niet gevonden"})
+                    if not (w["tekst"] or "").strip():
+                        return self._json({"ok": False, "melding": "De tekst van je mail is nog niet bewaard; dat gebeurt bij de volgende ronde. Open hem tot dan in Mail"})
+                    ontv = Email(bron="", bron_id="", van=w["aan"] or "", aan="", onderwerp=w["onderwerp"] or "",
+                                 datum=datetime.now().astimezone(), tekst="")
+                    if not mag_naar_claude(cfg, ontv):
+                        return self._json({"ok": False, "melding": "Deze ontvanger gaat niet naar Claude; schrijf de herinnering zelf"})
+                    werk = lees_werktijd(cfg.agenda)
+                    dagen, d = 0, datetime.fromisoformat(w["verstuurd"]).date()
+                    while d < date.today():
+                        d += timedelta(days=1)
+                        dagen += d.isoweekday() in werk.dagen
+                    concept = llm_factory().herinnering(w["aan"] or "", w["onderwerp"] or "",
+                                                        anonimiseer(cfg, w["tekst"]), dagen)
+                    store.zet_wacht_concept(w["id"], concept)
+                    return self._json({"ok": True, "concept": concept})
+                elif actie == "wacht-concept":
+                    store.zet_wacht_concept(int(v["id"]), v.get("concept") or "")
+                    melding = ""
                 elif actie == "wacht-openen":
                     w = store.wacht_op(int(v["id"]))
                     mid = (w["message_id"] or "").strip().strip("<>") if w else ""
