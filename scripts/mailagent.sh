@@ -16,4 +16,5 @@ if grep -qE '^\s*backend:\s*api' config.yaml 2>/dev/null && [ -z "${ANTHROPIC_AP
   fi
   export ANTHROPIC_API_KEY
 fi
+export PYTHONUNBUFFERED=1   # meldingen meteen in data/*.log, ook op de achtergrond
 exec "$MAP/.venv/bin/python" -m mailagent -c "$MAP/config.yaml" "$@"
