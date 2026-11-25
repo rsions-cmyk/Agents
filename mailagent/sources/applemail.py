@@ -134,6 +134,14 @@ end zoekMap
 '''
 
 
+def titelstuk(onderwerp: str) -> str:
+    """Stuk van het onderwerp waaraan je het antwoordvenster herkent: zonder Re:, AW:, Antw: of Fw: ervoor,
+    want Mail zet daar zelf 'Re: ' voor (en voegt ze soms samen)."""
+    import re
+    kaal = re.sub(r"^\s*((re|aw|antw|fw|fwd|wg|doorst|sv|vs)\s*(\[\d+\])?\s*:\s*)+", "", onderwerp or "", flags=re.IGNORECASE).strip()
+    return kaal[:25]
+
+
 def controlestuk(tekst: str) -> str:
     """Een herkenbaar stuk van het concept (begin van de langste regel) om in het antwoord terug te vinden.
     Niet de aanhef: 'Beste Jan,' staat ook in andere antwoorden."""
@@ -178,6 +186,11 @@ on run argv
         set oudKlembord to the clipboard
     end try
     set the clipboard to conceptTekst
+    -- hoeveel vensters Mail nu heeft, om straks het nieuwe antwoordvenster te herkennen
+    set voor to -1
+    try
+        tell application "System Events" to set voor to count of windows of process "Mail"
+    end try
     tell application "Mail"
         activate
         if allen then
@@ -185,27 +198,40 @@ on run argv
         else
             set antwoord to reply m with opening window
         end if
-        set onderwerp to subject of m
     end tell
-    delay 1
-    -- 2. Alleen plakken als het nieuwe antwoordvenster vooraan staat. Zonder onderwerp is dat niet
-    --    te controleren; dan plak je zelf.
-    set fragment to onderwerp
-    if (length of fragment) > 25 then set fragment to text 1 thru 25 of fragment
-    if fragment is "" then return "klembord"
+    -- 2. Wachten (tot 9 seconden; Exchange kan traag zijn) tot het nieuwe antwoordvenster er is en
+    --    vooraan staat. Pas dan plakken, zodat je tekst nooit in een ander venster belandt.
+    set fragment to item 10 of argv
+    set klaar to false
+    set titel to ""
     try
         tell application "System Events"
             tell process "Mail"
-                set frontmost to true
-                delay 0.2
-                set titel to name of front window
+                repeat with poging from 1 to 30
+                    set frontmost to true
+                    try
+                        set titel to name of front window
+                        set nieuw to (voor < 0) or ((count of windows) > voor)
+                        -- na ruim 4 seconden ook zonder extra venster (Mail opent antwoorden soms als tabblad)
+                        if fragment is "" then
+                            if nieuw then set klaar to true
+                        else if titel contains fragment and (nieuw or poging > 14) then
+                            set klaar to true
+                        end if
+                        if klaar then exit repeat
+                    end try
+                    delay 0.3
+                end repeat
             end tell
-            if titel does not contain fragment then return "klembord"
-            keystroke "v" using command down
+            if klaar then
+                delay 0.4
+                keystroke "v" using command down
+            end if
         end tell
     on error foutTekst
-        return "geen-toegang"
+        return "geen-toegang" & tab & foutTekst
     end try
+    if not klaar then return "klembord" & tab & titel & tab & fragment
     delay 0.8
     -- 3. Controleren in DIT antwoord (het bericht dat reply teruggaf, niet een ander open venster)
     --    of je tekst erin staat. Lukt dat niet, dan blijft je tekst op het klembord staan.
@@ -563,9 +589,12 @@ class AppleMailBron:
 
     def maak_concept(self, bron_id: str, tekst: str, onderwerp: str, aan: str, message_id: str | None = None,
                      verzenden: bool = False) -> str:
-        hoe = _osascript(SCRIPT_CONCEPT, self.account, self.mailbox, bron_id, tekst, message_id or "",
+        uit = _osascript(SCRIPT_CONCEPT, self.account, self.mailbox, bron_id, tekst, message_id or "",
                          self.mappen["archief"], "1" if self.allen_beantwoorden else "0", "1" if verzenden else "0",
-                         controlestuk(tekst)).strip()
+                         controlestuk(tekst), titelstuk(onderwerp)).strip()
+        hoe, _, details = uit.partition("\t")
+        if hoe != "geplakt" and hoe != "verzonden":
+            log.warning("antwoord in Mail: %s (%s)", hoe, details.replace("\t", " | "))
         self.laatste_uitkomst = hoe
         if hoe == "verzonden":
             return "verzonden"
@@ -578,9 +607,11 @@ class AppleMailBron:
         if hoe == "geplakt":
             return "antwoord staat klaar in Apple Mail, met je tekst boven de oorspronkelijke mail; versturen doe je zelf"
         if hoe == "geen-toegang":
-            return ("antwoordvenster geopend; druk in Mail op ⌘V om je tekst te plakken. Zelf plakken lukt na "
-                    "toestemming in Systeeminstellingen, Privacy en beveiliging, Toegankelijkheid")
-        return "antwoordvenster geopend; druk in Mail op ⌘V om je tekst te plakken"
+            return ("Antwoord geopend, maar plakken mag nog niet. Je tekst staat op het klembord: klik in het antwoord "
+                    "en druk op ⌘V. Zelf plakken lukt na toestemming in Systeeminstellingen, Privacy en beveiliging, "
+                    "Toegankelijkheid (zet daar Terminal of Python aan)")
+        return ("Antwoord geopend, maar het venster kwam niet op tijd vooraan, dus ik heb niet geplakt. Je tekst staat "
+                "op het klembord: klik in het antwoord en druk op ⌘V")
 
     def markeer(self, bron_id: str, message_id: str | None, aan: bool, kleur: int = 4) -> None:
         """Vlag zetten (aan) of weghalen. Kleur: 0 rood, 1 oranje, 2 geel, 3 groen, 4 blauw, 5 paars, 6 grijs."""

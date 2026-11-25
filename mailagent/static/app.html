@@ -703,7 +703,7 @@ function toast(tekst, fout, knop){
     (knoppen.length ? `<div class="knoppen">${knoppen.map((k, i) => `<button class="knop" data-i="${i}">${esc(k.label)}</button>`).join("")}</div>` : "");
   t.querySelectorAll("button").forEach(b => b.addEventListener("click", () => { t.remove(); knoppen[Number(b.dataset.i)].doe(); }));
   document.getElementById("toasts").append(t);
-  setTimeout(() => t.remove(), fout ? 9000 : knoppen.length ? 8000 : 3500);
+  setTimeout(() => t.remove(), fout || /⌘V/.test(tekst) ? 12000 : knoppen.length ? 8000 : 3500);   // instructie: langer in beeld
 }
 
 // rij laten wegschuiven voordat hij uit de lijst gaat

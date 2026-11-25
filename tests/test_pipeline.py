@@ -1094,3 +1094,20 @@ def test_wacht_op_paneel_tekst_sindsdien_en_herinnering(omgeving):
         assert store.wacht_op(w["id"])["concept"] == j["concept"]                 # bewaard
     finally:
         server.shutdown()
+
+
+def test_antwoordvenster_herkennen_en_meldingen(monkeypatch):
+    from mailagent.sources import applemail
+    from mailagent.sources.applemail import SCRIPT_CONCEPT, AppleMailBron, titelstuk
+
+    assert titelstuk("RE: Erasmus+ guest lecturer in March") == "Erasmus+ guest lecturer i"
+    assert titelstuk("Antw: AW: Re: budget 2027") == "budget 2027"
+    # wachten op het venster in plaats van één vaste seconde, en pas daarna plakken
+    assert "repeat with poging from 1 to 30" in SCRIPT_CONCEPT and "delay 1\n" not in SCRIPT_CONCEPT
+    assert SCRIPT_CONCEPT.index("if klaar then") < SCRIPT_CONCEPT.index('keystroke "v"')
+    gezien = []
+    monkeypatch.setattr(applemail, "_osascript", lambda script, *a: gezien.append(a) or "klembord\tInbox\tbudget 2027")
+    bron = AppleMailBron("buas", "Exchange")
+    melding = bron.maak_concept("12", "Beste Jan,\n\nPrima.", "Re: budget 2027", "jan@x.nl")
+    assert gezien[0][-1] == "budget 2027"                                  # het onderwerp zonder Re:
+    assert "klembord" in melding and "⌘V" in melding and bron.laatste_uitkomst == "klembord"
