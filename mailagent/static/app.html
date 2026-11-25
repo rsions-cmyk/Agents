@@ -196,6 +196,12 @@ details.origineel pre{white-space:pre-wrap;font:13px/1.5 -apple-system,sans-seri
 .tk-erbij{display:flex;gap:8px;flex-wrap:wrap}
 .tk-uitleg{font-size:12px;color:var(--zacht)}
 .c-schrijf{margin-top:8px}
+details.achtergrond{font-size:13px;color:var(--zacht)}
+details.achtergrond summary{cursor:pointer;display:flex;align-items:center;gap:6px}
+details.achtergrond summary svg{width:14px;height:14px;flex:none}
+.ag-kop{font-size:11px;font-weight:650;letter-spacing:.05em;text-transform:uppercase;margin:8px 0 2px}
+.ag-r{display:flex;gap:10px;padding:2px 0}
+.ag-r .meta{width:52px;flex:none}
 .vandaag{border:1px solid var(--lijn);border-radius:var(--r2, 12px);background:var(--vlak);box-shadow:var(--schaduw);padding:10px 14px;margin:0 0 14px}
 .vd-kop{display:flex;align-items:center;gap:10px;margin-bottom:4px}
 .vd-kop .meta{margin-right:auto}
@@ -653,6 +659,23 @@ async function controleerTaken(){
   controleert = false;
   toast(j.melding, !j.ok);
   laad();
+}
+
+// Welke eerdere mail Claude als achtergrond gebruikte voor dit concept en deze taken
+function achtergrondHTML(context, van){
+  const ik_ = afzender(van || ""), wieNaam = w => (w || "").toLowerCase() === (ik_.adres || "").toLowerCase() ? ik_.naam : w;
+  const c = context || [], draad = c.filter(x => x.soort === "draad"), eerder = c.filter(x => x.soort === "eerder");
+  const taken = c.find(x => x.soort === "taken"), wacht = c.find(x => x.soort === "wacht");
+  if (!c.length) return "";
+  const delen = [];
+  if (draad.length) delen.push(draad.length === 1 ? "1 mail uit dit gesprek" : `${draad.length} mails uit dit gesprek`);
+  if (eerder.length) delen.push(eerder.length === 1 ? "1 eerdere mail met deze persoon" : `${eerder.length} eerdere mails met deze persoon`);
+  if (taken) delen.push(taken.aantal === 1 ? "1 open taak" : `${taken.aantal} open taken`);
+  if (wacht) delen.push(wacht.aantal === 1 ? "1 vraag waarop je wacht" : `${wacht.aantal} vragen waarop je wacht`);
+  const regel = x => `<div class="ag-r"><span class="meta">${kortDatum(x.datum)}</span><span>${x.richting === "uit" ? "jij aan " + esc(wieNaam(x.wie)) : esc(afzender(x.wie).naam)} · ${esc(x.onderwerp)}</span></div>`;
+  return `<details class="achtergrond"><summary>${ik("mail")}Achtergrond voor dit concept: ${delen.join(", ")}</summary>
+    ${draad.length ? `<div class="ag-kop">Dit gesprek</div>${draad.map(regel).join("")}` : ""}
+    ${eerder.length ? `<div class="ag-kop">Eerder met deze persoon</div>${eerder.map(regel).join("")}` : ""}</details>`;
 }
 
 // Concept laten schrijven voor een mail in Te doen die er nog geen heeft
@@ -1304,6 +1327,7 @@ function tekenPaneel(it){
       <div><div class="label">${ik("reply")}Concept-antwoord</div>
         <textarea id="concept" placeholder="${it.status === "handmatig" ? "Deze afzender gaat niet naar Claude. Typ hier zelf je antwoord." : "Nog geen concept. Laat Claude er een schrijven, of typ zelf."}">${esc(concept)}</textarea>
         ${it.status === "handmatig" ? "" : `<div class="c-schrijf"${concept.trim() && !schrijft.has(it.id) ? " hidden" : ""}><button class="knop" id="c-claude"${schrijft.has(it.id) ? " disabled" : ""}>${ik("sparkle")}${schrijft.has(it.id) ? "Claude schrijft…" : "Concept laten schrijven"}</button></div>`}</div>
+      ${achtergrondHTML(it.context, it.van)}
       <div><div class="label">${ik("task")}Taken uit deze mail</div>
         <div class="takenlijst" style="gap:6px">${bewerkTaken(it).map((t, i) => `
           <div class="tk-rij${t.antwoord ? " tk-antwoord" : ""}">${t.antwoord ? `<span class="tk-ik" title="Vervalt als je nu antwoordt met In Mail zetten of Verzenden">${ik("reply")}</span>` : ""}<textarea class="groei" rows="1" data-tk="${i}" data-veld="omschrijving" placeholder="Wat moet er gebeuren?">${esc(t.omschrijving)}</textarea>

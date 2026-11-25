@@ -36,9 +36,10 @@ class NepLLM:
         return Sortering(project="overig", actie="ter_info", prioriteit="laag",
                          deadline=None, samenvatting=mail.onderwerp, reden="test")
 
-    def werk_uit(self, mail, tekst, sortering, voorbeelden=None):
+    def werk_uit(self, mail, tekst, sortering, voorbeelden=None, achtergrond=None):
         self.gezien.append(tekst)
         self.voorbeelden = voorbeelden
+        self.achtergrond = achtergrond
         return Uitwerking(concept_antwoord=f"Concept voor: {mail.onderwerp}",
                           taken=[Taak(omschrijving="Opvolgen", deadline=sortering.deadline)],
                           agenda_voorstel=None, vragen_aan_jou="Akkoord?")
@@ -59,7 +60,7 @@ class NepLLM:
         return Verwachtingen(mails=[Verwachting(nr=m["nr"], verwacht_antwoord="?" in m["tekst"], wat="de datum")
                                     for m in mails])
 
-    def plan_taak(self, mail, tekst, project):
+    def plan_taak(self, mail, tekst, project, achtergrond=None):
         from mailagent.models import Taakplan
         self.gezien.append(tekst)
         return Taakplan(titel=f"Afhandelen: {mail.onderwerp}", stappen=["Lezen", "Reageren"], minuten=45,
@@ -1126,3 +1127,41 @@ def test_geen_toegang_noemt_het_programma(monkeypatch):
     monkeypatch.setattr(applemail, "_osascript", lambda script, *a: "geen-toegang\tosascript is not allowed assistive access. (-1719)")
     melding = AppleMailBron("buas", "Exchange").maak_concept("12", "Prima.", "Meeting minutes", "jan@x.nl")
     assert "Terminal aanzet" in melding and "Toegankelijkheid" in melding and "⌘V" in melding
+
+
+def test_achtergrond_uit_gesprek_en_eerdere_mail(omgeving):
+    from datetime import datetime
+    from mailagent.pipeline import achtergrond, zet_taken_klaar
+
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    eerste = next(r for r in store.items() if r["onderwerp"] == "Uitstel portfolio stage")
+    zet_taken_klaar(store, bronnen, eerste["id"], "c", [{"omschrijving": "Stagebedrijf bellen over de evaluatie"}])
+    # je antwoordde vanaf je telefoon, daarna schreef Sanne terug in hetzelfde gesprek
+    _verstuur(cfg, "antwoord.eml",
+              "From: docent@buas.nl\nTo: 123456@students.buas.nl\nSubject: Re: Uitstel portfolio stage\n"
+              "Date: Mon, 23 Nov 2026 10:00:00 +0100\nMessage-ID: <antw1@buas.nl>\nIn-Reply-To: <a1@students.buas.nl>\n\n"
+              "Hoi Sanne, je krijgt uitstel tot 4 december. Stuur me de evaluatie zodra je hem hebt.\n\n"
+              "Op 20 nov schreef Sanne:\n> Mag ik een week uitstel? Mijn studentnummer is 123456.\n")
+    (cfg.pad.parent / "mail" / "07-sanne.eml").write_text(
+        "From: Sanne de Vries <123456@students.buas.nl>\nTo: docent@buas.nl\nSubject: Re: Uitstel portfolio stage\n"
+        "Date: Tue, 24 Nov 2026 09:00:00 +0100\nMessage-ID: <a2@students.buas.nl>\n"
+        "In-Reply-To: <antw1@buas.nl>\nReferences: <a1@students.buas.nl> <antw1@buas.nl>\n\n"
+        "Dank! Het bedrijf zegt dat de evaluatie volgende week komt. Is dat op tijd?\n")
+    llm = NepLLM()
+    run(cfg, store, bronnen, llm)
+    a = llm.achtergrond
+    assert "uitstel tot 4 december" in a                                    # jouw antwoord vanaf je telefoon
+    assert "Mag ik een week uitstel" in a                                   # de eerste mail van Sanne
+    assert a.count("Mag ik een week uitstel") == 1                          # citaten niet dubbel
+    assert "Stagebedrijf bellen over de evaluatie" in a                     # open taak bij deze afzender
+    assert "123456" not in a                                                # ook de achtergrond wordt geanonimiseerd
+    nieuw = next(r for r in store.items(status="wacht") if r["sleutel"].endswith("07-sanne.eml"))
+    context = json.loads(store.item(nieuw["id"])["context"])
+    assert {c.get("richting") for c in context if c["soort"] == "draad"} == {"in", "uit"}
+
+    # niets van afzenders op de lijst 'nooit naar Claude'
+    tekst, lijst = achtergrond(cfg, store, sleutel="x", van="Mijn Bank <service@mijnbank.example>",
+                               onderwerp="Uw rekeningoverzicht", thread_id=None, verwijzingen=None,
+                               datum=datetime.now().astimezone())
+    assert "NL91" not in tekst and not [c for c in lijst if c.get("soort") in ("draad", "eerder")]

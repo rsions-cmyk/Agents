@@ -30,7 +30,7 @@ from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
 from .opmaak import externe_afbeeldingen, html_uit_bron, veilig
-from .pipeline import RondeBezig, afzender_adres, deadline_in_agenda, ochtend, voorstellen_voor, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
+from .pipeline import RondeBezig, achtergrond_voor_item, afzender_adres, deadline_in_agenda, ochtend, voorstellen_voor, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
 from .melding import meld
 from .store import Store
 
@@ -43,7 +43,7 @@ def item_dict(rij, volledig: bool = False) -> dict:
     if volledig:
         d.update({
             "reden": rij["reden"], "concept": rij["concept"] or "", "agenda": rij["agenda"],
-            "vragen": rij["vragen"], "opmerking": rij["opmerking"],
+            "vragen": rij["vragen"], "opmerking": rij["opmerking"], "context": json.loads(rij["context"] or "[]"),
             "taken": json.loads(rij["taken"] or "[]"), "tekst": (rij["tekst"] or "")[:8000],
         })
     return d
@@ -164,7 +164,8 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
         mail = Email(bron=it["bron"], bron_id=it["bron_id"], van=it["van"] or "", aan=it["aan"] or "",
                      onderwerp=it["onderwerp"] or "", datum=datetime.fromisoformat(it["datum"]), tekst=it["tekst"] or "")
         if mag_naar_claude(cfg, mail):
-            plan = llm_factory().plan_taak(mail, anonimiseer(cfg, mail.tekst), it["project"])
+            extra, _ = achtergrond_voor_item(cfg, store, it)
+            plan = llm_factory().plan_taak(mail, anonimiseer(cfg, mail.tekst), it["project"], achtergrond=extra or None)
             voorstel = plan.model_dump()
         else:
             voorstel = {"titel": f"Afhandelen: {mail.onderwerp}", "stappen": [], "minuten": 30,
@@ -357,8 +358,11 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                         return self._json({"ok": False, "melding": "Deze afzender gaat niet naar Claude; schrijf het antwoord zelf"})
                     s = Sortering(project=it["project"], actie="antwoorden", prioriteit=it["prioriteit"],
                                   deadline=it["deadline"], samenvatting=it["samenvatting"] or it["onderwerp"], reden="")
+                    extra, context = achtergrond_voor_item(cfg, store, it)
                     u = llm_factory().werk_uit(mail, anonimiseer(cfg, mail.tekst), s,
-                                               stijlvoorbeelden(cfg, store, mail, it["project"]))
+                                               stijlvoorbeelden(cfg, store, mail, it["project"]), achtergrond=extra or None)
+                    if context:
+                        store.zet_context(it["id"], context)
                     if not (u.concept_antwoord or "").strip():
                         return self._json({"ok": False, "melding": "Claude vond geen antwoord nodig en schreef geen concept"})
                     store.zet_concept(it["id"], u.concept_antwoord.strip(), vragen=u.vragen_aan_jou or "")

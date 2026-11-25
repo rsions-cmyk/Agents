@@ -67,12 +67,16 @@ def verwerk_mail(cfg: Config, store: Store, llm: LLM, mail: Email) -> int:
         return store.nieuw_item(mail, s, None, "genegeerd")
 
     tekst = anonimiseer(cfg, mail.tekst)
-    uitwerking = None
+    uitwerking, context = None, []
     try:
         if sortering is None:
             sortering = llm.sorteer(mail, tekst, vast_project)
         if sortering.actie in UITWERK_ACTIES:
-            uitwerking = llm.werk_uit(mail, tekst, sortering, stijlvoorbeelden(cfg, store, mail, sortering.project))
+            extra, context = achtergrond(cfg, store, sleutel=mail.sleutel, van=mail.van, onderwerp=mail.onderwerp,
+                                         thread_id=mail.thread_id, verwijzingen=mail.extra.get("verwijzingen"),
+                                         datum=mail.datum)
+            uitwerking = llm.werk_uit(mail, tekst, sortering, stijlvoorbeelden(cfg, store, mail, sortering.project),
+                                      achtergrond=extra or None)
     except Exception as e:  # ook een kapot antwoord of een onverwachte fout: de mail komt bij 'zelf doen'
         soort = "Claude-fout" if isinstance(e, LLMFout) else f"onverwachte fout ({type(e).__name__})"
         log.warning("%s bij %s: %s", soort, mail.sleutel, e)
@@ -83,7 +87,10 @@ def verwerk_mail(cfg: Config, store: Store, llm: LLM, mail: Email) -> int:
         sortering = sortering.model_copy(update={"prioriteit": "hoog",
                                                  "reden": f"{sortering.reden} · belangrijke afzender".strip(" ·")})
     if sortering.actie in UITWERK_ACTIES:
-        return store.nieuw_item(mail, sortering, uitwerking, "wacht")
+        item_id = store.nieuw_item(mail, sortering, uitwerking, "wacht")
+        if context:
+            store.zet_context(item_id, context)
+        return item_id
     if belangrijk:
         return store.nieuw_item(mail, sortering, None, "wacht")
     status = "genegeerd" if sortering.actie == "negeren" else "ter_info"
@@ -326,6 +333,7 @@ def run(cfg: Config, store: Store, bronnen: dict, llm: LLM, dagen: int | None = 
     """
     with ronde_slot(store):
         resultaat: dict[str, int] = {}
+        uitgaand: dict[str, list] = {}   # per bron: je verstuurde mail van de laatste 30 dagen
         maximum = maximum or cfg.max_mails_per_run
         nu = datetime.now().astimezone()
         sinds = nu - timedelta(days=dagen or cfg.terugkijken_dagen)
@@ -339,6 +347,12 @@ def run(cfg: Config, store: Store, bronnen: dict, llm: LLM, dagen: int | None = 
                 resultaat[naam] = -1
                 continue
 
+            if hasattr(bron, "verzonden_sinds"):   # eerst: als achtergrond bij de nieuwe concepten
+                try:
+                    uitgaand[naam] = bron.verzonden_sinds(nu - timedelta(days=30))
+                    bewaar_verstuurd(store, naam, uitgaand[naam])
+                except Exception as e:
+                    log.warning("%s: verzonden mail niet te lezen: %s", naam, e)
             totaal = getattr(bron, "laatste_totaal", len(mails))
             te_doen = [m for m in sorted(mails, key=lambda m: (not is_belangrijk(cfg, store, m.van), m.datum))
                        if not store.is_bekend(m)]   # belangrijke afzenders eerst
@@ -364,7 +378,7 @@ def run(cfg: Config, store: Store, bronnen: dict, llm: LLM, dagen: int | None = 
             store.log(None, f"run {naam}: {len(mails)} van {totaal} verwerkt, nog {rest}")
             resultaat[naam] = nieuw
         try:
-            telling = controleer_uitgaand(cfg, store, bronnen, llm)
+            telling = controleer_uitgaand(cfg, store, bronnen, llm, uitgaand=uitgaand)
             log.info("controle: %(taken)d taken en %(beantwoord)d mails lijken al gedaan; wacht op antwoord: "
                      "%(wacht_nieuw)d nieuw, %(wacht_opgelost)d beantwoord", telling)
         except Exception as e:  # de controle mag de ronde niet laten mislukken
@@ -457,6 +471,114 @@ def zoek_antwoorden(item, verstuurd: list[dict]) -> list[dict]:
     return sorted(treffers, key=lambda v: v["datum"])
 
 
+MID = re.compile(r"<([^<>\s]+)>")
+
+
+def _ids(tekst: str | None) -> set[str]:
+    """Message-ID's uit In-Reply-To/References (of één losse ID), zonder haakjes, in kleine letters."""
+    tekst = tekst or ""
+    gevonden = {m.lower() for m in MID.findall(tekst)}
+    if not gevonden and tekst.strip() and " " not in tekst.strip():
+        gevonden = {tekst.strip().strip("<>").lower()}
+    return gevonden
+
+
+def bewaar_verstuurd(store: Store, bron: str, verstuurd: list[dict]) -> None:
+    """Je verstuurde mail onthouden als achtergrond voor latere antwoorden (alleen je eigen tekst)."""
+    store.bewaar_verstuurd(bron, [{**v, "eigen": _eigen_tekst(v["tekst"])} for v in verstuurd])
+
+
+def achtergrond(cfg: Config, store: Store, *, sleutel: str, van: str, onderwerp: str, thread_id: str | None,
+                verwijzingen: str | None, datum: datetime, dagen: int = 120) -> tuple[str, list[dict]]:
+    """Wat Claude moet weten om goed te antwoorden: eerdere mail in dit gesprek (ook jouw antwoorden vanaf
+    een ander apparaat), eerdere gesprekken met dezelfde afzender, en wat er met die persoon nog openstaat.
+
+    Alleen je eigen tekst en de nieuwe tekst van elke mail, zonder citaten, en niets van afzenders of
+    ontvangers op de lijst 'nooit naar Claude'. Geeft (tekst voor Claude, lijst voor de app)."""
+    adres = afzender_adres(van or "")
+    kaal = _kaal_onderwerp(onderwerp)
+    draad_ids = _ids(thread_id) | _ids(verwijzingen)
+    grens = datum - timedelta(days=dagen)
+    stukken = []   # (datum, in_draad, richting, wie, onderwerp, tekst)
+
+    def mag(wie: str, ond: str) -> bool:
+        return mag_naar_claude(cfg, Email(bron="", bron_id="", van=wie, aan="", onderwerp=ond or "", datum=datum, tekst=""))
+
+    for m in store.mails_met_tekst():
+        if m["sleutel"] == sleutel:
+            continue
+        try:
+            d = datetime.fromisoformat(m["datum"])
+        except (TypeError, ValueError):
+            continue
+        if d < grens or d > datum + timedelta(days=1):
+            continue
+        m_adres = afzender_adres(m["van"] or "")
+        in_draad = bool(draad_ids & (_ids(m["thread_id"]) | _ids(m["verwijzingen"]))) or (
+            bool(kaal) and _kaal_onderwerp(m["onderwerp"]) == kaal and m_adres == adres)
+        if not (in_draad or (adres and m_adres == adres)) or not mag(m["van"] or "", m["onderwerp"]):
+            continue
+        stukken.append((d, in_draad, "in", m["van"] or m_adres, m["onderwerp"] or "", _eigen_tekst(m["tekst"] or "")))
+    for v in store.verstuurd_lijst():
+        try:
+            d = datetime.fromisoformat(v["datum"])
+        except (TypeError, ValueError):
+            continue
+        if d < grens or d > datum + timedelta(days=1):
+            continue
+        aan = (v["aan"] or "").lower()
+        in_draad = bool(draad_ids & _ids(v["verwijzingen"])) or (bool(kaal) and _kaal_onderwerp(v["onderwerp"]) == kaal
+                                                                  and adres in aan)
+        if not (in_draad or (adres and adres in aan)) or not mag(aan, v["onderwerp"]):
+            continue
+        stukken.append((d, in_draad, "uit", aan.split(",")[0].strip(), v["onderwerp"] or "", v["tekst"] or ""))
+
+    draad = sorted([x for x in stukken if x[1]], key=lambda x: x[0])[-8:]
+    eerder = sorted([x for x in stukken if not x[1]], key=lambda x: x[0], reverse=True)[:6]
+    regels, lijst, ruimte = [], [], 6000
+
+    def blok(x, maat):
+        nonlocal ruimte
+        d, _, richting, wie, ond, tekst = x
+        kop = f"{d.astimezone():%d-%m-%Y} · " + (f"jij aan {wie}" if richting == "uit" else f"van {wie}") + f" · {ond}"
+        stuk = f"{kop}\n{tekst[:maat].strip()}"
+        if len(stuk) > ruimte:
+            return None
+        ruimte -= len(stuk)
+        lijst.append({"soort": "draad" if x[1] else "eerder", "richting": richting, "datum": d.isoformat(),
+                      "wie": wie, "onderwerp": ond})
+        return stuk
+
+    if draad:
+        regels.append("Eerder in dit gesprek (oud naar nieuw):")
+        regels += [b for b in (blok(x, 900) for x in draad) if b]
+    if eerder:
+        regels.append("Andere recente mail met dezelfde persoon (nieuw naar oud):")
+        regels += [b for b in (blok(x, 450) for x in eerder) if b]
+
+    open_taken = []
+    for t in store.open_taken():
+        if t["item_id"]:
+            it = store.item(t["item_id"])
+            if it is not None and afzender_adres(it["van"] or "") == adres:
+                open_taken.append(f"- {t['omschrijving']}" + (f" (deadline {t['deadline']})" if t["deadline"] else ""))
+    if open_taken:
+        regels.append("Open taken die al bij deze afzender horen:\n" + "\n".join(open_taken[:6]))
+        lijst.append({"soort": "taken", "aantal": len(open_taken)})
+    wacht = [w for w in store.wacht_op_lijst("wacht") if adres and adres in (w["aan"] or "").lower()]
+    if wacht:
+        regels.append("Je wacht nog op antwoord van deze persoon op:\n" + "\n".join(
+            f"- {w['onderwerp']} (verstuurd {w['verstuurd'][:10]}){': ' + w['wat'] if w['wat'] else ''}" for w in wacht[:4]))
+        lijst.append({"soort": "wacht", "aantal": len(wacht)})
+    return anonimiseer(cfg, "\n\n".join(regels)), lijst
+
+
+def achtergrond_voor_item(cfg: Config, store: Store, it) -> tuple[str, list[dict]]:
+    return achtergrond(cfg, store, sleutel=it["sleutel"], van=it["van"] or "", onderwerp=it["onderwerp"] or "",
+                       thread_id=it["thread_id"], verwijzingen=it["verwijzingen"],
+                       datum=datetime.fromisoformat(it["datum"]))
+
+
 def is_belangrijk(cfg: Config, store: Store, van: str) -> bool:
     """Staat de afzender op je lijst belangrijke afzenders (config of sterretje in de app)?"""
     adres = afzender_adres(van or "")
@@ -490,7 +612,8 @@ def controleer_taken(cfg: Config, store: Store, bronnen: dict, llm: LLM | None =
     return controleer_uitgaand(cfg, store, bronnen, llm, slot)["taken"]
 
 
-def controleer_uitgaand(cfg: Config, store: Store, bronnen: dict, llm: LLM | None = None, slot=None) -> dict:
+def controleer_uitgaand(cfg: Config, store: Store, bronnen: dict, llm: LLM | None = None, slot=None,
+                        uitgaand: dict | None = None) -> dict:
     """Leest per bron je map Verzonden (van elk apparaat) en doet daar drie dingen mee.
 
     1. Taken bij een mail die je al beantwoordde krijgen 'lijkt gedaan' (andere taken: Claude kijkt mee).
@@ -525,12 +648,16 @@ def controleer_uitgaand(cfg: Config, store: Store, bronnen: dict, llm: LLM | Non
         nieuw_vanaf = nu_ - timedelta(days=7)
         sinds = min([datetime.fromisoformat(it["datum"]) for it in items] + [nieuw_vanaf])
         sinds = max(sinds, nu_ - timedelta(days=30))
-        try:
-            with (slot or nullcontext()):
-                verstuurd = bron.verzonden_sinds(sinds)
-        except Exception as e:
-            log.warning("%s: verzonden mail niet te lezen: %s", bron_naam, e)
-            continue
+        if uitgaand and bron_naam in uitgaand:          # al gelezen aan het begin van de ronde
+            verstuurd = [v for v in uitgaand[bron_naam] if v["datum"] > sinds]
+        else:
+            try:
+                with (slot or nullcontext()):
+                    verstuurd = bron.verzonden_sinds(sinds)
+            except Exception as e:
+                log.warning("%s: verzonden mail niet te lezen: %s", bron_naam, e)
+                continue
+            bewaar_verstuurd(store, bron_naam, verstuurd)
 
         # 1. taken
         for it in taak_items[bron_naam]:

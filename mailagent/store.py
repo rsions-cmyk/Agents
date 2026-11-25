@@ -92,6 +92,13 @@ CREATE TABLE IF NOT EXISTS afbeeldingen_ok (
     adres TEXT PRIMARY KEY,      -- afzender van wie externe afbeeldingen altijd mogen laden
     aangemaakt TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS verstuurd (
+    message_id TEXT PRIMARY KEY,     -- mail die je zelf verstuurde (van elk apparaat), als achtergrond
+    bron TEXT NOT NULL,
+    aan TEXT, onderwerp TEXT, datum TEXT,
+    tekst TEXT,                      -- alleen wat je zelf schreef, zonder citaat
+    verwijzingen TEXT                -- In-Reply-To en References
+);
 CREATE TABLE IF NOT EXISTS gemeld (
     sleutel TEXT PRIMARY KEY,
     tijd TEXT NOT NULL
@@ -134,7 +141,7 @@ class Store:
             self.db.execute("ALTER TABLE items ADD COLUMN eigen_antwoord TEXT")
         if "vorige_status" not in itemkolommen:
             self.db.execute("ALTER TABLE items ADD COLUMN vorige_status TEXT")
-        for kolom in ("lijkt_beantwoord", "bewijs", "deadline_in_agenda"):   # al beantwoord? deadline in agenda?
+        for kolom in ("lijkt_beantwoord", "bewijs", "deadline_in_agenda", "context"):   # context: gebruikte achtergrond
             if kolom not in itemkolommen:
                 self.db.execute(f"ALTER TABLE items ADD COLUMN {kolom} TEXT")
         wachtkolommen = {r["name"] for r in self.db.execute("PRAGMA table_info(wacht_op)")}
@@ -215,7 +222,7 @@ class Store:
 
     def item(self, item_id: int) -> Optional[sqlite3.Row]:
         return self.db.execute(
-            "SELECT i.*, m.van, m.aan, m.onderwerp, m.datum, m.tekst, m.bron, m.bron_id, m.thread_id "
+            "SELECT i.*, m.van, m.aan, m.onderwerp, m.datum, m.tekst, m.bron, m.bron_id, m.thread_id, m.verwijzingen "
             "FROM items i JOIN mails m USING(sleutel) WHERE i.id=?", (item_id,)).fetchone()
 
     def items(self, status: Optional[str] = None, project: Optional[str] = None,
@@ -341,6 +348,25 @@ class Store:
             self.db.execute("INSERT OR IGNORE INTO afbeeldingen_ok(adres, aangemaakt) VALUES (?,?)", (adres.lower(), nu()))
         else:
             self.db.execute("DELETE FROM afbeeldingen_ok WHERE adres=?", (adres.lower(),))
+        self.db.commit()
+
+    def bewaar_verstuurd(self, bron: str, berichten: list[dict]) -> None:
+        for v in berichten:
+            if v.get("message_id"):
+                self.db.execute("INSERT OR REPLACE INTO verstuurd(message_id, bron, aan, onderwerp, datum, tekst, verwijzingen) "
+                                "VALUES (?,?,?,?,?,?,?)",
+                                (v["message_id"], bron, v.get("aan"), v.get("onderwerp"), v["datum"].isoformat(),
+                                 v.get("eigen", v.get("tekst", ""))[:3000], f"{v.get('in_reply_to', '')} {v.get('references', '')}".strip()))
+        self.db.commit()
+
+    def verstuurd_lijst(self) -> list[sqlite3.Row]:
+        return self.db.execute("SELECT * FROM verstuurd").fetchall()
+
+    def mails_met_tekst(self) -> list[sqlite3.Row]:
+        return self.db.execute("SELECT sleutel, van, aan, onderwerp, datum, tekst, thread_id, verwijzingen FROM mails").fetchall()
+
+    def zet_context(self, item_id: int, context: list[dict]) -> None:
+        self.db.execute("UPDATE items SET context=? WHERE id=?", (json.dumps(context, ensure_ascii=False), item_id))
         self.db.commit()
 
     def is_gemeld(self, sleutel: str) -> bool:
