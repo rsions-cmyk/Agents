@@ -91,6 +91,17 @@ def volgende_ronde(cfg: Config) -> str | None:
     return None
 
 
+def te_doen_dict(cfg: Config, store: Store, r) -> dict:
+    """Mail in Te doen, met of de afzender belangrijk is en, als hij al beantwoord lijkt, wat je stuurde."""
+    it = store.item(r["id"])
+    d = {**item_dict(it, True), "belangrijk": is_belangrijk(cfg, store, r["van"]), "jouw_antwoord": None}
+    if it["lijkt_beantwoord"] and it["bewijs"]:
+        v = store.verstuurd_bericht(it["bewijs"])
+        if v is not None:
+            d["jouw_antwoord"] = {"tekst": (v["tekst"] or "")[:1500], "onderwerp": v["onderwerp"], "datum": v["datum"]}
+    return d
+
+
 def wacht_dict(store: Store, w) -> dict:
     """Een regel 'wacht op antwoord', met mail die sindsdien van dezelfde mensen kwam (misschien in een andere draad)."""
     d = dict(w)
@@ -121,9 +132,8 @@ def verzamel(cfg: Config, store: Store, ophalen: dict) -> dict:
     zelf = store.items(status="fout") + store.items(status="handmatig")
     return {
         "projecten": [{"naam": p, "wacht": tellingen[p]} for p in cfg.projecten],
-        "wacht": [{**item_dict(store.item(r["id"]), True), "belangrijk": is_belangrijk(cfg, store, r["van"])}
-                  for r in store.items(status="wacht")],
-        "zelf": [{**item_dict(store.item(r["id"]), True), "belangrijk": is_belangrijk(cfg, store, r["van"])} for r in zelf],
+        "wacht": [te_doen_dict(cfg, store, r) for r in store.items(status="wacht")],
+        "zelf": [te_doen_dict(cfg, store, r) for r in zelf],
         "info": [item_dict(r) for r in store.items(status="ter_info")[:100]],
         "overgeslagen": [item_dict(r) for r in store.items(status="genegeerd")[:100]],
         "taken": [taak_dict(store, t) for t in store.open_taken()],

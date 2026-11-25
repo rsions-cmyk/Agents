@@ -359,6 +359,9 @@ class Store:
                                  v.get("eigen", v.get("tekst", ""))[:3000], f"{v.get('in_reply_to', '')} {v.get('references', '')}".strip()))
         self.db.commit()
 
+    def verstuurd_bericht(self, message_id: str) -> Optional[sqlite3.Row]:
+        return self.db.execute("SELECT * FROM verstuurd WHERE message_id=?", (message_id,)).fetchone()
+
     def verstuurd_lijst(self) -> list[sqlite3.Row]:
         return self.db.execute("SELECT * FROM verstuurd").fetchall()
 

@@ -1165,3 +1165,25 @@ def test_achtergrond_uit_gesprek_en_eerdere_mail(omgeving):
                                onderwerp="Uw rekeningoverzicht", thread_id=None, verwijzingen=None,
                                datum=datetime.now().astimezone())
     assert "NL91" not in tekst and not [c for c in lijst if c.get("soort") in ("draad", "eerder")]
+
+
+def test_later_contact_als_vraag_en_jouw_antwoord_in_beeld(omgeving):
+    from mailagent.pipeline import controleer_uitgaand
+    from mailagent.web import te_doen_dict
+
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    # je mailde de Board Chair daarna met een ander onderwerp, zonder verwijzing naar zijn mail
+    _verstuur(cfg, "ander.eml",
+              "From: docent@buas.nl\nTo: chair@istte.org\nSubject: Stukken bestuursvergadering\n"
+              "Date: Mon, 23 Nov 2026 16:00:00 +0100\nMessage-ID: <ander1@buas.nl>\n\n"
+              "Hoi, de agenda voor december is prima. Ik stuur de stukken vrijdag.\n")
+    controleer_uitgaand(cfg, store, bronnen, NepLLM())
+    it = next(r for r in store.items() if r["onderwerp"] == "Agenda board meeting December")
+    rij = store.item(it["id"])
+    assert "Was dat je antwoord?" in rij["lijkt_beantwoord"] and "Stukken bestuursvergadering" in rij["lijkt_beantwoord"]
+    d = te_doen_dict(cfg, store, it)
+    assert "agenda voor december is prima" in d["jouw_antwoord"]["tekst"]     # wat je stuurde, ter controle
+    store.wis_lijkt_beantwoord(it["id"])                                      # 'Nog niet'
+    controleer_uitgaand(cfg, store, bronnen, NepLLM())
+    assert store.item(it["id"])["lijkt_beantwoord"] is None                   # niet opnieuw voor dezelfde mail

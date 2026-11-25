@@ -608,6 +608,14 @@ VRAAGT = re.compile(r"\?|\b(graag|kun je|kunt u|zou je|zou u|wil je|laat (je|u) 
                     r"could you|can you|would you|please|let me know|looking forward to)\b", re.IGNORECASE)
 
 
+def _later_contact(item, verstuurd: list[dict], dagen: int = 14):
+    """Laatste mail die je na deze mail aan dezelfde afzender stuurde (ander onderwerp), binnen `dagen`."""
+    afzender = afzender_adres(item["van"] or "")
+    na = datetime.fromisoformat(item["datum"])
+    kandidaten = [v for v in verstuurd if afzender and afzender in v["aan"] and na < v["datum"] <= na + timedelta(days=dagen)]
+    return max(kandidaten, key=lambda v: v["datum"]) if kandidaten else None
+
+
 def controleer_taken(cfg: Config, store: Store, bronnen: dict, llm: LLM | None = None, slot=None) -> int:
     return controleer_uitgaand(cfg, store, bronnen, llm, slot)["taken"]
 
@@ -665,13 +673,21 @@ def controleer_uitgaand(cfg: Config, store: Store, bronnen: dict, llm: LLM | Non
         # 2. Te doen
         for it in te_doen[bron_naam]:
             antwoorden = zoek_antwoorden(it, verstuurd)
-            if not antwoorden or it["bewijs"] == antwoorden[-1]["message_id"]:
-                continue
-            v = antwoorden[-1]
-            soort = "doorgestuurd" if DOORSTUREN.match(v["onderwerp"] or "") else "beantwoord"
-            ontvanger = v["aan"].split(",")[0].strip() or "de afzender"
-            store.zet_lijkt_beantwoord(it["id"], f"Je hebt deze mail {soort} op {v['datum'].astimezone():%d-%m %H:%M} "
-                                       f"(aan {ontvanger})", v["message_id"])
+            if antwoorden:
+                v = antwoorden[-1]
+                soort = "doorgestuurd" if DOORSTUREN.match(v["onderwerp"] or "") else "beantwoord"
+                ontvanger = v["aan"].split(",")[0].strip() or "de afzender"
+                reden = f"Je hebt deze mail {soort} op {v['datum'].astimezone():%d-%m %H:%M} (aan {ontvanger})."
+            else:
+                # geen antwoord in dit gesprek, maar wel daarna gemaild met deze persoon: vragen of dat het was
+                v = _later_contact(it, verstuurd)
+                if v is None:
+                    continue
+                reden = (f"Je mailde deze persoon daarna op {v['datum'].astimezone():%d-%m %H:%M}, met onderwerp "
+                         f"\u201c{v['onderwerp'] or '(geen)'}\u201d. Was dat je antwoord?")
+            if it["bewijs"] == v["message_id"]:
+                continue          # al gemeld met dit bericht, of door jou op 'nog niet' gezet
+            store.zet_lijkt_beantwoord(it["id"], reden, v["message_id"])
             telling["beantwoord"] += 1
         # 3. wacht op antwoord
         if cfg.opvolgen_aan:

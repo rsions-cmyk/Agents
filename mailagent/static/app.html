@@ -226,6 +226,10 @@ details.achtergrond summary svg{width:14px;height:14px;flex:none}
   background:var(--ok-zacht);font-size:13px}
 .lijktgedaan>svg{color:var(--ok);width:16px;height:16px;flex:none}
 .lijktgedaan>div{flex:1;min-width:180px}
+.jouw-antwoord{margin-top:6px;padding:6px 10px;border-left:3px solid var(--ok);background:var(--vlak);border-radius:6px;
+  white-space:pre-wrap;max-height:9em;overflow:auto;color:var(--tekst)}
+details.al-beantwoord>summary{cursor:pointer;color:var(--zacht);font-size:13px;margin-bottom:8px}
+details.al-beantwoord[open]>summary{margin-bottom:12px}
 .controle{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-bottom:8px}
 .chip.ok{color:var(--ok);background:var(--ok-zacht);border-color:transparent}
 .vip svg{width:13px;height:13px;color:var(--let);fill:var(--let);vertical-align:-2px;margin-right:4px}
@@ -582,7 +586,11 @@ const naamProject = p => p === "alles" ? "Alles" : p === "istte" ? "ISTTE" : p[0
 function afzender(van){
   const m = String(van||"").match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>/);
   const naam = (m ? m[1] : "").trim() || (m ? m[2] : van) || "?";
-  return {naam: naam.replace(/,\s*/," "), adres: m ? m[2] : van};
+  // 'Achternaam, Voornaam' (Outlook) wordt 'Voornaam Achternaam'; titels achter een komma blijven staan
+  const delen = naam.split(",").map(x => x.trim()).filter(Boolean);
+  const omgedraaid = delen.length === 2 && !/^(ph\.?d|msc|ma|ba|mba|md|dr|prof|jr|sr)\.?$/i.test(delen[1]) && !naam.includes("@")
+    ? `${delen[1]} ${delen[0]}` : naam.replace(/,\s*/g, " ");
+  return {naam: omgedraaid, adres: m ? m[2] : van};
 }
 function initialen(naam){
   const w = naam.replace(/[^\p{L}\s]/gu," ").trim().split(/\s+/).filter(Boolean);
@@ -1304,6 +1312,7 @@ function tekenPaneel(it){
   const zelfdeMail = Number(p.dataset.id) === it.id;
   const concept = bestaand && zelfdeMail ? bestaand.value : it.concept;
   const scroll = zelfdeMail ? (p.querySelector(".p-inhoud")?.scrollTop || 0) : 0;
+  const beantwoord = !!it.lijkt_beantwoord;
   const origOpen = zelfdeMail && p.querySelector("details.origineel")?.open;
   const focusId = zelfdeMail && p.contains(document.activeElement) ? document.activeElement.id : null;
   p.dataset.id = it.id; p.dataset.sleutel = ""; p.dataset.lees = "";
@@ -1318,12 +1327,15 @@ function tekenPaneel(it){
           ${it.deadline?`<span class="chip">${ik("clock")}${esc(dagKort(it.deadline))}</span>${it.deadline_in_agenda ? `<span class="chip">${ik("calendar")}in agenda</span>` : D.agenda_aan ? `<button class="knop klein" data-deadlineagenda="${it.id}" data-soort="mail" title="Hele-dag-afspraak met slotje, herinnering de dag ervoor om 09:00">In agenda</button>` : ""}`:""}</div></div>
       <button class="ikoon sluit-mail" id="sluit" title="Sluiten (Esc)">${ik("x")}</button></div>
     <div class="p-inhoud">
-      ${it.lijkt_beantwoord ? `<div class="lijktgedaan">${ik("check")}<div><b>Lijkt beantwoord.</b> ${esc(it.lijkt_beantwoord)}</div>
+      ${beantwoord ? `<div class="lijktgedaan">${ik("check")}<div><b>Lijkt beantwoord.</b> ${esc(it.lijkt_beantwoord)}
+          ${it.jouw_antwoord && it.jouw_antwoord.tekst ? `<div class="jouw-antwoord">${esc(it.jouw_antwoord.tekst)}</div>` : ""}</div>
         <button class="knop klein goed" data-gedaanmelding="1">Gedaan</button>
         <button class="knop klein" data-nietbeantwoord="${it.id}">Nog niet</button></div>` : ""}
       ${it.samenvatting && it.samenvatting !== it.onderwerp ? `<div class="melding info">${ik("sparkle")}<div>${esc(it.samenvatting)}</div></div>` : ""}
       ${zelf ? `<div class="melding fout">${ik("alert")}<div>${esc(it.opmerking || it.reden || "Bekijk deze mail zelf.")}</div></div>` : ""}
-      ${it.vragen ? `<div class="melding">${ik("alert")}<div><b>Beslissing voor jou</b><br>${esc(it.vragen)}</div></div>` : ""}
+      ${it.vragen && !beantwoord ? `<div class="melding">${ik("alert")}<div><b>Beslissing voor jou</b><br>${esc(it.vragen)}</div></div>` : ""}
+      ${beantwoord ? `<details class="al-beantwoord"${zelfdeMail && p.querySelector("details.al-beantwoord")?.open ? " open" : ""}><summary>Concept, achtergrond en taken toch tonen</summary>
+        ${it.vragen ? `<div class="melding" style="margin-bottom:12px">${ik("alert")}<div><b>Beslissing voor jou</b><br>${esc(it.vragen)}</div></div>` : ""}` : ""}
       <div><div class="label">${ik("reply")}Concept-antwoord</div>
         <textarea id="concept" placeholder="${it.status === "handmatig" ? "Deze afzender gaat niet naar Claude. Typ hier zelf je antwoord." : "Nog geen concept. Laat Claude er een schrijven, of typ zelf."}">${esc(concept)}</textarea>
         ${it.status === "handmatig" ? "" : `<div class="c-schrijf"${concept.trim() && !schrijft.has(it.id) ? " hidden" : ""}><button class="knop" id="c-claude"${schrijft.has(it.id) ? " disabled" : ""}>${ik("sparkle")}${schrijft.has(it.id) ? "Claude schrijft…" : "Concept laten schrijven"}</button></div>`}</div>
@@ -1337,6 +1349,7 @@ function tekenPaneel(it){
           <div class="tk-erbij"><button class="knop klein" data-tkerbij="1">+ Taak toevoegen</button>
             <button class="knop klein" data-klaarzetten="${it.id}" title="Alle taken naar Planning, zonder nu te antwoorden. De mail en het concept blijven bij de taken.">${ik("calendar")}Taken klaarzetten</button></div>
           <div class="tk-uitleg">Antwoord je nu, dan vervalt de antwoordtaak en gaan de andere taken mee naar Planning.</div></div></div>
+      ${beantwoord ? `</details>` : ""}
       ${it.agenda ? `<div class="melding info">${ik("calendar")}<div><b>Agendavoorstel</b><br>${esc(it.agenda)}</div></div>` : ""}
       <details class="origineel" data-orig="${it.id}"><summary>${ik("mail")}Oorspronkelijke mail</summary>${p.querySelector(`details[data-orig="${it.id}"]`)?.open ? mailWeergave(it.id, it.tekst) : ""}</details>
     </div>
@@ -1346,11 +1359,11 @@ function tekenPaneel(it){
         <button class="knop ikoonknop" data-opbergen="${it.id}" title="Opbergen in een map (V)">${ik("folder")}<kbd>V</kbd></button>
         <button class="knop ikoonknop" data-een="archief" data-id="${it.id}" title="Archiveren zonder antwoord (E)">${ik("archive")}<kbd>E</kbd></button>
         <button class="knop ikoonknop" id="afwijzen" title="Afwijzen: het voorstel klopt niet (X)">${ik("x")}<kbd>X</kbd></button>
-        <button class="knop" id="gedaan" title="Gedaan: geen antwoord nodig. Daarna kun je de mail archiveren of opbergen (D; Shift+D kiest meteen een map)">${ik("check")}<span class="lbl">Gedaan</span><kbd>D</kbd></button>
+        <button class="knop${beantwoord ? " goed" : ""}" id="gedaan" title="Gedaan: geen antwoord nodig. Daarna kun je de mail archiveren of opbergen (D; Shift+D kiest meteen een map)">${ik("check")}<span class="lbl">Gedaan</span><kbd>D</kbd></button>
       </div>
       <div class="groepje">
         <button class="knop" id="goedkeuren" title="Antwoord met deze tekst klaarzetten in Apple Mail; je verstuurt daar zelf (⌘↵)">${ik("reply")}<span class="lbl">In Mail zetten</span><kbd>⌘↵</kbd></button>
-        <button class="knop goed" id="verzenden" title="Meteen versturen; tweede klik bevestigt (⇧⌘↵)">${ik("forward")}<span class="lbl">Verzenden</span><kbd>⇧⌘↵</kbd></button>
+        <button class="knop${beantwoord ? "" : " goed"}" id="verzenden" title="Meteen versturen; tweede klik bevestigt (⇧⌘↵)">${ik("forward")}<span class="lbl">Verzenden</span><kbd>⇧⌘↵</kbd></button>
       </div>
     </div>`;
   p.classList.add("open"); p.setAttribute("aria-hidden","false");
