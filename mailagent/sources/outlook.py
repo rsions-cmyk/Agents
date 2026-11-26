@@ -45,7 +45,7 @@ class OutlookBron:
         app, cache = self._app()
         flow = app.initiate_device_flow(scopes=SCOPES)
         if "user_code" not in flow:
-            raise RuntimeError(f"Inloggen niet gestart: {flow.get('error_description', flow)}")
+            raise RuntimeError(f"Sign-in not started: {flow.get('error_description', flow)}")
         print(flow["message"])
         res = app.acquire_token_by_device_flow(flow)
         if "access_token" not in res:
@@ -58,7 +58,7 @@ class OutlookBron:
         accounts = app.get_accounts()
         res = app.acquire_token_silent(SCOPES, account=accounts[0]) if accounts else None
         if not res or "access_token" not in res:
-            raise RuntimeError(f"Niet ingelogd bij Outlook voor bron '{self.naam}'. Draai eerst: mailagent login")
+            raise RuntimeError(f"Not signed in to Outlook for account '{self.naam}'. Run first: mailagent login")
         self._bewaar(cache)
         return res["access_token"]
 
@@ -100,11 +100,11 @@ class OutlookBron:
     def maak_concept(self, bron_id: str, tekst: str, onderwerp: str, aan: str, message_id: str | None = None,
                      verzenden: bool = False) -> str:
         if verzenden:
-            raise ValueError("meteen verzenden kan niet via de Outlook-koppeling (bewust geen verzendrecht)")
+            raise ValueError("sending directly isn't possible through the Outlook connection (it deliberately has no permission to send)")
         with self._client() as c:
             r = c.post(f"/me/messages/{bron_id}/createReply", json={"comment": html.escape(tekst).replace("\n", "<br>")})
             r.raise_for_status()
-        return "concept-antwoord staat in je Outlook-map Concepten"
+        return "the draft reply is in your Outlook Drafts folder"
 
     def verplaats(self, bron_ids: list[str], doel: str) -> dict[str, str | None]:
         bestemming = {"archief": "archive", "prullenbak": "deleteditems"}[doel]

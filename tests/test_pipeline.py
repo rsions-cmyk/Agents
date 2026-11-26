@@ -139,7 +139,7 @@ def test_goedkeuren_en_afwijzen(omgeving):
     eerste, tweede = wacht[0]["id"], wacht[1]["id"]
 
     melding = keur_goed(store, bronnen, eerste, "Aangepaste tekst")
-    assert "opgeslagen" in melding
+    assert "saved as" in melding
     concepten = list((cfg.data_dir / "concepten").glob("*.eml"))
     assert len(concepten) == 1 and "Aangepaste tekst" in concepten[0].read_text()
     assert store.item(eerste)["status"] == "goedgekeurd"
@@ -152,7 +152,7 @@ def test_goedkeuren_en_afwijzen(omgeving):
     assert store.item(tweede)["status"] == "afgewezen"
 
     tekst = overzicht(cfg, store, uren=10**6)
-    assert "Open taken" in tekst and "Wacht op jou" in tekst
+    assert "Open tasks" in tekst and "Waiting for you" in tekst
 
 
 def test_claude_aanroep_vorm(omgeving):
@@ -244,11 +244,11 @@ def test_archiveren_verwijderen_en_overslaan(omgeving):
     assert len(info) == 1                                    # nieuwsbrief
 
     melding = verplaats_items(store, bronnen, [info[0]["id"]], "archief")
-    assert melding.startswith("1 mail(s) verplaatst naar het archief")
+    assert melding.startswith("1 email moved to the archive")
     assert store.item(info[0]["id"])["status"] == "gearchiveerd"
     assert (bronnen["test"].pad / "_archief" / "04-nieuwsbrief.eml").exists()
     # nog een keer verplaatsen doet niets
-    assert verplaats_items(store, bronnen, [info[0]["id"]], "prullenbak").startswith("0 mail(s)")
+    assert verplaats_items(store, bronnen, [info[0]["id"]], "prullenbak").startswith("0 emails")
 
     # afzender voortaan overslaan: volgende mail van die afzender gaat niet naar Claude
     store.zet_afzender_regel(afzender_adres("BUas Nieuws <nieuwsbrief@buas.nl>"), "negeren", "overig")
@@ -368,7 +368,7 @@ def test_taak_maken_en_inplannen(omgeving):
     start = datetime(2026, 11, 25, 10, 0).astimezone()
     melding = maak_taak(store, bronnen, ag, info["id"], "Nieuwsbrief lezen", ["Lezen", "Delen met team"],
                         45, "2026-11-27", start, archiveren=True)
-    assert "Taak gemaakt" in melding and "ingepland" in melding and "archief" in melding
+    assert "Task created" in melding and "ingepland" in melding and "archive" in melding
     titel, b, e, notities = ag.afspraken[0]
     assert e - b == timedelta(minutes=45) and "- Delen met team" in notities
     taak = store.open_taken()[0]
@@ -403,7 +403,7 @@ def test_taak_terugzetten_en_antwoord_vanuit_taak(omgeving):
     assert store.open_taken()[0]["id"] == taak["id"] and store.afgeronde_taken() == []
 
     melding = open_antwoord(store, bronnen, info["id"], "Dank, ik lees hem.")
-    assert "opgeslagen" in melding and store.item(info["id"])["concept"] == "Dank, ik lees hem."
+    assert "saved as" in melding and store.item(info["id"])["concept"] == "Dank, ik lees hem."
     assert store.open_taken()[0]["id"] == taak["id"]          # taak blijft staan
 
 
@@ -431,7 +431,7 @@ def test_vlag_bij_taak(omgeving):
     info = store.items(status="ter_info")[0]
     bron = bronnen["test"]
     melding = maak_taak(store, bronnen, None, info["id"], "Lezen", [], 30, None, None, False, vlag=4)
-    assert "ingepland" in melding and bron.vlaggen == {"04-nieuwsbrief.eml": 4}
+    assert "flagged" in melding and bron.vlaggen == {"04-nieuwsbrief.eml": 4}
     # tweede taak bij dezelfde mail; eentje afvinken laat de vlag staan
     maak_taak(store, bronnen, None, info["id"], "Delen", [], 15, None, None, False, vlag=4)
     eerste, tweede = store.open_taken()
@@ -539,10 +539,10 @@ def test_opbergen_in_map_met_voorstel(omgeving):
 
     # zonder geschiedenis: voorstel op basis van de mapnaam
     vs = map_voorstellen(store, store.item(it["id"]), mappen)
-    assert vs[0]["map"] == "Projecten/ENTER÷IFITT" and "onderwerp" in vs[0]["reden"]
+    assert vs[0]["map"] == "Projecten/ENTER÷IFITT" and "subject" in vs[0]["reden"]
 
     melding = verplaats_items(store, bronnen, [it["id"]], "map:Projecten/ENTER÷IFITT")
-    assert "map Projecten/ENTER÷IFITT" in melding
+    assert "folder Projecten/ENTER÷IFITT" in melding
     assert store.item(it["id"])["status"] == "opgeborgen"
     assert (pad / "_map_Projecten_ENTER÷IFITT" / "12-enter.eml").exists()
 
@@ -553,7 +553,7 @@ def test_opbergen_in_map_met_voorstel(omgeving):
     run(cfg, store, bronnen, NepLLM())
     it2 = next(r for r in store.items() if r["onderwerp"] == "Registration reminder")
     vs2 = map_voorstellen(store, store.item(it2["id"]), mappen)
-    assert vs2[0]["map"] == "Projecten/ENTER÷IFITT" and "afzender" in vs2[0]["reden"]
+    assert vs2[0]["map"] == "Projecten/ENTER÷IFITT" and "sender" in vs2[0]["reden"]
 
     with pytest.raises(ValueError):
         verplaats_items(store, bronnen, [it2["id"]], "map:")
@@ -571,7 +571,7 @@ def test_ongedaan_maken_tijdfactor_en_eerste_stap(omgeving):
     # archiveren en ongedaan maken: mail terug, item terug in Opruimen
     verplaats_items(store, bronnen, [info["id"]], "archief")
     assert not (pad / "04-nieuwsbrief.eml").exists()
-    assert "1 mail(s) terug" in zet_terug(store, bronnen, [info["id"]])
+    assert "1 email back" in zet_terug(store, bronnen, [info["id"]])
     assert (pad / "04-nieuwsbrief.eml").exists() and store.item(info["id"])["status"] == "ter_info"
     # ook vanuit een map
     verplaats_items(store, bronnen, [info["id"]], "map:ISTTE")
@@ -581,7 +581,7 @@ def test_ongedaan_maken_tijdfactor_en_eerste_stap(omgeving):
 
     # eerste stap in de titel van de afspraak
     assert afspraak_titel("Mentoren benaderen", ["Lijst van vijf mentoren openen", "Mails sturen"]) == \
-        "Mentoren benaderen · begin met: lijst van vijf mentoren openen"
+        "Mentoren benaderen · start with: lijst van vijf mentoren openen"
     assert afspraak_titel("Lezen", []) == "Lezen"
 
     # tijdfactor uit oordelen
@@ -628,7 +628,7 @@ def test_verzenden_alleen_via_bevestigde_klik_en_gedaan(omgeving):
     a, b = [r["id"] for r in store.items(status="wacht")][:2]
     with pytest.raises(ValueError):
         keur_goed(store, bronnen, a, "  ", verzenden=True)          # geen tekst, niets versturen
-    assert "verzonden aan" in keur_goed(store, bronnen, a, "Dank, akkoord.", verzenden=True)
+    assert "sent to" in keur_goed(store, bronnen, a, "Dank, akkoord.", verzenden=True)
     assert store.item(a)["status"] == "verzonden"
     assert (cfg.data_dir / "verzonden").exists()
 
@@ -644,7 +644,7 @@ def test_mapvoorstel_op_projectnaam(omgeving):
     run(cfg, store, bronnen, NepLLM())
     it = next(r for r in store.items() if r["project"] == "istte")
     vs = map_voorstellen(store, store.item(it["id"]), bronnen["test"].mappenlijst())
-    assert vs[0] == {"map": "ISTTE", "reden": "zelfde naam als het project"}
+    assert vs[0] == {"map": "ISTTE", "reden": "same name as the project"}
 
 
 def test_verzenden_geblokkeerd_of_niet_bevestigd(omgeving):
@@ -738,13 +738,13 @@ def test_taken_klaarzetten_zonder_te_antwoorden(omgeving):
              {"omschrijving": "Rooster nakijken", "deadline": "2026-12-01", "minuten": "45"},
              {"omschrijving": "   ", "deadline": ""}]
     melding, ids = zet_taken_klaar(store, bronnen, a, "Mijn concept", taken)
-    assert "2 taken klaargezet" in melding and len(ids) == 2
+    assert "2 tasks ready" in melding and len(ids) == 2
     it = store.item(a)
     assert it["status"] == "taak" and it["concept"] == "Mijn concept"          # concept wacht bij Beantwoorden
     open_ = {t["omschrijving"]: t for t in store.open_taken()}
     assert open_["Rooster nakijken"]["minuten"] == 45 and open_["Beantwoorden: uitstel"]["item_id"] == a
 
-    assert zet_taken_klaar_terug(store, bronnen, a, ids) == "Terug in Te doen"   # ongedaan maken
+    assert zet_taken_klaar_terug(store, bronnen, a, ids) == "Back in To do"   # ongedaan maken
     assert store.item(a)["status"] == "wacht" and not store.open_taken()
 
     # nu antwoorden: de antwoordtaak vervalt, de andere taken gaan mee
@@ -828,11 +828,11 @@ def test_afspraak_met_herinnering_en_slotje():
     ag._kalender = lambda: Kalender(True)
     melding = ag.maak_afspraak("Taak", start, start + timedelta(minutes=30), "")
     assert gemaakt[-1].alarmen == [("alarm", -900)] and gemaakt[-1].niveau == 2
-    assert "herinnering 15 min vooraf" in melding and "privé" in melding
+    assert "reminder 15 min before" in melding and "private" in melding
 
     ag._kalender = lambda: Kalender(False)          # account zonder privé-afspraken: wel opslaan, geen slotje
     melding = ag.maak_afspraak("Taak", start, start + timedelta(minutes=30), "")
-    assert gemaakt[-1].niveau == 0 and "niet privé" in melding
+    assert gemaakt[-1].niveau == 0 and "not private" in melding
 
 
 def test_taken_lijken_gedaan_na_verstuurd_antwoord(omgeving):
@@ -857,7 +857,7 @@ def test_taken_lijken_gedaan_na_verstuurd_antwoord(omgeving):
         "Op 20 nov 2026 schreef Sanne:\n> Mag ik een week uitstel? Mijn studentnummer is 123456.\n")
     assert controleer_taken(cfg, store, bronnen, llm) == 2                 # antwoordtaak + stagebedrijf
     taken = {t["omschrijving"]: t for t in store.open_taken()}
-    assert "beantwoord op 23-11" in taken["Beantwoorden: Uitstel portfolio stage"]["lijkt_klaar"]
+    assert "answered this email on 23 Nov" in taken["Beantwoorden: Uitstel portfolio stage"]["lijkt_klaar"]
     assert taken["Stagebedrijf mailen over de evaluatie"]["lijkt_klaar"]
     assert taken["Rooster aanpassen"]["lijkt_klaar"] is None                # niet in het antwoord
     assert "Mag ik een week uitstel" not in llm.gezien[-1]                  # alleen je eigen tekst, geen citaat
@@ -910,7 +910,7 @@ def test_al_beantwoord_en_wacht_op_antwoord(omgeving):
     tel = controleer_uitgaand(cfg, store, bronnen, NepLLM())
     assert tel["beantwoord"] == 1 and tel["wacht_nieuw"] == 1
     student = next(r for r in store.items() if r["onderwerp"] == "Uitstel portfolio stage")
-    assert "beantwoord op 23-11" in store.item(student["id"])["lijkt_beantwoord"]
+    assert "answered this email on 23 Nov" in store.item(student["id"])["lijkt_beantwoord"]
     assert store.item(student["id"])["status"] == "wacht"                  # de app handelt niets zelf af
     wacht = store.wacht_op_lijst("wacht")
     assert [w["onderwerp"] for w in wacht] == ["Revisie hoofdstuk 3"] and wacht[0]["wat"] == "de datum"
@@ -1045,7 +1045,7 @@ def test_ochtendoverzicht_en_deadlines(omgeving, monkeypatch):
     rapport = next(t for t in store.open_taken() if t["omschrijving"] == "Rapport lezen")
     assert o["zonder_moment"] == [rapport["id"]]
     assert o["blijft_liggen_n"] >= 1 and o["blijft_liggen"][0]["dagen"] >= 9
-    assert "deadlines deze week" in ochtend_tekst(o)
+    assert "deadlines this week" in ochtend_tekst(o)
 
     ag = NepAgenda2()
     vs = voorstellen_voor(ag, cfg, [rapport], datetime.now().astimezone())
@@ -1152,7 +1152,7 @@ def test_antwoordvenster_herkennen_en_meldingen(monkeypatch):
     bron = AppleMailBron("buas", "Exchange")
     melding = bron.maak_concept("12", "Beste Jan,\n\nPrima.", "Re: budget 2027", "jan@x.nl")
     assert gezien[0][-1] == "budget 2027"                                  # het onderwerp zonder Re:
-    assert "klembord" in melding and "⌘V" in melding and bron.laatste_uitkomst == "klembord"
+    assert "clipboard" in melding and "⌘V" in melding and bron.laatste_uitkomst == "klembord"
 
 
 def test_geen_toegang_noemt_het_programma(monkeypatch):
@@ -1165,7 +1165,7 @@ def test_geen_toegang_noemt_het_programma(monkeypatch):
     monkeypatch.setenv("TERM_PROGRAM", "Apple_Terminal")
     monkeypatch.setattr(applemail, "_osascript", lambda script, *a: "geen-toegang\tosascript is not allowed assistive access. (-1719)")
     melding = AppleMailBron("buas", "Exchange").maak_concept("12", "Prima.", "Meeting minutes", "jan@x.nl")
-    assert "Terminal aanzet" in melding and "Toegankelijkheid" in melding and "⌘V" in melding
+    assert "turn on Terminal" in melding and "Accessibility" in melding and "⌘V" in melding
 
 
 def test_achtergrond_uit_gesprek_en_eerdere_mail(omgeving):
@@ -1220,7 +1220,7 @@ def test_later_contact_als_vraag_en_jouw_antwoord_in_beeld(omgeving):
     controleer_uitgaand(cfg, store, bronnen, NepLLM())
     it = next(r for r in store.items() if r["onderwerp"] == "Agenda board meeting December")
     rij = store.item(it["id"])
-    assert "Was dat je antwoord?" in rij["lijkt_beantwoord"] and "Stukken bestuursvergadering" in rij["lijkt_beantwoord"]
+    assert "Was that your reply?" in rij["lijkt_beantwoord"] and "Stukken bestuursvergadering" in rij["lijkt_beantwoord"]
     d = te_doen_dict(cfg, store, it)
     assert "agenda voor december is prima" in d["jouw_antwoord"]["tekst"]     # wat je stuurde, ter controle
     store.wis_lijkt_beantwoord(it["id"])                                      # 'Nog niet'
@@ -1250,7 +1250,7 @@ def test_taak_uit_agenda_en_onthouden_afspraak(omgeving):
     start = (datetime.now().astimezone() + timedelta(days=1)).replace(hour=10, minute=0, second=0, microsecond=0)
     plan_bestaande_taak(store, ag, t["id"], start, 30)
     assert store.taak(t["id"])["afspraak_id"] == "EV-1"                    # onthouden welke afspraak het is
-    assert "Nog in te plannen" in haal_uit_agenda(store, ag, t["id"])
+    assert "To schedule" in haal_uit_agenda(store, ag, t["id"])
     assert ag.weg == ["EV-1"] and store.taak(t["id"])["gepland"] is None
     with pytest.raises(ValueError):
         haal_uit_agenda(store, ag, t["id"])                                   # staat al niet meer in de agenda
@@ -1346,7 +1346,7 @@ def test_afspraken_indelen_door_claude_en_jouw_keuze(omgeving):
     store.zet_afspraak_soort(afspraak_sleutel(staff), "eigen", None, "jij")
     store.zet_afspraak_soort(afspraak_sleutel(staff), "afdeling", "opnieuw", "claude")
     g = store.afspraak_soorten()[afspraak_sleutel(staff)]
-    assert soort_bepalen(staff, {}, [], g) == ("eigen", "jouw keuze")
+    assert soort_bepalen(staff, {}, [], g) == ("eigen", "your choice")
     # zonder Claude herkent de app een groot overleg ook zelf als afdeling
     assert soort_bepalen({**staff, "id": "X"}, {}, [], None)[0] == "afdeling"
 
@@ -1388,8 +1388,8 @@ def test_afspraak_plannen_momenten_vasthouden_bevestigen(omgeving):
     assert len({x.date() for x in vrij}) == len(vrij)                              # hoogstens één per dag
 
     houd_vast(store, ag, it["id"], [m["vrij"][0], m["vrij"][1]], 30, "Koffie over Erasmus+", "Peter Warner")
-    assert [t for t, _ in ag.voorlopig] == ["Voorlopig: Koffie over Erasmus+ (Peter Warner)"] * 2
-    assert "1 andere momenten vrijgegeven" in bevestig_voorlopig(store, ag, "V2")
+    assert [t for t, _ in ag.voorlopig] == ["Tentative: Koffie over Erasmus+ (Peter Warner)"] * 2
+    assert "1 other time released" in bevestig_voorlopig(store, ag, "V2")
     assert ag.bevestigd == [("V2", "Koffie over Erasmus+ (Peter Warner)")] and ag.weg == ["V1"]
     assert store.voorlopige(it["id"]) == []
 
@@ -1403,7 +1403,7 @@ def test_afgehandeld_terugvinden_zoeken_en_terugzetten(omgeving):
     istte = te_doen["Agenda board meeting December"]
     markeer_gedaan(store, istte)
     ander = next(i for o, i in te_doen.items() if i != istte)
-    assert verplaats_items(store, bronnen, [ander], "archief").startswith("1 mail")
+    assert verplaats_items(store, bronnen, [ander], "archief").startswith("1 email")
     ter_info = next(r["id"] for r in store.items(status="ter_info"))
     verplaats_items(store, bronnen, [ter_info], "archief")          # stond niet in Te doen: hoort er niet bij
 
@@ -1416,9 +1416,9 @@ def test_afgehandeld_terugvinden_zoeken_en_terugzetten(omgeving):
     assert store.zoek("chair@istte.org")["mail"] and not store.zoek("board xyzzy")["mail"]
     assert store.zoek("   ") == {"mail": [], "taken": [], "wacht": []}
 
-    assert terug_naar_te_doen(store, bronnen, istte) == "Terug in Te doen"
+    assert terug_naar_te_doen(store, bronnen, istte) == "Back in To do"
     assert store.item(istte)["status"] == "wacht"
-    assert terug_naar_te_doen(store, bronnen, istte) == "Staat al in Te doen"
-    assert terug_naar_te_doen(store, bronnen, ander).startswith("Terug in je inbox")
+    assert terug_naar_te_doen(store, bronnen, istte) == "Already in To do"
+    assert terug_naar_te_doen(store, bronnen, ander).startswith("Back in your inbox")
     assert store.item(ander)["status"] == "wacht"
     assert istte not in [r["id"] for r in store.afgehandeld_uit_te_doen()]

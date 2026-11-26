@@ -120,7 +120,7 @@ on zoekMap(accountNaam, pad)
         end if
         -- 2. zoeken op naam; bij meer dan één treffer gaat een Gmail-systeemmap voor
         set kandidaten to (every mailbox of account accountNaam whose name is pad)
-        if (count of kandidaten) is 0 then error "map '" & pad & "' niet gevonden in account " & accountNaam
+        if (count of kandidaten) is 0 then error "folder '" & pad & "' not found in account " & accountNaam
         repeat with k in kandidaten
             try
                 set ouder to name of container of k
@@ -190,7 +190,7 @@ on run argv
             tell application "Mail" to set m to first message of mailbox mailboxNaam of account accountNaam whose message id is berichtMid
         end try
     end if
-    if m is missing value then error "mail niet meer gevonden in " & mailboxNaam & " of " & archiefNaam
+    if m is missing value then error "email no longer found in " & mailboxNaam & " or " & archiefNaam
     set allen to (count of argv) > 6 and (item 7 of argv) is "1"
     set verzend to (count of argv) > 7 and (item 8 of argv) is "1"
     -- 1. Een echt antwoordvenster: Mail zet de oorspronkelijke mail er zelf in, met alle opmaak,
@@ -373,7 +373,7 @@ on run argv
             tell application "Mail" to set m to first message of arch whose message id is berichtMid
         end try
     end if
-    if m is missing value then error "mail niet gevonden"
+    if m is missing value then error "email not found"
     tell application "Mail"
         if aan then
             set flag index of m to kleur
@@ -438,7 +438,7 @@ on run argv
             tell application "Mail" to set m to first message of arch whose message id is berichtMid
         end try
     end if
-    if m is missing value then error "mail niet gevonden"
+    if m is missing value then error "email not found"
     tell application "Mail" to return source of m
 end run
 '''
@@ -530,9 +530,9 @@ def _osascript(script: str, *args: str) -> str:
     try:
         r = subprocess.run(["osascript", "-", *args], input=script, capture_output=True, text=True, timeout=600)
     except subprocess.TimeoutExpired:
-        raise RuntimeError("Apple Mail reageerde 10 minuten niet. Staat er in Mail een venster of vraag open?")
+        raise RuntimeError("Apple Mail did not respond for 10 minutes. Is there a window or question open in Mail?")
     if r.returncode != 0:
-        raise RuntimeError(f"AppleScript-fout: {r.stderr.strip()}")
+        raise RuntimeError(f"AppleScript error: {r.stderr.strip()}")
     return r.stdout
 
 
@@ -625,19 +625,19 @@ class AppleMailBron:
         if hoe == "verzonden":
             return "verzonden"
         if hoe == "niet-verzonden":
-            return "niet verzonden: Mail weigerde te versturen; het antwoord staat open in Mail"
+            return "not sent: Mail refused to send it; the reply is open in Mail"
         if hoe == "niet-gecontroleerd":
-            return ("ik kon niet controleren of je tekst in het nieuwe antwoord staat"
-                    + (", dus er is niets verstuurd" if verzenden else "")
-                    + ". Kijk in Mail; staat hij er niet, plak dan met ⌘V. Je tekst staat op het klembord")
+            return ("I couldn't check whether your text is in the new reply"
+                    + (", so nothing was sent" if verzenden else "")
+                    + ". Look in Mail; if it isn't there, paste it with ⌘V. Your text is on the clipboard")
         if hoe == "geplakt":
-            return "antwoord staat klaar in Apple Mail, met je tekst boven de oorspronkelijke mail; versturen doe je zelf"
+            return "the reply is ready in Apple Mail, with your text above the original email; you send it yourself"
         if hoe == "geen-toegang":
-            return ("Antwoord geopend, maar de app mag nog niet plakken. Je tekst staat op het klembord: klik in het "
-                    f"antwoord en druk op ⌘V. Zelf plakken lukt als je {wie_vraagt_toegang()} aanzet in "
-                    "Systeeminstellingen > Privacy en beveiliging > Toegankelijkheid, en die daarna opnieuw start")
-        return ("Antwoord geopend, maar het venster kwam niet op tijd vooraan, dus ik heb niet geplakt. Je tekst staat "
-                "op het klembord: klik in het antwoord en druk op ⌘V")
+            return ("Reply opened, but the app isn't allowed to paste yet. Your text is on the clipboard, so click in the "
+                    f"reply and press ⌘V. To let the app paste, turn on {wie_vraagt_toegang()} in "
+                    "System Settings > Privacy & Security > Accessibility, then restart it")
+        return ("Reply opened, but the window didn't come to the front in time, so I didn't paste. Your text is on "
+                "the clipboard, so click in the reply and press ⌘V")
 
     def markeer(self, bron_id: str, message_id: str | None, aan: bool, kleur: int = 4) -> None:
         """Vlag zetten (aan) of weghalen. Kleur: 0 rood, 1 oranje, 2 geel, 3 groen, 4 blauw, 5 paars, 6 grijs."""
@@ -702,7 +702,7 @@ class AppleMailBron:
         """Verplaatst berichten naar archief, prullenbak of 'map:<pad>'. Niets wordt definitief verwijderd."""
         map_ = doel[4:] if doel.startswith("map:") else self.mappen[doel]
         uit = _osascript(SCRIPT_VERPLAATS, self.account, self.mailbox, map_, *bron_ids)
-        resultaat: dict[str, str | None] = {i: "geen antwoord van Apple Mail" for i in bron_ids}
+        resultaat: dict[str, str | None] = {i: "no response from Apple Mail" for i in bron_ids}
         for regel in uit.splitlines():
             mid, _, status = regel.partition(":")
             if mid.strip() in resultaat:

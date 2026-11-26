@@ -18,7 +18,7 @@ from .store import Store
 
 log = logging.getLogger("mailagent")
 
-OPEN_PLEK = re.compile(r"\[\s*AANVULLEN", re.IGNORECASE)   # plek die Claude voor jou openliet
+OPEN_PLEK = re.compile(r"\[\s*(FILL IN|AANVULLEN)", re.IGNORECASE)   # plek die Claude voor jou openliet
 
 
 def stijlvoorbeelden(cfg: Config, store: Store, mail: Email, project: str, aantal: int = 3) -> list[dict]:
@@ -53,17 +53,17 @@ def verwerk_mail(cfg: Config, store: Store, llm: LLM, mail: Email) -> int:
     if sortering is None and geleerd is not None and not belangrijk:
         s = Sortering(project=geleerd["project"] or vast_project or "overig", actie=geleerd["actie"],
                       prioriteit="laag", deadline=None, samenvatting=mail.onderwerp,
-                      reden="afzender staat op je lijst 'voortaan overslaan'")
+                      reden="sender is on your list of senders to skip")
         return store.nieuw_item(mail, s, None, "genegeerd")
 
     if not mag_naar_claude(cfg, mail):
         s = Sortering(project=vast_project or "overig", actie="antwoorden", prioriteit="hoog" if belangrijk else "normaal",
-                      deadline=None, samenvatting=mail.onderwerp, reden="staat op de lijst 'nooit naar Claude'")
+                      deadline=None, samenvatting=mail.onderwerp, reden="on the list of senders never sent to Claude")
         return store.nieuw_item(mail, s, None, "handmatig")
 
     if cfg.bulk_overslaan and mail.extra.get("bulk") and vast_project is None and sortering is None and not belangrijk:
         s = Sortering(project="overig", actie="negeren", prioriteit="laag", deadline=None,
-                      samenvatting=mail.onderwerp, reden="nieuwsbrief of reclame (afmeldlink); niet naar Claude")
+                      samenvatting=mail.onderwerp, reden="newsletter or advertising (has an unsubscribe link); not sent to Claude")
         return store.nieuw_item(mail, s, None, "genegeerd")
 
     tekst = anonimiseer(cfg, mail.tekst)
@@ -81,7 +81,7 @@ def verwerk_mail(cfg: Config, store: Store, llm: LLM, mail: Email) -> int:
         soort = "Claude-fout" if isinstance(e, LLMFout) else f"onverwachte fout ({type(e).__name__})"
         log.warning("%s bij %s: %s", soort, mail.sleutel, e)
         s = sortering or Sortering(project=vast_project or "overig", actie="antwoorden", prioriteit="normaal",
-                                   deadline=None, samenvatting=mail.onderwerp, reden="niet gesorteerd")
+                                   deadline=None, samenvatting=mail.onderwerp, reden="not sorted")
         return store.nieuw_item(mail, s, None, "fout", opmerking=f"{soort}: {e}"[:500])
     if belangrijk:   # nooit missen: altijd in Te doen, bovenaan
         sortering = sortering.model_copy(update={"prioriteit": "hoog",
@@ -113,21 +113,21 @@ def map_voorstellen(store: Store, item, mappen: list[str], aantal: int = 3) -> l
             continue
         if r["adres"] == adres:
             score[r["map"]] = score.get(r["map"], 0) + 10 * r["aantal"]
-            reden[r["map"]] = f"{r['aantal']}× eerder voor deze afzender"
+            reden[r["map"]] = f"used {r['aantal']}× before for this sender"
         elif r["project"] and r["project"] == item["project"]:
             score[r["map"]] = score.get(r["map"], 0) + r["aantal"]
-            reden.setdefault(r["map"], f"vaker gebruikt voor {item['project']}")
+            reden.setdefault(r["map"], f"often used for {item['project']}")
     woorden = {w for w in re.findall(r"[a-z0-9]+", (item["onderwerp"] or "").lower()) if len(w) >= 4}
     for m in mappen:
         mapwoorden = {w for w in re.findall(r"[a-z0-9]+", m.split("/")[-1].lower()) if len(w) >= 4}
         if any(w.startswith(mw) or mw.startswith(w) for w in woorden for mw in mapwoorden):
             score[m] = score.get(m, 0) + 5
-            reden.setdefault(m, "naam past bij het onderwerp")
+            reden.setdefault(m, "name matches the subject")
     project = (item["project"] or "").lower()
     for m in mappen:
         if project and project != "overig" and m.split("/")[-1].strip().lower() == project:
             score[m] = score.get(m, 0) + 3
-            reden.setdefault(m, "zelfde naam als het project")
+            reden.setdefault(m, "same name as the project")
     beste = sorted(score, key=lambda m: -score[m])[:aantal]
     return [{"map": m, "reden": reden[m]} for m in beste]
 
@@ -148,7 +148,7 @@ def verplaats_items(store: Store, bronnen: dict, item_ids: list[int], doel: str)
     for bron_naam, items in per_bron.items():
         bron = bronnen.get(bron_naam)
         if bron is None or not hasattr(bron, "verplaats"):
-            mislukt += [f"{it['onderwerp'][:40]} (bron {bron_naam} kan niet verplaatsen)" for it in items]
+            mislukt += [f"{it['onderwerp'][:40]} (account {bron_naam} can't move email)" for it in items]
             continue
         try:
             res = bron.verplaats([it["bron_id"] for it in items], doel)
@@ -156,7 +156,7 @@ def verplaats_items(store: Store, bronnen: dict, item_ids: list[int], doel: str)
             mislukt += [f"{it['onderwerp'][:40]} ({e})" for it in items]
             continue
         for it in items:
-            fout = res.get(it["bron_id"], "geen resultaat")
+            fout = res.get(it["bron_id"], "no result")
             if fout is None:
                 store.bewaar_vorige_status(it["id"], it["status"])
                 store.zet_status(it["id"], nieuwe_status, opmerking=doel[4:] if doel.startswith("map:") else None)
@@ -166,11 +166,11 @@ def verplaats_items(store: Store, bronnen: dict, item_ids: list[int], doel: str)
             else:
                 mislukt.append(f"{it['onderwerp'][:40]} ({fout})")
 
-    waar = ("het archief" if doel == "archief" else "de prullenbak (terug te halen in Apple Mail)"
-            if doel in ("archief", "prullenbak") else f"map {doel[4:]}")
-    melding = f"{gelukt} mail(s) verplaatst naar {waar}"
+    waar = ("the archive" if doel == "archief" else "the Bin (you can restore it in Apple Mail)"
+            if doel in ("archief", "prullenbak") else f"folder {doel[4:]}")
+    melding = f"{gelukt} " + ("email" if gelukt == 1 else "emails") + f" moved to {waar}"
     if mislukt:
-        melding += f"; niet gelukt: {'; '.join(mislukt[:5])}"
+        melding += f"; failed: {'; '.join(mislukt[:5])}"
     return melding
 
 
@@ -189,7 +189,7 @@ def markeer_mail(store: Store, bronnen: dict, item_id: int | None, aan: bool, kl
         store.log(item_id, "vlag gezet" if aan else "vlag weggehaald")
         return None
     except Exception as e:
-        return f"vlag in Mail {'zetten' if aan else 'weghalen'} lukte niet ({e})"
+        return f"couldn't {'set' if aan else 'remove'} the flag in Mail ({e})"
 
 
 def maak_taak(store: Store, bronnen: dict, agenda, item_id: int, titel: str, stappen: list[str],
@@ -198,47 +198,47 @@ def maak_taak(store: Store, bronnen: dict, agenda, item_id: int, titel: str, sta
     """Taak opslaan, eventueel inplannen in de agenda en de mail archiveren. Alleen na een klik."""
     item = store.item(item_id)
     if item is None:
-        raise ValueError(f"Item {item_id} bestaat niet")
+        raise ValueError(f"Item {item_id} does not exist")
     meldingen = []
     gepland = None
     if start is not None:
         if agenda is None:
-            raise ValueError("geen agenda gekoppeld; maak de taak zonder inplannen")
-        notities = "\n".join(f"- {s}" for s in stappen) + f"\n\nNaar aanleiding van: {item['onderwerp']} ({item['van']})"
+            raise ValueError("no calendar connected; create the task without scheduling it")
+        notities = "\n".join(f"- {s}" for s in stappen) + f"\n\nRegarding: {item['onderwerp']} ({item['van']})"
         meldingen.append(agenda.maak_afspraak(afspraak_titel(titel, stappen), start, start + timedelta(minutes=minuten), notities))
         gepland = start.isoformat(timespec="minutes")
     taak_id = store.nieuwe_taak(item_id, item["project"], titel, deadline, minuten, stappen, gepland)
     if gepland:
         store.zet_afspraak_id(taak_id, getattr(agenda, "laatste_id", None))
-    meldingen.insert(0, "Taak gemaakt, mail gekoppeld")
+    meldingen.insert(0, "Task created and linked to the email")
     if vlag is not None:   # eerst markeren, dan pas eventueel archiveren
         fout = markeer_mail(store, bronnen, item_id, True, vlag)
-        meldingen.append(fout or "gemarkeerd als ingepland in Mail")
+        meldingen.append(fout or "flagged as scheduled in Mail")
     if archiveren and item["status"] in ("ter_info", "genegeerd"):
         meldingen.append(verplaats_items(store, bronnen, [item_id], "archief"))
     elif item["status"] in ("ter_info", "genegeerd", "wacht", "fout", "handmatig"):
         # weg uit Beoordelen en Opruimen; het concept-antwoord blijft bewaard en staat klaar bij Beantwoorden
-        store.zet_status(item_id, "taak", opmerking="omgezet in taak; mail blijft in de inbox")
+        store.zet_status(item_id, "taak", opmerking="turned into a task; the email stays in the inbox")
     return "; ".join(meldingen)
 
 
 def plan_bestaande_taak(store: Store, agenda, taak_id: int, start: datetime, minuten: int) -> str:
     """Een open taak in de agenda zetten (vanuit Planning). Alleen na een klik."""
     if agenda is None:
-        raise ValueError("geen agenda gekoppeld")
+        raise ValueError("no calendar connected")
     t = store.taak(taak_id)
     if t is None:
-        raise ValueError("taak niet gevonden")
+        raise ValueError("task not found")
     if t["gepland"]:
-        raise ValueError("deze taak staat al in je agenda")   # geen dubbele afspraken
+        raise ValueError("this task is already in your calendar")   # geen dubbele afspraken
     if t["klaar"]:
-        raise ValueError("deze taak is al afgevinkt")
+        raise ValueError("this task is already ticked off")
     stappen = json.loads(t["stappen"] or "[]")
     notities = "\n".join(f"- {s}" for s in stappen)
     if t["item_id"]:
         it = store.item(t["item_id"])
         if it is not None:
-            notities += f"\n\nNaar aanleiding van: {it['onderwerp']} ({it['van']})"
+            notities += f"\n\nRegarding: {it['onderwerp']} ({it['van']})"
     melding = agenda.maak_afspraak(afspraak_titel(t["omschrijving"], stappen), start,
                                    start + timedelta(minutes=minuten), notities.strip())
     store.plan_taak(taak_id, start.isoformat(timespec="minutes"), minuten)
@@ -249,15 +249,15 @@ def plan_bestaande_taak(store: Store, agenda, taak_id: int, start: datetime, min
 def verzet_taak(store: Store, agenda, taak_id: int, start: datetime, minuten: int) -> str:
     """Ingeplande taak naar een ander moment of een andere duur (slepen in Planning). Overlappen mag."""
     if agenda is None:
-        raise ValueError("geen agenda gekoppeld")
+        raise ValueError("no calendar connected")
     t = store.taak(taak_id)
     if t is None or not t["gepland"]:
-        raise ValueError("deze taak staat niet in je agenda")
+        raise ValueError("this task isn't in your calendar")
     oud = datetime.fromisoformat(t["gepland"])
     stappen = json.loads(t["stappen"] or "[]")
     afspraak = t["afspraak_id"]
     if not afspraak and hasattr(agenda, "zoek_afspraak"):
-        afspraak = agenda.zoek_afspraak(oud, afspraak_titel(t["omschrijving"], stappen))
+        afspraak = agenda.zoek_afspraak(oud, t["omschrijving"])
     eind = start + timedelta(minutes=minuten)
     if afspraak and hasattr(agenda, "verplaats_afspraak"):
         melding = agenda.verplaats_afspraak(afspraak, oud, start, eind)
@@ -272,28 +272,27 @@ def verzet_taak(store: Store, agenda, taak_id: int, start: datetime, minuten: in
 def haal_uit_agenda(store: Store, agenda, taak_id: int) -> str:
     """Ingeplande taak weer uit je agenda: de afspraak weg, de taak terug bij 'Nog in te plannen'. Na een klik."""
     if agenda is None:
-        raise ValueError("geen agenda gekoppeld")
+        raise ValueError("no calendar connected")
     t = store.taak(taak_id)
     if t is None or not t["gepland"]:
-        raise ValueError("deze taak staat niet in je agenda")
+        raise ValueError("this task isn't in your calendar")
     afspraak = t["afspraak_id"]
     if not afspraak and hasattr(agenda, "zoek_afspraak"):   # taken van vóór deze versie: zoeken op tijd en titel
-        afspraak = agenda.zoek_afspraak(datetime.fromisoformat(t["gepland"]),
-                                        afspraak_titel(t["omschrijving"], json.loads(t["stappen"] or "[]")))
+        afspraak = agenda.zoek_afspraak(datetime.fromisoformat(t["gepland"]), t["omschrijving"])
     weg = bool(afspraak) and hasattr(agenda, "verwijder_afspraak") and agenda.verwijder_afspraak(afspraak)
     store.ontplan_taak(taak_id)
-    return ("Uit je agenda; de taak staat weer bij Nog in te plannen" if weg else
-            "De afspraak stond niet (meer) in je agenda; de taak staat weer bij Nog in te plannen")
+    return ("Removed from your calendar; the task is back under To schedule" if weg else
+            "The event was no longer in your calendar; the task is back under To schedule")
 
 
 def open_antwoord(store: Store, bronnen: dict, item_id: int, tekst: str) -> str:
     """Antwoordvenster openen voor de mail achter een taak. Verandert niets aan taak of status."""
     item = store.item(item_id)
     if item is None:
-        raise ValueError("mail niet gevonden")
+        raise ValueError("email not found")
     bron = bronnen.get(item["bron"])
     if bron is None:
-        raise ValueError(f"Bron '{item['bron']}' staat niet meer in de configuratie")
+        raise ValueError(f"Account '{item['bron']}' is no longer in the configuration")
     store.zet_concept(item_id, tekst)
     if tekst.strip():
         store.zet_eigen_antwoord(item_id, tekst)
@@ -329,9 +328,9 @@ def zet_terug(store: Store, bronnen: dict, item_ids: list[int]) -> str:
         store.db.execute("UPDATE items SET opmerking=NULL WHERE id=?", (i,))   # mapnaam e.d. niet als melding tonen
         store.db.commit()
         gelukt += 1
-    melding = f"{gelukt} mail(s) terug in je inbox"
+    melding = f"{gelukt} " + ("email" if gelukt == 1 else "emails") + " back in your inbox"
     if mislukt:
-        melding += f"; niet gelukt: {'; '.join(mislukt[:3])}"
+        melding += f"; failed: {'; '.join(mislukt[:3])}"
     return melding
 
 
@@ -340,7 +339,7 @@ def afspraak_titel(titel: str, stappen: list[str]) -> str:
     eerste = next((s.strip() for s in stappen if s.strip()), "")
     if not eerste:
         return titel
-    return f"{titel} · begin met: {eerste[0].lower() + eerste[1:]}"
+    return f"{titel} · start with: {eerste[0].lower() + eerste[1:]}"
 
 
 class RondeBezig(RuntimeError):
@@ -359,7 +358,7 @@ def ronde_slot(store: Store):
         try:
             fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            raise RondeBezig("Er loopt al een mailronde. Probeer het over een paar minuten opnieuw.") from None
+            raise RondeBezig("A mail round is already running. Try again in a few minutes.") from None
         try:
             yield
         finally:
@@ -435,21 +434,21 @@ def keur_goed(store: Store, bronnen: dict, item_id: int, concept: str | None,
     Versturen gebeurt alleen vanuit de app na een klik van de gebruiker, nooit tijdens een ronde."""
     item = store.item(item_id)
     if item is None:
-        raise ValueError(f"Item {item_id} bestaat niet")
+        raise ValueError(f"Item {item_id} does not exist")
     if item["status"] not in ("wacht", "fout", "handmatig"):
-        raise ValueError(f"Item {item_id} is al afgehandeld ({item['status']})")
+        raise ValueError(f"Item {item_id} has already been handled ({item['status']})")
 
     meldingen = []
     concept = (concept or "").strip() or None
     if verzenden and not concept:
-        raise ValueError("geen tekst om te versturen")
+        raise ValueError("there is no text to send")
     if verzenden and OPEN_PLEK.search(concept):
-        raise ValueError("het concept bevat nog [AANVULLEN: …]; vul dat eerst in")
+        raise ValueError("the draft still contains [FILL IN: …]; fill that in first")
     verzonden = False
     if concept:
         bron = bronnen.get(item["bron"])
         if bron is None:
-            raise ValueError(f"Bron '{item['bron']}' staat niet meer in de configuratie")
+            raise ValueError(f"Account '{item['bron']}' is no longer in the configuration")
         store.zet_concept(item_id, concept)   # jouw tekst blijft bewaard, ook als Mail hierna faalt
         if verzenden:
             uitkomst = bron.maak_concept(item["bron_id"], concept, item["onderwerp"], item["van"],
@@ -459,7 +458,7 @@ def keur_goed(store: Store, bronnen: dict, item_id: int, concept: str | None,
                 # niet aantoonbaar verstuurd: de mail blijft in Te doen, met jouw tekst bewaard
                 store.log(item_id, f"verzenden niet bevestigd: {uitkomst}")
                 return uitkomst
-            meldingen.append(f"verzonden aan {item['van']}")
+            meldingen.append(f"sent to {item['van']}")
         else:
             meldingen.append(bron.maak_concept(item["bron_id"], concept, item["onderwerp"], item["van"],
                                                message_id=item["thread_id"]))
@@ -468,8 +467,8 @@ def keur_goed(store: Store, bronnen: dict, item_id: int, concept: str | None,
     taken = [t for t in schone_taken(taken) if not t["antwoord"]]   # je antwoordt nu, dus die taak vervalt
     if taken:
         store.voeg_taken_toe(item_id, item["project"], taken)
-        meldingen.append("1 taak toegevoegd" if len(taken) == 1 else f"{len(taken)} taken toegevoegd")
-    melding = "; ".join(meldingen) or "goedgekeurd zonder concept of taken"
+        meldingen.append("1 task added" if len(taken) == 1 else f"{len(taken)} tasks added")
+    melding = "; ".join(meldingen) or "approved without a draft or tasks"
     store.zet_status(item_id, "verzonden" if verzonden else "goedgekeurd", concept=concept, opmerking=melding)
     if concept:
         store.zet_eigen_antwoord(item_id, concept)
@@ -718,16 +717,18 @@ def controleer_uitgaand(cfg: Config, store: Store, bronnen: dict, llm: LLM | Non
             antwoorden = zoek_antwoorden(it, verstuurd)
             if antwoorden:
                 v = antwoorden[-1]
-                soort = "doorgestuurd" if DOORSTUREN.match(v["onderwerp"] or "") else "beantwoord"
-                ontvanger = v["aan"].split(",")[0].strip() or "de afzender"
-                reden = f"Je hebt deze mail {soort} op {v['datum'].astimezone():%d-%m %H:%M} (aan {ontvanger})."
+                soort = "forwarded" if DOORSTUREN.match(v["onderwerp"] or "") else "answered"
+                ontvanger = v["aan"].split(",")[0].strip() or "the sender"
+                d = v["datum"].astimezone()
+                reden = f"You {soort} this email on {d.day} {d:%b %H:%M} (to {ontvanger})."
             else:
                 # geen antwoord in dit gesprek, maar wel daarna gemaild met deze persoon: vragen of dat het was
                 v = _later_contact(it, verstuurd)
                 if v is None:
                     continue
-                reden = (f"Je mailde deze persoon daarna op {v['datum'].astimezone():%d-%m %H:%M}, met onderwerp "
-                         f"\u201c{v['onderwerp'] or '(geen)'}\u201d. Was dat je antwoord?")
+                d = v["datum"].astimezone()
+                reden = (f"You emailed this person afterwards, on {d.day} {d:%b %H:%M}, with the subject "
+                         f"\u201c{v['onderwerp'] or '(none)'}\u201d. Was that your reply?")
             if it["bewijs"] == v["message_id"]:
                 continue          # al gemeld met dit bericht, of door jou op 'nog niet' gezet
             store.zet_lijkt_beantwoord(it["id"], reden, v["message_id"])
@@ -748,15 +749,16 @@ def _taken_met_antwoord(cfg: Config, store: Store, llm, it, taken: list, verstuu
         return 0
     laatste = antwoorden[-1]
     bewijs = laatste["message_id"]
-    ontvanger = laatste["aan"].split(",")[0].strip() or "de afzender"
-    wanneer = f"{laatste['datum'].astimezone():%d-%m %H:%M}"
+    ontvanger = laatste["aan"].split(",")[0].strip() or "the sender"
+    _d = laatste["datum"].astimezone()
+    wanneer = f"{_d.day} {_d:%b %H:%M}"
     nieuw, te_vragen = 0, []
     for t in taken:
         if t["bewijs"] == bewijs:
             continue          # al bekeken met dit antwoord (of door jou op 'nog niet' gezet)
         if t["soort"] == "antwoord":
-            soort = "doorgestuurd" if DOORSTUREN.match(laatste["onderwerp"] or "") else "beantwoord"
-            store.zet_lijkt_klaar(t["id"], f"Je hebt deze mail {soort} op {wanneer} (aan {ontvanger})", bewijs)
+            soort = "forwarded" if DOORSTUREN.match(laatste["onderwerp"] or "") else "answered"
+            store.zet_lijkt_klaar(t["id"], f"You {soort} this email on {wanneer} (to {ontvanger})", bewijs)
             nieuw += 1
         else:
             te_vragen.append(t)
@@ -774,7 +776,7 @@ def _taken_met_antwoord(cfg: Config, store: Store, llm, it, taken: list, verstuu
     klaar = {o.taak_id: o.reden for o in oordeel.taken if o.klaar}
     for t in te_vragen:
         if t["id"] in klaar:
-            store.zet_lijkt_klaar(t["id"], f"Je mail van {wanneer} aan {ontvanger}: {klaar[t['id']]}", bewijs)
+            store.zet_lijkt_klaar(t["id"], f"Your email of {wanneer} to {ontvanger}: {klaar[t['id']]}", bewijs)
             nieuw += 1
         else:
             store.zet_lijkt_klaar(t["id"], None, bewijs)   # bekeken, niet gedaan
@@ -931,23 +933,23 @@ def afspraak_momenten(cfg: Config, agenda, verzoek: dict, vanaf, uiterlijk, dagd
 def houd_vast(store: Store, agenda, item_id: int, momenten: list[str], duur: int, onderwerp: str, met: str) -> str:
     """Aangeboden momenten voorlopig in je agenda, zodat er niets anders in komt. Na een klik."""
     if agenda is None or not hasattr(agenda, "maak_voorlopig"):
-        raise ValueError("voorlopig vasthouden kan niet in deze agenda")
+        raise ValueError("this calendar can't hold tentative events")
     item = store.item(item_id)
     titel = onderwerp + (f" ({met})" if met else "")
     for m in momenten:
         start = datetime.fromisoformat(m).astimezone()
         eind = start + timedelta(minutes=duur)
-        aid = agenda.maak_voorlopig(f"Voorlopig: {titel}", start, eind,
-                                    f"Voorgesteld aan {met or 'de afzender'}, naar aanleiding van: {item['onderwerp'] if item else ''}")
+        aid = agenda.maak_voorlopig(f"Tentative: {titel}", start, eind,
+                                    f"Proposed to {met or 'the sender'}, regarding: {item['onderwerp'] if item else ''}")
         store.bewaar_voorlopig(aid, item_id, titel, start.isoformat(timespec="minutes"), eind.isoformat(timespec="minutes"))
-    return (f"{len(momenten)} momenten voorlopig vastgehouden" if len(momenten) != 1 else "1 moment voorlopig vastgehouden")
+    return (f"{len(momenten)} times held as tentative" if len(momenten) != 1 else "1 time held as tentative")
 
 
 def bevestig_voorlopig(store: Store, agenda, afspraak_id: str) -> str:
     """Het gekozen moment wordt een echte afspraak; de andere voorlopige momenten van dit verzoek gaan weg."""
     v = store.voorlopig(afspraak_id)
     if v is None:
-        raise ValueError("dit is geen voorlopig moment van de app")
+        raise ValueError("this isn't a tentative time held by the app")
     melding = agenda.bevestig_voorlopig(afspraak_id, v["titel"])
     weg = 0
     for ander in store.voorlopige(v["item_id"]):
@@ -959,41 +961,41 @@ def bevestig_voorlopig(store: Store, agenda, afspraak_id: str) -> str:
             store.wis_voorlopig(ander["afspraak_id"])
             weg += 1
     store.wis_voorlopig(afspraak_id)
-    return melding + (f"; {weg} andere momenten vrijgegeven" if weg else "")
+    return melding + ((f"; {weg} other times released" if weg != 1 else "; 1 other time released") if weg else "")
 
 
 def geef_voorlopig_vrij(store: Store, agenda, afspraak_id: str) -> str:
     if store.voorlopig(afspraak_id) is None:
-        raise ValueError("dit is geen voorlopig moment van de app")
+        raise ValueError("this isn't a tentative time held by the app")
     agenda.verwijder_afspraak(afspraak_id)
     store.wis_voorlopig(afspraak_id)
-    return "Moment vrijgegeven"
+    return "Time released"
 
 
 def deadline_in_agenda(store: Store, agenda, soort: str, rij_id: int) -> str:
     """Deadline van een taak of mail als hele-dag-afspraak in je agenda. Alleen na een klik."""
     from datetime import date as _date
     if agenda is None:
-        raise ValueError("geen agenda gekoppeld")
+        raise ValueError("no calendar connected")
     if soort == "taak":
         rij = store.taak(rij_id)
         if rij is None:
-            raise ValueError("taak niet gevonden")
+            raise ValueError("task not found")
         titel, item = rij["omschrijving"], store.item(rij["item_id"]) if rij["item_id"] else None
     else:
         rij = item = store.item(rij_id)
         if rij is None:
-            raise ValueError("mail niet gevonden")
+            raise ValueError("email not found")
         titel = rij["samenvatting"] or rij["onderwerp"]
     if not rij["deadline"]:
-        raise ValueError("er is geen deadline")
+        raise ValueError("there is no deadline")
     if rij["deadline_in_agenda"]:
-        raise ValueError("deze deadline staat al in je agenda")
+        raise ValueError("this deadline is already in your calendar")
     try:
         dag = _date.fromisoformat(rij["deadline"])
     except ValueError:
-        raise ValueError(f"deadline '{rij['deadline']}' is geen datum") from None
-    notities = f"Naar aanleiding van: {item['onderwerp']} ({item['van']})" if item is not None else ""
+        raise ValueError(f"deadline '{rij['deadline']}' is not a date") from None
+    notities = f"Regarding: {item['onderwerp']} ({item['van']})" if item is not None else ""
     melding = agenda.maak_deadline(f"Deadline: {titel}", dag, notities)
     store.zet_deadline_in_agenda(soort, rij_id, dag.isoformat())
     return melding
@@ -1068,20 +1070,23 @@ def ochtend_tekst(o: dict) -> str:
     delen = []
     tijden = [a for a in o["afspraken"] if not a["heledag"]]
     if tijden:
-        delen.append(f"{len(tijden)} afspraken, eerste om {tijden[0]['start'][11:16]}")
+        delen.append((f"{len(tijden)} events" if len(tijden) != 1 else "1 event") + f", the first at {tijden[0]['start'][11:16]}")
     if o["ingepland"]:
-        delen.append(f"{len(o['ingepland'])} taken ingepland")
+        delen.append(f"{len(o['ingepland'])} " + ("task" if len(o["ingepland"]) == 1 else "tasks") + " scheduled")
     if o["deadlines"]:
-        delen.append(f"{len(o['deadlines'])} deadlines deze week")
+        delen.append(f"{len(o['deadlines'])} " + ("deadline" if len(o["deadlines"]) == 1 else "deadlines") + " this week")
     if o["belangrijk"]:
-        delen.append(f"{o['belangrijk']} van belangrijke afzenders")
+        delen.append(f"{o['belangrijk']} from important senders")
     if o["blijft_liggen_n"]:
-        delen.append(f"{o['blijft_liggen_n']} mails liggen al twee werkdagen")
+        delen.append(f"{o['blijft_liggen_n']} " + ("email has" if o["blijft_liggen_n"] == 1 else "emails have") + " been waiting two working days")
     if o["wacht_op"]:
-        delen.append(f"{o['wacht_op']} keer geen antwoord")
+        delen.append(f"{o['wacht_op']} " + ("reply" if o["wacht_op"] == 1 else "replies") + " still outstanding")
     if o["lijkt_gedaan"]:
-        delen.append(f"{o['lijkt_gedaan']} lijken al gedaan")
-    return ", ".join(delen) + "." if delen else "Niets dringends vandaag."
+        delen.append(f"{o['lijkt_gedaan']} " + ("looks" if o["lijkt_gedaan"] == 1 else "look") + " done already")
+    if not delen:
+        return "Nothing urgent today."
+    zin = ", ".join(delen) + "."
+    return zin[0].upper() + zin[1:]
 
 
 def schone_taken(taken: list[dict]) -> list[dict]:
@@ -1108,12 +1113,12 @@ def zet_taken_klaar(store: Store, bronnen: dict, item_id: int, concept: str | No
     zodat Beantwoorden in Planning het klaar heeft staan. Alleen na een klik."""
     item = store.item(item_id)
     if item is None:
-        raise ValueError(f"Item {item_id} bestaat niet")
+        raise ValueError(f"Item {item_id} does not exist")
     if item["status"] not in ("wacht", "fout", "handmatig"):
-        raise ValueError("deze mail is al afgehandeld")
+        raise ValueError("this email has already been handled")
     taken = schone_taken(taken)
     if not taken:
-        raise ValueError("er staan geen taken in de lijst")
+        raise ValueError("there are no tasks in the list")
     factor, n = store.tijdfactor(item["project"])
     for t in taken:   # je eigen ervaring met schattingen in dit project
         if t["minuten"] and n >= 3 and abs(factor - 1) >= 0.1:
@@ -1122,9 +1127,9 @@ def zet_taken_klaar(store: Store, bronnen: dict, item_id: int, concept: str | No
         store.zet_concept(item_id, concept.strip())
     ids = store.voeg_taken_toe(item_id, item["project"], taken)
     store.bewaar_vorige_status(item_id, item["status"])
-    store.zet_status(item_id, "taak", opmerking="taken klaargezet; mail blijft in de inbox")
+    store.zet_status(item_id, "taak", opmerking="tasks prepared; the email stays in the inbox")
     store.log(item_id, f"{len(ids)} taken klaargezet")
-    melding = ("1 taak" if len(ids) == 1 else f"{len(ids)} taken") + " klaargezet in Planning"
+    melding = ("1 task" if len(ids) == 1 else f"{len(ids)} tasks") + " ready in Planning"
     if vlag is not None:
         fout = markeer_mail(store, bronnen, item_id, True, vlag)
         if fout:
@@ -1137,31 +1142,31 @@ def zet_taken_klaar_terug(store: Store, bronnen: dict, item_id: int, taak_ids: l
     """Ongedaan maken van Taken klaarzetten: taken weg (zolang ze open en niet ingepland zijn), mail terug."""
     item = store.item(item_id)
     if item is None or item["status"] != "taak":
-        raise ValueError("deze mail staat niet meer als taak")
+        raise ValueError("this email is no longer a task")
     eigen = {t["id"] for t in store.open_taken() if t["item_id"] == item_id}
     store.verwijder_open_taken([i for i in taak_ids if i in eigen])
     store.zet_status(item_id, item["vorige_status"] or "wacht")
     if vlag is not None and not any(t["item_id"] == item_id for t in store.open_taken()):
         markeer_mail(store, bronnen, item_id, False, vlag)
-    return "Terug in Te doen"
+    return "Back in To do"
 
 
 def markeer_gedaan(store: Store, item_id: int) -> str:
     """Geen antwoord nodig: uit Te doen, de mail blijft waar hij staat."""
     item = store.item(item_id)
     if item is None:
-        raise ValueError("mail niet gevonden")
+        raise ValueError("email not found")
     store.bewaar_vorige_status(item_id, item["status"])
     store.zet_status(item_id, "gedaan")
-    return "Gedaan"
+    return "Done"
 
 
 def zet_gedaan_terug(store: Store, item_id: int) -> str:
     item = store.item(item_id)
     if item is None or item["status"] != "gedaan":
-        raise ValueError("niet als gedaan gemarkeerd")
+        raise ValueError("not marked as done")
     store.zet_status(item_id, item["vorige_status"] or "wacht")
-    return "Terug in Te doen"
+    return "Back in To do"
 
 
 def terug_naar_te_doen(store: Store, bronnen: dict, item_id: int) -> str:
@@ -1169,18 +1174,18 @@ def terug_naar_te_doen(store: Store, bronnen: dict, item_id: int) -> str:
     opgeborgen of weggegooide mail gaat eerst terug naar de inbox. Al verstuurde antwoorden blijven verstuurd."""
     it = store.item(item_id)
     if it is None:
-        raise ValueError("mail niet gevonden")
+        raise ValueError("email not found")
     if it["status"] in ("gearchiveerd", "opgeborgen", "verwijderd"):
         melding = zet_terug(store, bronnen, [item_id])
-        if "niet gelukt" in melding:
+        if "failed" in melding:
             raise ValueError(melding)
-        return "Terug in je inbox en in Te doen"
+        return "Back in your inbox and in To do"
     if it["status"] in ("wacht", "fout", "handmatig"):
-        return "Staat al in Te doen"
+        return "Already in To do"
     terug = it["vorige_status"] if it["vorige_status"] in ("wacht", "fout", "handmatig") else "wacht"
     store.zet_status(item_id, terug)
     store.wis_lijkt_beantwoord(item_id)
-    return ("Terug in Te doen; je antwoord was al verstuurd" if it["status"] == "verzonden" else "Terug in Te doen")
+    return ("Back in To do; your reply had already been sent" if it["status"] == "verzonden" else "Back in To do")
 
 
 def wijs_af(store: Store, item_id: int, reden: str | None = None) -> None:
@@ -1190,7 +1195,7 @@ def wijs_af(store: Store, item_id: int, reden: str | None = None) -> None:
 def overzicht(cfg: Config, store: Store, uren: int = 24) -> str:
     """Overzicht in Markdown, per project."""
     sinds = (datetime.now().astimezone() - timedelta(hours=uren)).isoformat(timespec="seconds")
-    regels = [f"# Mailoverzicht {datetime.now():%A %d %B %Y, %H:%M}", ""]
+    regels = [f"# Email overview, {datetime.now():%A} {datetime.now().day} {datetime.now():%B %Y, %H:%M}", ""]
     for p in cfg.projecten:
         wacht = store.items(status="wacht", project=p)
         fout = store.items(status="fout", project=p) + store.items(status="handmatig", project=p)
@@ -1198,25 +1203,25 @@ def overzicht(cfg: Config, store: Store, uren: int = 24) -> str:
         taken = store.open_taken(p)
         if not (wacht or fout or info or taken):
             continue
-        regels.append(f"## {p.upper() if p == 'istte' else p.capitalize()}")
+        regels.append("## " + {"onderwijs": "Teaching", "onderzoek": "Research", "istte": "ISTTE", "overig": "Other"}.get(p, p.capitalize()))
         if wacht:
-            regels.append(f"**Wacht op jou ({len(wacht)})**")
+            regels.append(f"**Waiting for you ({len(wacht)})**")
             for i in wacht:
                 dl = f", deadline {i['deadline']}" if i["deadline"] else ""
                 regels.append(f"- [{i['prioriteit']}{dl}] {i['samenvatting']} ({i['van']})")
         if fout:
-            regels.append(f"**Zelf bekijken ({len(fout)})**")
+            regels.append(f"**Check yourself ({len(fout)})**")
             for i in fout:
                 regels.append(f"- {i['onderwerp']} ({i['van']}): {i['opmerking'] or i['reden']}")
         if taken:
-            regels.append(f"**Open taken ({len(taken)})**")
+            regels.append(f"**Open tasks ({len(taken)})**")
             for t in taken:
-                regels.append(f"- {t['omschrijving']}" + (f" (voor {t['deadline']})" if t["deadline"] else ""))
+                regels.append(f"- {t['omschrijving']}" + (f" (by {t['deadline']})" if t["deadline"] else ""))
         if info:
-            regels.append(f"**Ter info, laatste {uren} uur ({len(info)})**")
+            regels.append(f"**FYI, last {uren} hours ({len(info)})**")
             for i in info:
                 regels.append(f"- {i['samenvatting']}")
         regels.append("")
     if len(regels) == 2:
-        regels.append("Niets nieuws.")
+        regels.append("Nothing new.")
     return "\n".join(regels)

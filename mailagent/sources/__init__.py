@@ -38,7 +38,7 @@ def maak_bronnen(cfg: Config) -> dict[str, Bron]:
             bronnen[naam] = OutlookBron(naam, b["client_id"], b.get("tenant", "organizations"),
                                         b.get("map", "inbox"), cfg.data_dir)
         else:
-            raise SystemExit(f"Onbekend brontype in config: {soort!r}")
+            raise SystemExit(f"Unknown source type in config: {soort!r}")
     if not bronnen:
-        raise SystemExit("Geen bronnen ingesteld in config.yaml.")
+        raise SystemExit("No sources set up in config.yaml.")
     return bronnen

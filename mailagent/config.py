@@ -57,7 +57,7 @@ KLEUREN = {"rood": 0, "oranje": 1, "geel": 2, "groen": 3, "blauw": 4, "paars": 5
 def laad(pad: str | Path = "config.yaml") -> Config:
     pad = Path(pad).resolve()
     if not pad.exists():
-        raise SystemExit(f"Configuratie niet gevonden: {pad}. Kopieer config.example.yaml naar config.yaml.")
+        raise SystemExit(f"Configuration not found: {pad}. Copy config.example.yaml to config.yaml.")
     ruw = yaml.safe_load(pad.read_text(encoding="utf-8")) or {}
     basis = pad.parent
 

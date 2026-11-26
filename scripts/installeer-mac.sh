@@ -11,7 +11,7 @@ python3 -m venv .venv
 .venv/bin/pip install -q -e ".[outlook,agenda]"
 chmod +x scripts/mailagent.sh
 
-[ -f config.yaml ] || { cp config.example.yaml config.yaml; echo "config.yaml aangemaakt: vul dit eerst in."; }
+[ -f config.yaml ] || { cp config.example.yaml config.yaml; echo "config.yaml created: fill it in first."; }
 mkdir -p data "$HOME/Library/LaunchAgents"
 
 schrijf_plist() {  # $1 label, $2 opdracht, $3 extra XML
@@ -41,14 +41,14 @@ schrijf_plist nl.mailagent.inbox inbox "<key>RunAtLoad</key><true/><key>KeepAliv
 
 cat <<TXT
 
-Installatie klaar. Volgende stappen:
-  1. Vul config.yaml in (bronnen, regels) en de bestanden in projecten/.
-  2. Zet je API-sleutel in de sleutelhanger:
+Installation complete. Next steps:
+  1. Fill in config.yaml (sources, rules) and the files in projecten/.
+  2. Add your API key to the keychain:
        security add-generic-password -s mailagent-anthropic -a "\$USER" -w
-  3. Bij Outlook: scripts/mailagent.sh login
-  4. Test met de hand: scripts/mailagent.sh run
-  5. Zet de automatische taken aan:
+  3. For Outlook: scripts/mailagent.sh login
+  4. Test by hand: scripts/mailagent.sh run
+  5. Switch on the background jobs:
        launchctl load ~/Library/LaunchAgents/nl.mailagent.run.plist
        launchctl load ~/Library/LaunchAgents/nl.mailagent.inbox.plist
-  Uitzetten: launchctl unload <zelfde pad>
+  To switch off: launchctl unload <same path>
 TXT

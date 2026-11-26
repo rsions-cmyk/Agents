@@ -183,7 +183,7 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
     def taakvoorstel(store: Store, item_id: int) -> dict:
         it = store.item(item_id)
         if it is None:
-            raise ValueError("onbekende mail")
+            raise ValueError("unknown email")
         mail = Email(bron=it["bron"], bron_id=it["bron_id"], van=it["van"] or "", aan=it["aan"] or "",
                      onderwerp=it["onderwerp"] or "", datum=datetime.fromisoformat(it["datum"]), tekst=it["tekst"] or "")
         if mag_naar_claude(cfg, mail):
@@ -191,14 +191,14 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
             plan = llm_factory().plan_taak(mail, anonimiseer(cfg, mail.tekst), it["project"], achtergrond=extra or None)
             voorstel = plan.model_dump()
         else:
-            voorstel = {"titel": f"Afhandelen: {mail.onderwerp}", "stappen": [], "minuten": 30,
-                        "deadline": it["deadline"], "toelichting": "Deze afzender gaat niet naar Claude; standaard 30 minuten."}
+            voorstel = {"titel": f"Deal with: {mail.onderwerp}", "stappen": [], "minuten": 30,
+                        "deadline": it["deadline"], "toelichting": "This sender is not sent to Claude, so the default is 30 minutes."}
         voorstel["deadline"] = voorstel["deadline"] or it["deadline"]
         factor, n = store.tijdfactor(it["project"])
         if n >= 3 and abs(factor - 1) >= 0.1:
             voorstel["minuten"] = max(15, min(480, round(voorstel["minuten"] * factor / 15) * 15))
-            voorstel["toelichting"] += (f" Aangepast met ×{factor:.1f}".replace(".", ",")
-                                        + f": je laatste {n} taken in {it['project']} duurden {'langer' if factor > 1 else 'korter'} dan geschat.")
+            voorstel["toelichting"] += (f" Adjusted by ×{factor:.1f}, because your last {n} tasks in {it['project']} "
+                                        f"took {'longer' if factor > 1 else 'less time'} than estimated.")
         ag, fout = agenda()
         voorstel["momenten"], voorstel["agenda_fout"] = [], fout
         werk = lees_werktijd(cfg.agenda)
@@ -217,7 +217,7 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                     momenten = vrije_momenten(bezet, voorstel["minuten"], nu, werk, None)
                 voorstel["momenten"] = [m.isoformat(timespec="minutes") for m in momenten]
             except Exception as ex:
-                voorstel["agenda_fout"] = f"Agenda niet te lezen: {ex}"
+                voorstel["agenda_fout"] = f"Could not read the calendar: {ex}"
         return voorstel
 
     def ophalen_op_achtergrond():
@@ -225,12 +225,12 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
             rest: dict = {}
             res = run(cfg, Store(db_pad), bronnen, llm_factory(), voortgang=rest)
             ophalen["laatste"] = ", ".join(
-                f"{k}: mislukt" if v < 0 else f"{k}: {v} nieuw" + (f", nog {rest[k]} te gaan" if rest.get(k) else "")
+                f"{k}: failed" if v < 0 else f"{k}: {v} new" + (f", {rest[k]} still to go" if rest.get(k) else "")
                 for k, v in res.items())
         except RondeBezig as ex:
             ophalen["laatste"] = str(ex)
         except Exception as ex:
-            ophalen["laatste"] = f"ophalen mislukt: {ex}"
+            ophalen["laatste"] = f"getting mail failed: {ex}"
         finally:
             ophalen["bezig"] = False
 
@@ -303,7 +303,7 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                 if st.is_gemeld(sleutel) or not is_belangrijk(cfg, st, van):
                     continue
                 st.zet_gemeld(sleutel)
-                meld(f"Mail van {van.split('<')[0].strip() or van}", onderwerp or "(geen onderwerp)")
+                meld(f"Email from {van.split('<')[0].strip() or van}", onderwerp or "(no subject)")
                 gevonden += 1
         if gevonden and not ophalen["bezig"]:
             ophalen["bezig"], ophalen["laatste"] = True, ""
@@ -362,11 +362,11 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
             return secrets.compare_digest(self.headers.get("X-Token", ""), token)
 
         def _weiger(self, status: int = 403):
-            return self._json({"ok": False, "melding": "Ongeldige sessie. Herlaad de pagina."}, status)
+            return self._json({"ok": False, "melding": "Invalid session. Reload the page."}, status)
 
         def do_GET(self):
             if not self._host_ok():
-                return self._stuur("Onbekend adres", 421, "text/plain; charset=utf-8")
+                return self._stuur("Unknown address", 421, "text/plain; charset=utf-8")
             pad = urlparse(self.path).path
             if pad == "/":
                 html = APP_HTML.read_text(encoding="utf-8").replace("__TOKEN__", token)
@@ -381,18 +381,18 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                 return self._json(verzamel(cfg, store, ophalen))
             if pad == "/api/overzicht.md":
                 return self._stuur(overzicht(cfg, store), soort="text/markdown; charset=utf-8")
-            self._stuur("Niet gevonden", 404, "text/plain; charset=utf-8")
+            self._stuur("Not found", 404, "text/plain; charset=utf-8")
 
         def do_POST(self):
             if not self._host_ok():
-                return self._stuur("Onbekend adres", 421, "text/plain; charset=utf-8")
+                return self._stuur("Unknown address", 421, "text/plain; charset=utf-8")
             if not self._origin_ok() or not self._token_ok():
                 return self._weiger()
             lengte = int(self.headers.get("Content-Length", 0) or 0)
             try:
                 v = json.loads(self.rfile.read(lengte) or b"{}")
             except json.JSONDecodeError:
-                return self._json({"ok": False, "melding": "Ongeldig verzoek"}, 400)
+                return self._json({"ok": False, "melding": "Invalid request"}, 400)
             actie = urlparse(self.path).path.removeprefix("/api/")
             store = Store(db_pad)
             try:
@@ -412,7 +412,7 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                 elif actie in ("taak-klaar", "taak-heropen"):
                     klaar = actie == "taak-klaar"
                     (store.taak_klaar if klaar else store.taak_heropen)(int(v["id"]))
-                    melding = "Taak afgevinkt" if klaar else "Taak teruggezet"
+                    melding = "Task ticked off" if klaar else "Task restored"
                     t = store.taak(int(v["id"]))
                     if cfg.vlag_aan and t is not None and t["item_id"]:
                         def vlag(item_id=t["item_id"], aan=not klaar):
@@ -423,7 +423,7 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                     it = store.item(int(v["id"]))
                     mid = (it["thread_id"] or "").strip().strip("<>") if it else ""
                     if not mid:
-                        return self._json({"ok": False, "melding": "Deze mail kan niet in Mail worden geopend"})
+                        return self._json({"ok": False, "melding": "This email can't be opened in Mail"})
                     subprocess.run(["open", f"message://%3c{mid}%3e"], check=False, timeout=20)
                     melding = ""
                 elif actie == "antwoord-concept":
@@ -431,7 +431,7 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                     mail = Email(bron=it["bron"], bron_id=it["bron_id"], van=it["van"] or "", aan=it["aan"] or "",
                                  onderwerp=it["onderwerp"] or "", datum=datetime.fromisoformat(it["datum"]), tekst=it["tekst"] or "")
                     if not mag_naar_claude(cfg, mail):
-                        return self._json({"ok": False, "melding": "Deze afzender gaat niet naar Claude; schrijf het antwoord zelf"})
+                        return self._json({"ok": False, "melding": "This sender is not sent to Claude, so write the reply yourself"})
                     s = Sortering(project=it["project"], actie="antwoorden", prioriteit=it["prioriteit"],
                                   deadline=it["deadline"], samenvatting=it["samenvatting"] or it["onderwerp"], reden="")
                     extra, context = achtergrond_voor_item(cfg, store, it)
@@ -440,7 +440,7 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                     if context:
                         store.zet_context(it["id"], context)
                     if not (u.concept_antwoord or "").strip():
-                        return self._json({"ok": False, "melding": "Claude vond geen antwoord nodig en schreef geen concept"})
+                        return self._json({"ok": False, "melding": "Claude found no reply was needed and wrote no draft"})
                     store.zet_concept(it["id"], u.concept_antwoord.strip(), vragen=u.vragen_aan_jou or "")
                     return self._json({"ok": True, "concept": u.concept_antwoord.strip(), "vragen": u.vragen_aan_jou})
                 elif actie == "taken-klaarzetten":
@@ -456,53 +456,53 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                     tel = controleer_uitgaand(cfg, store, bronnen, llm_factory(), slot=mail_slot)
                     delen = []
                     if tel["taken"]:
-                        delen.append("1 taak lijkt al gedaan" if tel["taken"] == 1 else f"{tel['taken']} taken lijken al gedaan")
+                        delen.append("1 task looks done already" if tel["taken"] == 1 else f"{tel['taken']} tasks look done already")
                     if tel["beantwoord"]:
-                        delen.append("1 mail in Te doen lijkt al beantwoord" if tel["beantwoord"] == 1
-                                     else f"{tel['beantwoord']} mails in Te doen lijken al beantwoord")
+                        delen.append("1 email in To do looks answered already" if tel["beantwoord"] == 1
+                                     else f"{tel['beantwoord']} emails in To do look answered already")
                     if tel["wacht_opgelost"]:
-                        delen.append(f"{tel['wacht_opgelost']} keer kwam het antwoord waarop je wachtte")
-                    melding = "; ".join(delen) or "Niets nieuws gevonden"
+                        delen.append(f"{tel['wacht_opgelost']} awaited " + ("reply came in" if tel["wacht_opgelost"] == 1 else "replies came in"))
+                    melding = "; ".join(delen) or "Nothing new found"
                 elif actie == "niet-beantwoord":
                     store.wis_lijkt_beantwoord(int(v["id"]))
-                    melding = "Blijft in Te doen"
+                    melding = "Stays in To do"
                 elif actie == "belangrijk":
                     adres = (v.get("adres") or "").strip().lower()
                     if not adres:
-                        return self._json({"ok": False, "melding": "Geen adres"})
+                        return self._json({"ok": False, "melding": "No address"})
                     if v.get("aan", True):
                         store.zet_belangrijk(adres, v.get("naam"))
-                        melding = f"{v.get('naam') or adres} is nu een belangrijke afzender"
+                        melding = f"{v.get('naam') or adres} is now an important sender"
                     else:
                         if adres in cfg.belangrijk:
-                            return self._json({"ok": False, "melding": "Dit adres staat in config.yaml bij belangrijk:; haal het daar weg"})
+                            return self._json({"ok": False, "melding": "This address is listed under belangrijk: in config.yaml; remove it there"})
                         store.verwijder_belangrijk(adres)
-                        melding = f"{v.get('naam') or adres} is geen belangrijke afzender meer"
+                        melding = f"{v.get('naam') or adres} is no longer an important sender"
                 elif actie in ("wacht-klaar", "wacht-later", "wacht-terug"):
                     w = store.wacht_op(int(v["id"]))
                     if w is None:
-                        return self._json({"ok": False, "melding": "Niet gevonden"})
+                        return self._json({"ok": False, "melding": "Not found"})
                     if actie == "wacht-klaar":
                         store.zet_wacht_op(w["id"], status="klaar")
-                        melding = "Van de lijst"
+                        melding = "Off the list"
                     elif actie == "wacht-terug":
                         store.zet_wacht_op(w["id"], status="wacht")
-                        melding = "Terug op de lijst"
+                        melding = "Back on the list"
                     else:
                         dagen = int(v.get("werkdagen") or 3)
                         terug = plus_werkdagen(date.today(), dagen, lees_werktijd(cfg.agenda).dagen)
                         store.zet_wacht_op(w["id"], herinner_op=terug.isoformat())
-                        melding = f"Komt terug op {terug:%d-%m}"
+                        melding = f"Comes back on {terug.day} {terug:%b}"
                 elif actie == "wacht-herinnering":
                     w = store.wacht_op(int(v["id"]))
                     if w is None:
-                        return self._json({"ok": False, "melding": "Niet gevonden"})
+                        return self._json({"ok": False, "melding": "Not found"})
                     if not (w["tekst"] or "").strip():
-                        return self._json({"ok": False, "melding": "De tekst van je mail is nog niet bewaard; dat gebeurt bij de volgende ronde. Open hem tot dan in Mail"})
+                        return self._json({"ok": False, "melding": "The text of your email has not been saved yet; that happens in the next round. Until then, open it in Mail"})
                     ontv = Email(bron="", bron_id="", van=w["aan"] or "", aan="", onderwerp=w["onderwerp"] or "",
                                  datum=datetime.now().astimezone(), tekst="")
                     if not mag_naar_claude(cfg, ontv):
-                        return self._json({"ok": False, "melding": "Deze ontvanger gaat niet naar Claude; schrijf de herinnering zelf"})
+                        return self._json({"ok": False, "melding": "This recipient is not sent to Claude, so write the reminder yourself"})
                     werk = lees_werktijd(cfg.agenda)
                     dagen, d = 0, datetime.fromisoformat(w["verstuurd"]).date()
                     while d < date.today():
@@ -519,12 +519,12 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                     w = store.wacht_op(int(v["id"]))
                     mid = (w["message_id"] or "").strip().strip("<>") if w else ""
                     if not mid:
-                        return self._json({"ok": False, "melding": "Deze mail kan niet in Mail worden geopend"})
+                        return self._json({"ok": False, "melding": "This email can't be opened in Mail"})
                     subprocess.run(["open", f"message://%3c{mid}%3e"], check=False, timeout=20)
                     melding = ""
                 elif actie == "taak-niet-klaar":
                     store.wis_lijkt_klaar(int(v["id"]))
-                    melding = "Blijft open"
+                    melding = "Stays open"
                 elif actie == "taken-terug":
                     item_id = int(v["id"])
                     melding = zet_taken_klaar_terug(store, bronnen, item_id, [int(x) for x in v.get("taken", [])])
@@ -539,7 +539,7 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                 elif actie == "verplaats":
                     ids = [int(x) for x in v.get("ids", [])]
                     if not ids:
-                        return self._json({"ok": False, "melding": "Niets geselecteerd"})
+                        return self._json({"ok": False, "melding": "Nothing selected"})
                     if v.get("doel") == "overslaan":
                         adressen = set()
                         for i in ids:
@@ -548,11 +548,11 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                                 adres = afzender_adres(it["van"])
                                 adressen.add(adres)
                                 store.zet_afzender_regel(adres, "negeren", it["project"])
-                        melding = f"{len(adressen)} afzender(s) worden voortaan overgeslagen"
+                        melding = (f"{len(adressen)} senders will be skipped from now on" if len(adressen) != 1 else "1 sender will be skipped from now on")
                     else:
                         with mail_slot:
                             melding = verplaats_items(store, bronnen, ids, v.get("doel", ""))
-                        if "niet gelukt" in melding:
+                        if "failed" in melding:
                             return self._json({"ok": False, "melding": melding})
                 elif actie == "taak-voorstel":
                     return self._json({"ok": True, "voorstel": taakvoorstel(store, int(v["id"]))})
@@ -595,7 +595,7 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                 elif actie == "item-detail":
                     it = store.item(int(v["id"]))
                     if it is None:
-                        return self._json({"ok": False, "melding": "Mail niet gevonden"})
+                        return self._json({"ok": False, "melding": "Email not found"})
                     taken = [dict(t) for t in store.db.execute("SELECT * FROM taken WHERE item_id=? ORDER BY id", (it["id"],))]
                     return self._json({"ok": True, "mail": {**item_dict(it, True), "eigen_antwoord": it["eigen_antwoord"],
                                                             "afgehandeld": it["afgehandeld"], "taken_db": taken}})
@@ -605,13 +605,13 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                 elif actie == "afspraak-voorstel":
                     it = store.item(int(v["id"]))
                     if it is None:
-                        return self._json({"ok": False, "melding": "Mail niet gevonden"})
+                        return self._json({"ok": False, "melding": "Email not found"})
                     mail = Email(bron=it["bron"], bron_id=it["bron_id"], van=it["van"] or "", aan=it["aan"] or "",
                                  onderwerp=it["onderwerp"] or "", datum=datetime.fromisoformat(it["datum"]), tekst=it["tekst"] or "")
                     verzoek = json.loads(it["afspraak"]) if it["afspraak"] and not v.get("opnieuw") else None
                     if verzoek is None:
                         if not mag_naar_claude(cfg, mail):
-                            return self._json({"ok": False, "melding": "Deze afzender gaat niet naar Claude; plan de afspraak zelf"})
+                            return self._json({"ok": False, "melding": "This sender is not sent to Claude, so schedule the meeting yourself"})
                         extra, _ = achtergrond_voor_item(cfg, store, it)
                         verzoek = llm_factory().afspraak_uit_mail(mail, anonimiseer(cfg, mail.tekst), extra or None)
                         store.zet_afspraak_verzoek(it["id"], verzoek)
@@ -636,7 +636,7 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                     mail = Email(bron=it["bron"], bron_id=it["bron_id"], van=it["van"] or "", aan=it["aan"] or "",
                                  onderwerp=it["onderwerp"] or "", datum=datetime.fromisoformat(it["datum"]), tekst=it["tekst"] or "")
                     if not mag_naar_claude(cfg, mail):
-                        return self._json({"ok": False, "melding": "Deze afzender gaat niet naar Claude; zet de momenten zelf in je antwoord"})
+                        return self._json({"ok": False, "melding": "This sender is not sent to Claude, so add the times to your reply yourself"})
                     concept = llm_factory().concept_met_momenten(
                         mail, anonimiseer(cfg, mail.tekst), v.get("concept") or it["concept"] or "",
                         [str(m) for m in v.get("momenten", [])], [str(m) for m in v.get("niet", [])], v.get("locatie"))
@@ -650,34 +650,34 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                 elif actie in ("voorlopig-bevestig", "voorlopig-vrij"):
                     ag, fout = agenda()
                     if ag is None:
-                        return self._json({"ok": False, "melding": fout or "geen agenda gekoppeld"})
+                        return self._json({"ok": False, "melding": fout or "no calendar connected"})
                     with mail_slot:
                         melding = (bevestig_voorlopig if actie == "voorlopig-bevestig" else geef_voorlopig_vrij)(store, ag, v["afspraak"])
                     melding = melding[:1].upper() + melding[1:]
                 elif actie == "afspraak-soort":
                     sleutel = v.get("sleutel") or ""
                     if not sleutel:
-                        return self._json({"ok": False, "melding": "Onbekende afspraak"})
+                        return self._json({"ok": False, "melding": "Unknown event"})
                     if v.get("soort") in SOORTEN:
                         store.zet_afspraak_soort(sleutel, v["soort"], None, "jij", v.get("titel"))
-                        melding = {"les": "Les", "afdeling": "Afdelingsoverleg", "overleg": "Overleg met anderen",
-                                   "eigen": "Eigen afspraak"}[v["soort"]] + (", ook de volgende keren" if v.get("herhaalt") else "")
+                        melding = {"les": "Class", "afdeling": "Department meeting", "overleg": "Meeting with others",
+                                   "eigen": "Personal event"}[v["soort"]] + (", for future occurrences too" if v.get("herhaalt") else "")
                     else:
                         store.wis_afspraak_soort(sleutel)
-                        melding = "De app deelt deze afspraak weer zelf in"
+                        melding = "The app will classify this event itself again"
                 elif actie == "les-regel":
                     soort = v.get("soort")
                     waarde = (v.get("waarde") or "").strip()
                     if soort not in ("titel", "organisator", "kalender") or not waarde:
-                        return self._json({"ok": False, "melding": "Onbekende regel"})
+                        return self._json({"ok": False, "melding": "Unknown rule"})
                     store.zet_les_regel(soort, waarde, bool(v.get("les", True)))
-                    wat = {"titel": f"met de titel \u2018{waarde}\u2019", "organisator": f"van {v.get('label') or waarde}",
-                           "kalender": f"in de agenda \u2018{waarde}\u2019"}[soort]
-                    melding = (f"Afspraken {wat} gelden voortaan als les" if v.get("les", True)
-                               else f"Afspraken {wat} gelden voortaan niet als les")
+                    wat = {"titel": f"titled \u2018{waarde}\u2019", "organisator": f"from {v.get('label') or waarde}",
+                           "kalender": f"in the calendar \u2018{waarde}\u2019"}[soort]
+                    melding = (f"Events {wat} now count as classes" if v.get("les", True)
+                               else f"Events {wat} no longer count as classes")
                 elif actie == "les-regel-weg":
                     store.verwijder_les_regel(int(v["id"]))
-                    melding = "Regel weggehaald"
+                    melding = "Rule removed"
                 elif actie == "taak-maak":
                     start = datetime.fromisoformat(v["start"]).astimezone() if v.get("start") else None
                     stappen = [s.strip() for s in v.get("stappen", []) if s.strip()]
@@ -690,37 +690,37 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                 elif actie == "taak-plannen":
                     ag, fout = agenda()
                     if ag is None:
-                        return self._json({"ok": False, "melding": fout or "geen agenda gekoppeld"})
+                        return self._json({"ok": False, "melding": fout or "no calendar connected"})
                     start = datetime.fromisoformat(v["start"]).astimezone()
                     with mail_slot:
                         melding = plan_bestaande_taak(store, ag, int(v["id"]), start, int(v.get("minuten") or 30))
                 elif actie == "project":
                     if v.get("project") not in cfg.projecten:
-                        return self._json({"ok": False, "melding": "Onbekend project"})
+                        return self._json({"ok": False, "melding": "Unknown project"})
                     store.zet_project(int(v["id"]), v["project"])
-                    melding = f"Verplaatst naar {v['project']}"
+                    melding = f"Moved to {v['project']}"
                 elif actie == "mail":
                     it = store.item(int(v["id"]))
                     if it is None:
-                        return self._json({"ok": False, "melding": "Mail niet gevonden"})
+                        return self._json({"ok": False, "melding": "Email not found"})
                     return self._json({"ok": True, "mail": item_dict(it, True)})
                 elif actie == "mail-html":
                     i = int(v["id"])
                     it = store.item(i)
                     if it is None:
-                        return self._json({"ok": False, "melding": "Mail niet gevonden"})
+                        return self._json({"ok": False, "melding": "Email not found"})
                     adres = afzender_adres(it["van"] or "")
                     altijd = bool(adres) and store.afbeeldingen_ok(adres)
                     extern = bool(v.get("afbeeldingen")) or altijd
                     if i not in html_cache:
                         bron = bronnen.get(it["bron"])
                         if bron is None or not hasattr(bron, "bron"):
-                            return self._json({"ok": False, "melding": "Geen opgemaakte versie beschikbaar"})
+                            return self._json({"ok": False, "melding": "No formatted version available"})
                         with mail_slot:
                             ruw = bron.bron(it["bron_id"], it["thread_id"])
                         h = html_uit_bron(ruw)
                         if h is None:
-                            return self._json({"ok": False, "melding": "Geen opgemaakte versie gevonden"})
+                            return self._json({"ok": False, "melding": "No formatted version found"})
                         html_cache[i] = h          # ruwe HTML (met ingesloten afbeeldingen); veilig maken per verzoek
                         while len(html_cache) > 60:   # niet eindeloos groeien
                             html_cache.pop(next(iter(html_cache)))
@@ -730,17 +730,17 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                 elif actie == "afbeeldingen-altijd":
                     adres = (v.get("adres") or "").strip().lower()
                     if not adres:
-                        return self._json({"ok": False, "melding": "Geen afzender"})
+                        return self._json({"ok": False, "melding": "No sender"})
                     store.zet_afbeeldingen_ok(adres, bool(v.get("aan", True)))
-                    melding = (f"Afbeeldingen van {adres} laden voortaan meteen" if v.get("aan", True)
-                               else f"Afbeeldingen van {adres} worden weer tegengehouden")
+                    melding = (f"Images from {adres} will now load straight away" if v.get("aan", True)
+                               else f"Images from {adres} will be blocked again")
                 elif actie == "mappen":
                     it = store.item(int(v["id"]))
                     if it is None:
-                        return self._json({"ok": False, "melding": "Mail niet gevonden"})
+                        return self._json({"ok": False, "melding": "Email not found"})
                     bron = bronnen.get(it["bron"])
                     if bron is None or not hasattr(bron, "mappenlijst"):
-                        return self._json({"ok": False, "melding": "Opbergen in mappen kan niet voor deze bron"})
+                        return self._json({"ok": False, "melding": "Filing in folders isn't available for this account"})
                     if v.get("vernieuw") or it["bron"] not in mappen_cache:
                         with mail_slot:
                             mappen_cache[it["bron"]] = bron.mappenlijst()
@@ -754,27 +754,27 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                     bron = bronnen.get(it["bron"]) if it else None
                     naam = (v.get("naam") or "").strip().strip("/")
                     if bron is None or not hasattr(bron, "maak_map"):
-                        return self._json({"ok": False, "melding": "Een nieuwe map maken kan niet voor deze bron"})
+                        return self._json({"ok": False, "melding": "Creating a folder isn't available for this account"})
                     if not naam or len(naam) > 120:
-                        return self._json({"ok": False, "melding": "Geef de map een naam"})
+                        return self._json({"ok": False, "melding": "Give the folder a name"})
                     pad = bron.nieuw_pad(naam)
                     bestaand = mappen_cache.get(it["bron"]) or []
                     if pad.lower() not in {m.lower() for m in bestaand}:
                         with mail_slot:
                             bron.maak_map(pad)
                         mappen_cache[it["bron"]] = bestaand + [pad]
-                    return self._json({"ok": True, "pad": pad, "melding": f"Map '{naam}' gemaakt"})
+                    return self._json({"ok": True, "pad": pad, "melding": f"Folder '{naam}' created"})
                 elif actie == "terugzetten":
                     with mail_slot:
                         melding = zet_terug(store, bronnen, [int(x) for x in v.get("ids", [])])
-                    if "niet gelukt" in melding:
+                    if "failed" in melding:
                         return self._json({"ok": False, "melding": melding})
                 elif actie == "taak-oordeel":
                     store.taak_oordeel(int(v["id"]), int(v["oordeel"]))
-                    melding = "Dank, de volgende schattingen worden daarop aangepast"
+                    melding = "Thanks, future estimates will take this into account"
                 elif actie == "taak-later":
                     store.taak_later(int(v["id"]), bool(v.get("later", True)))
-                    melding = "Naar Later" if v.get("later", True) else "Terug in de planning"
+                    melding = "Moved to Later" if v.get("later", True) else "Back in the plan"
                 elif actie == "afsluiten":
                     ag, fout = agenda()
                     open_ = [t for t in store.open_taken() if not t["gepland"] and not t["later"]]
@@ -786,7 +786,7 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                 elif actie == "afspraak-verplaats":
                     ag, fout = agenda()
                     if ag is None:
-                        return self._json({"ok": False, "melding": fout or "geen agenda gekoppeld"})
+                        return self._json({"ok": False, "melding": fout or "no calendar connected"})
                     start = datetime.fromisoformat(v["start"]).astimezone()
                     minuten = max(5, min(24 * 60, int(v.get("minuten") or 30)))
                     with mail_slot:
@@ -794,14 +794,14 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                             melding = verzet_taak(store, ag, int(v["taak"]), start, minuten)
                         else:
                             if not hasattr(ag, "verplaats_afspraak"):
-                                return self._json({"ok": False, "melding": "Verzetten kan niet in deze agenda"})
+                                return self._json({"ok": False, "melding": "Events can't be moved in this calendar"})
                             oud = datetime.fromisoformat(v["oud_start"]).astimezone() if v.get("oud_start") else None
                             melding = ag.verplaats_afspraak(v["id"], oud, start, start + timedelta(minutes=minuten))
                     melding = melding[:1].upper() + melding[1:]
                 elif actie == "afspraak-weg":
                     ag, fout = agenda()
                     if ag is None:
-                        return self._json({"ok": False, "melding": fout or "geen agenda gekoppeld"})
+                        return self._json({"ok": False, "melding": fout or "no calendar connected"})
                     melding = haal_uit_agenda(store, ag, int(v["id"]))
                 elif actie == "agenda-openen":
                     # de app Agenda op de dag (en het uur) van deze afspraak
@@ -813,33 +813,33 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                 elif actie == "deadline-voorstellen":
                     ag, fout = agenda()
                     if ag is None:
-                        return self._json({"ok": False, "melding": fout or "geen agenda gekoppeld"})
+                        return self._json({"ok": False, "melding": fout or "no calendar connected"})
                     ids = set(ochtend(cfg, store)["zonder_moment"])
                     taken = [t for t in store.open_taken() if t["id"] in ids]
                     return self._json({"ok": True, "voorstellen": voorstellen_voor(ag, cfg, taken, datetime.now().astimezone())})
                 elif actie == "deadline-agenda":
                     ag, fout = agenda()
                     if ag is None:
-                        return self._json({"ok": False, "melding": fout or "geen agenda gekoppeld"})
+                        return self._json({"ok": False, "melding": fout or "no calendar connected"})
                     with mail_slot:
                         melding = deadline_in_agenda(store, ag, "taak" if v.get("soort") == "taak" else "mail", int(v["id"]))
                 elif actie == "regels-toevoegen":
                     adressen = [a.strip().lower() for a in v.get("adressen", []) if a.strip()]
                     for a in adressen:
                         store.zet_afzender_regel(a, "negeren", None)
-                    melding = f"{len(adressen)} afzender(s) worden voortaan overgeslagen"
+                    melding = (f"{len(adressen)} senders will be skipped from now on" if len(adressen) != 1 else "1 sender will be skipped from now on")
                 elif actie == "regel-weg":
                     store.verwijder_afzender_regel(v["adres"])
-                    melding = f"{v['adres']} wordt niet meer overgeslagen"
+                    melding = f"{v['adres']} is no longer skipped"
                 elif actie == "ophalen":
                     if ophalen["bezig"]:
-                        melding = "Ophalen loopt al"
+                        melding = "Already getting mail"
                     else:
                         ophalen["bezig"], ophalen["laatste"] = True, ""
                         threading.Thread(target=ophalen_op_achtergrond, daemon=True).start()
-                        melding = "Nieuwe mail wordt opgehaald"
+                        melding = "Getting new mail"
                 else:
-                    return self._json({"ok": False, "melding": "Onbekende actie"}, 404)
+                    return self._json({"ok": False, "melding": "Unknown action"}, 404)
             except Exception as ex:
                 return self._json({"ok": False, "melding": f"Fout: {ex}"})
             self._json({"ok": True, "melding": melding})
@@ -856,7 +856,7 @@ def serveer(cfg: Config, store: Store, bronnen: dict, llm_factory) -> None:
     server = ThreadingHTTPServer((cfg.web_host, cfg.web_poort), handler)
     if cfg.meldingen_aan:
         handler.start_bewaking()
-    print(f"Goedkeuringsapp: http://{cfg.web_host}:{cfg.web_poort}  (stoppen met Ctrl+C)")
+    print(f"attaché: http://{cfg.web_host}:{cfg.web_poort}  (stop with Ctrl+C)")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

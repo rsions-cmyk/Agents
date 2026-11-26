@@ -36,8 +36,8 @@ def lees_werktijd(ruw: dict | None) -> Werktijd:
     return w
 
 
-DAGEN = ["ma", "di", "wo", "do", "vr", "za", "zo"]
-MAANDEN = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"]
+DAGEN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+MAANDEN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 
 def nl_moment(t: datetime) -> str:
@@ -120,11 +120,11 @@ def soort_bepalen(a: dict, lessen: dict | None, regels, geleerd: Optional[dict])
     """(soort, waarom). Volgorde: jouw keuze voor deze afspraak of reeks, jouw regels (titel, organisator,
     agenda), Claude, en dan de eenvoudige herkenning op woorden en deelnemers."""
     if geleerd and geleerd.get("door") == "jij":
-        return geleerd["soort"], "jouw keuze"
+        return geleerd["soort"], "your choice"
     regel = les_regel_bij(a, regels)
     if regel is not None:
         if regel["les"]:
-            return "les", f"jouw regel ({regel['soort']})"
+            return "les", f"your rule ({ {'titel': 'title', 'organisator': 'organiser', 'kalender': 'calendar'}.get(regel['soort'], regel['soort']) })"
     elif geleerd and geleerd.get("soort") in SOORTEN:
         return geleerd["soort"], geleerd.get("reden") or "Claude"
     soort = soort_afspraak(a, lessen, regels)
@@ -199,8 +199,8 @@ class AppleAgenda:
             self.store.requestAccessToEntityType_completion_(EK.EKEntityTypeEvent, terug)
         klaar.wait(120)
         if not uitkomst.get("ok"):
-            raise RuntimeError("Geen toegang tot je agenda. Sta het toe in Systeeminstellingen, "
-                               "Privacy en beveiliging, Agenda's, en start de app opnieuw.")
+            raise RuntimeError("No access to your calendar. Allow it in System Settings, "
+                               "Privacy & Security, Calendars, and restart the app.")
 
     def kalenders(self) -> list[tuple[str, str, bool]]:
         uit = []
@@ -213,10 +213,10 @@ class AppleAgenda:
                       if str(k.title()) == self.kalender_naam
                       and (self.account is None or str(k.source().title()) == self.account)]
         if not kandidaten:
-            raise RuntimeError(f"Agenda '{self.kalender_naam}' niet gevonden. Bekijk de namen met: mailagent agendas")
+            raise RuntimeError(f"Calendar '{self.kalender_naam}' not found. List the names with: mailagent agendas")
         if len(kandidaten) > 1:
-            raise RuntimeError(f"Er zijn meerdere agenda's met de naam '{self.kalender_naam}'. "
-                               "Zet in config.yaml ook 'account:' (zie: mailagent agendas).")
+            raise RuntimeError(f"There are several calendars called '{self.kalender_naam}'. "
+                               "Add 'account:' in config.yaml as well (see: mailagent agendas).")
         return kandidaten[0]
 
     def _nsdate(self, t: datetime):
@@ -232,7 +232,7 @@ class AppleAgenda:
             kalenders = [k for k in self.store.calendarsForEntityType_(self.EK.EKEntityTypeEvent)
                          if f"{k.source().title()}/{k.title()}" in self.bezet_agendas or str(k.title()) in self.bezet_agendas]
             if not kalenders:
-                raise RuntimeError("Geen van de agenda's bij 'bezet:' in config.yaml gevonden (zie: mailagent agendas)")
+                raise RuntimeError("None of the calendars under 'bezet:' in config.yaml were found (see: mailagent agendas)")
         pred = self.store.predicateForEventsWithStartDate_endDate_calendars_(self._nsdate(van), self._nsdate(tot), kalenders)
         uit = []
         for ev in self.store.eventsMatchingPredicate_(pred) or []:
@@ -258,7 +258,7 @@ class AppleAgenda:
             uit.append(a)
         return uit
 
-    STATUS = {0: "", 1: "nog geen antwoord", 2: "ja", 3: "nee", 4: "misschien", 5: "gedelegeerd", 6: "klaar", 7: "bezig"}
+    STATUS = {0: "", 1: "no response yet", 2: "accepted", 3: "declined", 4: "maybe", 5: "delegated", 6: "completed", 7: "in process"}
 
     def _deelnemer(self, d) -> dict:
         url = str(d.URL().absoluteString()) if d.URL() else ""
@@ -288,17 +288,17 @@ class AppleAgenda:
         """Afspraak naar een ander moment (alleen dit exemplaar). Niet bij vergaderingen met anderen."""
         ev = self._exemplaar(afspraak_id, oud_start)
         if ev is None:
-            raise RuntimeError("afspraak niet gevonden in je agenda")
+            raise RuntimeError("event not found in your calendar")
         if ev.hasAttendees():
-            raise RuntimeError("dit is een vergadering met anderen; verzet die in Outlook, dan krijgen zij de wijziging ook")
+            raise RuntimeError("this is a meeting with other people; move it in Outlook so they get the change too")
         if not ev.calendar().allowsContentModifications():
-            raise RuntimeError(f"de agenda '{ev.calendar().title()}' kun je niet wijzigen")
+            raise RuntimeError(f"the calendar '{ev.calendar().title()}' can't be changed")
         ev.setStartDate_(self._nsdate(start))
         ev.setEndDate_(self._nsdate(eind))
         ok, fout = self.store.saveEvent_span_error_(ev, self.EK.EKSpanThisEvent, None)
         if not ok:
-            raise RuntimeError(f"Afspraak niet verzet: {fout}")
-        return f"verzet naar {nl_moment(start)}–{eind:%H:%M}"
+            raise RuntimeError(f"Event not moved: {fout}")
+        return f"moved to {nl_moment(start)}–{eind:%H:%M}"
 
     def verwijder_afspraak(self, afspraak_id: str) -> bool:
         ev = self.store.eventWithIdentifier_(afspraak_id)
@@ -306,7 +306,7 @@ class AppleAgenda:
             return False
         ok, fout = self.store.removeEvent_span_error_(ev, self.EK.EKSpanThisEvent, None)
         if not ok:
-            raise RuntimeError(f"Afspraak niet verwijderd: {fout}")
+            raise RuntimeError(f"Event not removed: {fout}")
         return True
 
     def bezet(self, van: datetime, tot: datetime) -> list[tuple[datetime, datetime]]:
@@ -348,7 +348,7 @@ class AppleAgenda:
         slot = self._maak_prive(ev, kalender) if self.prive else False
         ok, fout = self.store.saveEvent_span_error_(ev, self.EK.EKSpanThisEvent, None)
         if not ok:
-            raise RuntimeError(f"Afspraak niet opgeslagen: {fout}")
+            raise RuntimeError(f"Event not saved: {fout}")
         return ev, slot
 
     def maak_afspraak(self, titel: str, start: datetime, eind: datetime, notities: str) -> str:
@@ -356,10 +356,10 @@ class AppleAgenda:
         self.laatste_id = str(ev.eventIdentifier() or "")   # om de taak later te kunnen verzetten of weghalen
         extra = []
         if self.herinnering_minuten:
-            extra.append(f"herinnering {self.herinnering_minuten} min vooraf")
+            extra.append(f"reminder {self.herinnering_minuten} min before")
         if self.prive:
-            extra.append("privé" if slot else "niet privé: deze agenda laat dat niet toe")
-        return f"ingepland in '{self.kalender_naam}' op {nl_moment(start)}" + (f" ({', '.join(extra)})" if extra else "")
+            extra.append("private" if slot else "not private, because this calendar doesn't allow it")
+        return f"scheduled in '{self.kalender_naam}' on {nl_moment(start)}" + (f" ({', '.join(extra)})" if extra else "")
 
     def maak_deadline(self, titel: str, dag: date, notities: str) -> str:
         """Deadline als hele-dag-afspraak: telt niet als bezet, met slotje, herinnering de dag ervoor om 09:00."""
@@ -377,9 +377,9 @@ class AppleAgenda:
         slot = self._maak_prive(ev, kalender) if self.prive else False
         ok, fout = self.store.saveEvent_span_error_(ev, self.EK.EKSpanThisEvent, None)
         if not ok:
-            raise RuntimeError(f"Deadline niet opgeslagen: {fout}")
-        return (f"deadline op {DAGEN[dag.weekday()]} {dag.day} {MAANDEN[dag.month - 1]} in je agenda, "
-                f"herinnering de dag ervoor om 09:00" + ("" if slot or not self.prive else "; niet privé"))
+            raise RuntimeError(f"Deadline not saved: {fout}")
+        return (f"deadline on {DAGEN[dag.weekday()]} {dag.day} {MAANDEN[dag.month - 1]} in your calendar, "
+                f"reminder the day before at 09:00" + ("" if slot or not self.prive else "; not private"))
 
     def maak_voorlopig(self, titel: str, start: datetime, eind: datetime, notities: str) -> str:
         """Moment voorlopig vasthouden: telt als 'misschien' (tentative), met slotje, zonder herinnering."""
@@ -395,28 +395,28 @@ class AppleAgenda:
             self._maak_prive(ev, kalender)
         ok, fout = self.store.saveEvent_span_error_(ev, self.EK.EKSpanThisEvent, None)
         if not ok:
-            raise RuntimeError(f"Voorlopige afspraak niet opgeslagen: {fout}")
+            raise RuntimeError(f"Tentative event not saved: {fout}")
         return str(ev.eventIdentifier() or "")
 
     def bevestig_voorlopig(self, afspraak_id: str, titel: str) -> str:
         """Van voorlopig naar echt: nieuwe titel, bezet, herinnering."""
         ev = self.store.eventWithIdentifier_(afspraak_id)
         if ev is None:
-            raise RuntimeError("de voorlopige afspraak staat niet meer in je agenda")
+            raise RuntimeError("the tentative event is no longer in your calendar")
         ev.setTitle_(titel)
         ev.setAvailability_(self.EK.EKEventAvailabilityBusy)
         if self.herinnering_minuten and not (ev.alarms() or []):
             ev.addAlarm_(self.EK.EKAlarm.alarmWithRelativeOffset_(-60 * int(self.herinnering_minuten)))
         ok, fout = self.store.saveEvent_span_error_(ev, self.EK.EKSpanThisEvent, None)
         if not ok:
-            raise RuntimeError(f"Afspraak niet bevestigd: {fout}")
-        return f"bevestigd: {nl_moment(self._dt(ev.startDate()))}"
+            raise RuntimeError(f"Event not confirmed: {fout}")
+        return f"confirmed: {nl_moment(self._dt(ev.startDate()))}"
 
     def test_afspraak(self) -> tuple[object, dict]:
         """Testafspraak morgen 07:30 tot 07:45, om herinnering en slotje in Outlook te controleren."""
         morgen = (datetime.now().astimezone() + timedelta(days=1)).replace(hour=7, minute=30, second=0, microsecond=0)
-        ev, slot = self._nieuwe_afspraak("Mailagent-test: slotje en herinnering", morgen, morgen + timedelta(minutes=15),
-                                         "Testafspraak van mailagent. Mag weg.")
+        ev, slot = self._nieuwe_afspraak("attaché test: lock and reminder", morgen, morgen + timedelta(minutes=15),
+                                         "Test event from attaché. Safe to delete.")
         info = {"start": morgen, "slot": slot, "herinneringen": len(ev.alarms() or [])}
         try:
             info["niveau"] = str(ev.privacyLevelString()) if ev.respondsToSelector_("privacyLevelString") else None
@@ -427,20 +427,20 @@ class AppleAgenda:
     def verwijder(self, ev) -> None:
         ok, fout = self.store.removeEvent_span_error_(ev, self.EK.EKSpanThisEvent, None)
         if not ok:
-            raise RuntimeError(f"Afspraak niet verwijderd: {fout}")
+            raise RuntimeError(f"Event not removed: {fout}")
 
 
 def maak_agenda(cfg) -> tuple[Optional[Agenda], Optional[str]]:
     """Geeft (agenda, None) of (None, reden waarom er geen agenda is)."""
     ruw = cfg.agenda or {}
     if not ruw.get("kalender"):
-        return None, "Geen agenda ingesteld (agenda: kalender: in config.yaml)"
+        return None, "No calendar set up (agenda: kalender: in config.yaml)"
     try:
         herinnering = ruw.get("herinnering_minuten", 15)
         return AppleAgenda(ruw["kalender"], ruw.get("account"), ruw.get("bezet"),
                            herinnering_minuten=int(herinnering) if herinnering else None,
                            prive=bool(ruw.get("prive", True))), None
     except ImportError:
-        return None, "Agendakoppeling niet geïnstalleerd: .venv/bin/pip install pyobjc-framework-EventKit"
+        return None, "Calendar connection not installed. Run: .venv/bin/pip install pyobjc-framework-EventKit"
     except Exception as e:
         return None, str(e)

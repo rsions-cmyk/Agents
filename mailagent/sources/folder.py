@@ -57,7 +57,7 @@ class MapBron:
         doel = map_ / f"{'verzonden' if verzenden else 'concept'}-{Path(bron_id).stem}.eml"
         doel.write_bytes(bytes(msg))
         self.laatste_uitkomst = "verzonden" if verzenden else "geplakt"
-        return "verzonden" if verzenden else f"opgeslagen als {doel}"
+        return "verzonden" if verzenden else f"saved as {doel}"
 
     def recente(self, seconden: int) -> list[tuple[str, str, str]]:
         """Voor tests: alle .eml-bestanden gelden als net binnengekomen."""
@@ -92,7 +92,7 @@ class MapBron:
                 bron.rename(doelmap / i)
                 resultaat[i] = None
             else:
-                resultaat[i] = "bestand niet gevonden"
+                resultaat[i] = "file not found"
         return resultaat
 
     def markeer(self, bron_id: str, message_id: str | None, aan: bool, kleur: int = 4) -> None:
@@ -119,7 +119,7 @@ class MapBron:
             if mid in message_ids:
                 f.rename(self.pad / f.name)
                 res[mid] = f.name
-        return {m: res.get(m, "FOUT:niet gevonden") for m in message_ids}
+        return {m: res.get(m, "FOUT:not found") for m in message_ids}
 
     def bron(self, bron_id: str, message_id: str | None) -> str:
         for f in [self.pad / bron_id, *self.pad.glob(f"_*/{bron_id}")]:
