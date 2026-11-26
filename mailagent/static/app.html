@@ -382,12 +382,12 @@ details.regels summary svg{width:14px;height:14px;vertical-align:-2px;margin-rig
 :root[data-theme=dark] .leeg-teken,:root[data-theme=dark] .leeg-logo{box-shadow:0 0 0 1px rgba(255,255,255,.1)}
 .app.drie .leeg.klaar .leeg-logo{display:none}   /* drie kolommen: het logo staat al groot in het leespaneel */
 /* opstartscherm: alleen als je attaché opent, zolang de app laadt en minstens een ogenblik */
-.opstart{position:fixed;inset:0;z-index:300;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:var(--canvas);transition:opacity .4s ease}
+.opstart{position:fixed;inset:0;z-index:300;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:var(--canvas);transition:opacity .5s ease;cursor:default}
 .al-gestart .opstart{display:none}
-.opstart img{width:112px;height:112px;border-radius:25px;animation:opstart-in .6s cubic-bezier(.2,.7,.2,1) both}
+.opstart img{width:112px;height:112px;border-radius:25px;animation:opstart-in .7s cubic-bezier(.2,.7,.2,1) both}
 :root[data-theme=dark] .opstart img{box-shadow:0 0 0 1px rgba(255,255,255,.1)}
-.opstart .woordmerk{font-size:34px;margin-top:10px;opacity:0;transition:opacity .35s ease}
-.opstart .opstart-regel{font-size:14px;color:var(--t2);opacity:0;transition:opacity .35s ease .08s}
+.opstart .woordmerk{font-size:34px;margin-top:10px;opacity:0;transition:opacity .45s ease .3s}
+.opstart .opstart-regel{font-size:14px;color:var(--t2);opacity:0;transition:opacity .45s ease .6s}
 .opstart.letter .woordmerk,.opstart.letter .opstart-regel{opacity:1}
 .opstart.weg{opacity:0;pointer-events:none}
 @keyframes opstart-in{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}
@@ -917,6 +917,7 @@ main{grid-row:2;grid-column:2 / -1;min-width:0}
 </head>
 <body>
 <div class="opstart" id="opstart" aria-hidden="true"><img src="/merk.svg" alt="" width="112" height="112"><span class="woordmerk">attach<span class="woordmerk-e">é</span></span><span class="opstart-regel">Minding the details.</span></div>
+<script>requestAnimationFrame(function(){requestAnimationFrame(function(){window.opstartVanaf=performance.now()})})</script>
 <div class="app" id="app">
   <aside class="zij">
     <div class="logo"><span class="blok merk"><svg class="merkteken" aria-hidden="true" viewBox="0 0 512 512"><defs>
@@ -983,21 +984,30 @@ async function api(pad, opties = {}){
   if (r.status === 403 && await nieuweSleutel()) return stuur();
   return r;
 }
-// opstartscherm: de naam pas tonen als Young Serif er is; weg zodra de app er staat, maar niet eerder dan na
-// 0,8 seconde, anders flitst het. Alleen bij openen: een herlaadbeurt in hetzelfde venster slaat het over.
+// opstartscherm: eerst het teken, dan de naam (zodra Young Serif er is) en de regel. Het blijft staan tot de app
+// geladen is en minstens 1,5 seconde zichtbaar was, en vervaagt dan. Een klik of toets slaat het over.
+// Alleen bij openen: een herlaadbeurt in hetzelfde venster slaat het over.
 const opstart = document.getElementById("opstart");
+const OPSTART_MIN = 1500;
 let opstartKlaar = false;
 if (opstart && !document.documentElement.classList.contains("al-gestart")){
   const letter = document.fonts && document.fonts.load ? document.fonts.load('34px "Young Serif"').catch(() => {}) : Promise.resolve();
   Promise.race([letter, new Promise(r => setTimeout(r, 400))]).then(() => opstart.classList.add("letter"));
-  setTimeout(() => opstartWeg(), 4000);   // hoe dan ook weg, ook als de app niet bereikbaar is
+  setTimeout(() => opstartWeg(), 5000);   // hoe dan ook weg, ook als de app niet bereikbaar is
+  const overslaan = () => opstartWeg(true);
+  opstart.addEventListener("pointerdown", overslaan);
+  document.addEventListener("keydown", overslaan, {once: true});
 }
-function opstartWeg(){
-  if (opstartKlaar || !opstart) return;
+function opstartWeg(meteen){
+  if (!opstart || !opstart.isConnected) return;
+  if (opstartKlaar && !meteen) return;
   opstartKlaar = true;
   try { sessionStorage.setItem("attache-opgestart", "1"); } catch(e){}
   if (document.documentElement.classList.contains("al-gestart")) return opstart.remove();
-  setTimeout(() => { opstart.classList.add("weg"); setTimeout(() => opstart.remove(), 450); }, Math.max(0, 800 - performance.now()));
+  const gezien = window.opstartVanaf != null ? performance.now() - window.opstartVanaf : 0;
+  clearTimeout(opstart._t);
+  opstart._t = setTimeout(() => { opstart.classList.add("weg"); setTimeout(() => opstart.remove(), 550); },
+                          meteen ? 0 : Math.max(0, OPSTART_MIN - gezien));
 }
 const post = (naam, data) => api("/api/"+naam, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data||{})});
 const IKONEN = {
