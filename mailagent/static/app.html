@@ -718,6 +718,9 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
 :root[data-theme] .knop.bevestig{background:var(--fill)!important;border-color:var(--fill-b)!important;color:var(--on)!important;animation:none}
 :root[data-theme] .p-voet:has(#verzenden.bevestig) #goedkeuren{background:transparent;border-color:var(--line2);color:var(--t1)}
 :root[data-theme] .knop kbd{background:color-mix(in srgb,currentColor 12%,transparent)}
+/* knoppen op een donkere balk of melding houden de lichte tekst van die balk */
+:root[data-theme] .balk .knop,:root[data-theme] .toast .knop{background:transparent;color:inherit;border-color:color-mix(in srgb,currentColor 35%,transparent)}
+:root[data-theme] .balk .knop:hover,:root[data-theme] .toast .knop:hover{background:color-mix(in srgb,currentColor 12%,transparent);border-color:color-mix(in srgb,currentColor 55%,transparent)}
 :root[data-theme] .ikoon.rood:hover,:root[data-theme] .ikoon.voorkeur,:root[data-theme] .ikoon.voorkeur.rood{color:var(--t1);background:var(--s2)}
 :root[data-theme] .p-voet{background:var(--s1);border-top-color:var(--line)}
 :root[data-theme] .segment{background:var(--canvas);border:1px solid var(--line)}
