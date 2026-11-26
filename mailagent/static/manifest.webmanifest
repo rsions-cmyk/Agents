@@ -1,7 +1,7 @@
 {
   "name": "attaché",
   "short_name": "attaché",
-  "description": "Je mail, taken en agenda, voorbereid door Claude. Versturen doe je zelf.",
+  "description": "Minding the details. Je mail, taken en agenda, voorbereid door Claude; versturen doe je zelf.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

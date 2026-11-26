@@ -2,6 +2,8 @@
 
 <img src="mailagent/static/dock-icoon.png" width="96" alt="attaché: een é met een koffertje als oog en een messing accent">
 
+*Minding the details.*
+
 attaché bereidt je mail, taken en agenda voor; versturen doe je zelf. Een attaché is de assistent van een diplomaat, een attachékoffer draagt je papieren, en bijlagen in je mail heten in het Engels *attachments*. Het logo is de é uit Young Serif (SIL Open Font License, via Google Fonts): het oog van de letter is een gekanteld koffertje met een klein hengsel, het accent is messing. In de code heet het pakket nog `mailagent`, zodat paden, achtergrondtaken en commando's blijven werken. De vectorbestanden van het logo staan in `ontwerp/`: het merkteken, een vierkante versie, de Dock-versie in het macOS-raster en een kleine versie zonder hengsel voor 16 en 32 pixels.
 
 Eerste onderdeel van een persoonlijk agentsysteem, gebaseerd op het idee van een chief of staff met directeuren per domein. Dit onderdeel regelt e-mail voor drie projecten: **onderwijs**, **onderzoek** en **ISTTE-bestuurswerk**, plus een bak **overig**. Het draait op je eigen MacBook.

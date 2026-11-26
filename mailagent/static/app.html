@@ -6,7 +6,7 @@
 <title>attaché</title>
 <meta name="application-name" content="attaché">
 <meta name="apple-mobile-web-app-title" content="attaché">
-<meta name="description" content="Je mail, taken en agenda, voorbereid door Claude. Versturen doe je zelf.">
+<meta name="description" content="attaché. Minding the details. Je mail, taken en agenda, voorbereid door Claude; versturen doe je zelf.">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.webmanifest">
@@ -348,6 +348,9 @@ details.regels summary svg{width:14px;height:14px;vertical-align:-2px;margin-rig
 .leegpaneel p{margin:0;text-wrap:balance}
 .leegpaneel .rond{width:56px;height:56px;border-radius:50%;background:var(--ok-zacht);color:var(--ok);display:grid;place-items:center}
 .leegpaneel .rond svg{width:26px;height:26px}
+.leeg-merk{margin-top:28px;display:flex;flex-direction:column;align-items:center;gap:6px;opacity:.85}
+.leeg-merk .woordmerk{font-size:24px}
+.leeg-merk .tagline{font-size:12.5px;letter-spacing:.01em;color:var(--zacht)}
 .sneltoetsen{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--zacht);justify-content:center;max-width:360px}
 kbd{font:600 11px var(--romp,inherit);font-family:inherit;padding:1px 6px;border-radius:5px;border:1px solid var(--lijn);border-bottom-width:2px;background:var(--vlak);color:var(--tekst)}
 .knop kbd{margin-left:4px;font-size:10px;padding:0 4px;opacity:.75;background:transparent;color:inherit;border-color:currentColor}
@@ -1393,7 +1396,8 @@ function tekenLeegPaneel(){
         `${ik("mail")}<b style="color:var(--tekst)">Kies een mail</b>`}
       <div class="sneltoetsen"><span><kbd>J</kbd> <kbd>K</kbd> volgende, vorige</span><span><kbd>⌘</kbd><kbd>↵</kbd> in Mail</span><span><kbd>⇧⌘↵</kbd> verzenden</span><span><kbd>D</kbd> gedaan</span>
         <span><kbd>V</kbd> opbergen</span><span><kbd>E</kbd> archiveren</span><span><kbd>#</kbd> prullenbak</span><span><kbd>T</kbd> taak</span><span><kbd>X</kbd> afwijzen</span>
-        <span><kbd>1</kbd>–<kbd>${D.projecten.length}</kbd> project</span><span><kbd>?</kbd> alle sneltoetsen</span></div></div>`;
+        <span><kbd>1</kbd>–<kbd>${D.projecten.length}</kbd> project</span><span><kbd>?</kbd> alle sneltoetsen</span></div>
+      ${klaar ? `<div class="leeg-merk"><span class="woordmerk">attach<span class="woordmerk-e">é</span></span><span class="tagline">Minding the details.</span></div>` : ""}</div>`;
   p.classList.add("open"); p.setAttribute("aria-hidden","false");
 }
 
