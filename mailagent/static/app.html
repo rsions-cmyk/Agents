@@ -246,6 +246,12 @@ details.origineel pre{white-space:pre-wrap;font:13px/1.5 -apple-system,sans-seri
 .afs.sleept{cursor:grabbing;z-index:5;box-shadow:0 6px 18px rgba(0,0,0,.18);border-color:var(--accent);color:var(--tekst);opacity:.95}
 .sleep-tijd{position:absolute;right:6px;top:2px;font-size:11px;font-weight:600;color:var(--accent);background:var(--vlak);padding:0 4px;border-radius:4px}
 body.blok-slepen{user-select:none;-webkit-user-select:none;cursor:grabbing}
+/* een taak naar de agenda slepen: niets selecteren, overal de sleepcursor, en een voorbeeld op de plek waar hij landt */
+html.sleept-taak,html.sleept-taak *{cursor:grabbing!important;user-select:none!important;-webkit-user-select:none!important}
+.kaart.opgepakt{opacity:.45}
+#pl-tijdlijn.doel{outline:2px solid color-mix(in srgb,var(--t3) 55%,transparent);outline-offset:-2px}
+.tb.voorbeeld{pointer-events:none;transition:top 60ms linear;display:flex;flex-direction:column;gap:1px;overflow:hidden}
+.tb.voorbeeld span{font-weight:400}
 .afs.klik:hover,.afs.klik:focus-visible{border-color:var(--accent);color:var(--tekst);outline:none}
 .heledag .klik{cursor:pointer}
 .afs-pop{position:fixed;z-index:60;width:340px;max-height:min(560px,calc(100vh - 16px));overflow:auto;background:var(--vlak);
@@ -1527,7 +1533,7 @@ function teken(){
       <button class="${staat.td === "afgehandeld" ? "aan" : ""}" data-td="afgehandeld" role="tab" aria-selected="${staat.td === "afgehandeld"}" title="What you cleared from To do in the past three weeks">Handled${nAfg ? ` · ${nAfg}` : ""}</button></span>`;
   if (staat.tab === "te_doen" && staat.td === "afgehandeld") inhoud.innerHTML = tekenAfgehandeld();
   else if (staat.tab === "te_doen") inhoud.innerHTML = (wordtDrie ? "" : tekenVandaag()) + tekenVoortgang() + tekenWachtOp() + tekenBeoordelen(teDoen()) + tekenBelangrijk();
-  else if (staat.tab === "planning") inhoud.innerHTML = tekenPlanning();
+  else if (staat.tab === "planning"){ inhoud.innerHTML = tekenPlanning(); requestAnimationFrame(pasPlHoogteAan); }
   else inhoud.innerHTML = tekenOpruimen();
   tekenBalk();
   const dk = document.getElementById("dagkol"), dagZichtbaar = metDag || app.classList.contains("dag-open");
@@ -2004,7 +2010,8 @@ async function verzetAfspraak(a, start, minuten, stil_){
   const j = await stil("afspraak-verplaats", data);
   if (!j.ok){ a.start = oudStart; a.eind = lokaalIso(Date.parse(oudStart) + oudMin * 60000); if (t) t.gepland = oudStart; toast(j.melding, true); return teken(); }
   if (!stil_) toast(j.melding, false, {label: "Undo", doe: () => verzetAfspraak(a, Date.parse(oudStart), oudMin, true)});
-  legeDagen(); laad();
+  await laad();
+  verversDag(staat.planDag);
 }
 document.addEventListener("pointerdown", ev => {
   const el = ev.target.closest("#pl-tijdlijn .afs.sleepbaar[data-afs]");
@@ -3115,6 +3122,9 @@ document.addEventListener("keydown", ev => {
   const inVeld = ev.target.closest && ev.target.closest("input, textarea, select");
   if (ev.key === "?" && !inVeld){ ev.preventDefault(); return toonSneltoetsen(); }
   if (ev.key === "Escape" && document.querySelector(".overlay")) return document.querySelector(".overlay").remove();
+  if (ev.key === "Escape" && kaartSleep && kaartSleep.bezig){ const k = kaartSleep; k.start = null; kaartSleep = null;
+    k.spook?.remove(); document.getElementById("pl-voorbeeld")?.remove(); document.getElementById("pl-tijdlijn")?.classList.remove("doel");
+    document.documentElement.classList.remove("sleept-taak"); k.kaartEl.classList.remove("opgepakt"); return; }
   if (ev.key === "Escape"){ if (inVeld) return ev.target.blur(); if (plaatsing){ plaatsing = null; return teken(); }
     if (document.querySelector(".app.dag-open")){ staat.dagOpen = false; return teken(); }   // eerst de la Vandaag dicht
     if (staat.gekozen.size){ staat.gekozen.clear(); return teken(); } return (staat.geenAuto = true, sluitPaneel()); }
@@ -3274,9 +3284,12 @@ function plTijdlijnHTML(){
     const sm = (plaatsing.start - d0)/60000;
     van = Math.min(van, Math.floor(sm/60)*60); tot = Math.max(tot, Math.ceil((sm + plaatsing.minuten)/60)*60);
   }
-  // de werkdag vult de hoogte van het venster; nooit kleiner dan vroeger, nooit absurd groot
+  // de werkdag vult de hoogte van het paneel precies: eerst geschat, na het tekenen gemeten (pasPlHoogteAan)
   const heledagN = lijst.filter(a => a.heledag).length;
-  PLPX = Math.max(0.8, Math.min(2.6, (window.innerHeight - 150 - (heledagN ? 34 : 0) - (lijst.length ? 22 : 0)) / (tot - van)));
+  const sleutel = [innerHeight, staat.planDag, heledagN, lijst.length, !!plaatsing, van, tot].join("|");
+  PLPX = plMaat.sleutel === sleutel ? plMaat.px
+    : Math.max(0.8, Math.min(2.6, (window.innerHeight - 210 - (heledagN ? 34 : 0) - (lijst.length ? 22 : 0)) / (tot - van)));
+  plTijdlijnHTML.laatste = {sleutel, van, tot};
   const y = m => (m - van) * PLPX;
   let h = "";
   if (uurMin(w.begin) > van) h += `<div class="buiten" style="top:0;height:${y(uurMin(w.begin))}px"></div>`;
@@ -3294,6 +3307,85 @@ function plTijdlijnHTML(){
     .filter(([k]) => soorten.has(k)).map(([k, i, l]) => `<span class="lg lg-${k}">${ik(i)}${l}</span>`).join("");
   return (legenda && soorten.size > 1 ? `<div class="legenda">${legenda}</div>` : "") + (heledag.length ? `<div class="heledag">${heledag.map(a => `<span class="klik" data-afs="${a.i}" tabindex="0">${esc(a.titel)}</span>`).join("")}</div>` : "") +
     `<div class="tijdlijn" id="pl-tijdlijn"><div class="tl-binnen" id="pl-binnen" data-van="${van}" style="height:${(tot-van)*PLPX}px">${h}</div></div>`;
+}
+
+let plMaat = {sleutel: null, px: null};
+function pasPlHoogteAan(){
+  const info = plTijdlijnHTML.laatste, binnen = document.getElementById("pl-binnen"), r = document.querySelector(".pl-rechts");
+  if (!info || !binnen || !r || innerWidth <= 760 || plMaat.sleutel === info.sleutel) return;
+  // alles in het paneel behalve de uren zelf, plus de ruimte boven het paneel en 12 pixels eronder
+  const rest = r.scrollHeight - binnen.offsetHeight + 2;
+  const px = Math.max(0.8, Math.min(2.6, (innerHeight - 12 - r.getBoundingClientRect().top - rest) / (info.tot - info.van)));
+  plMaat = {sleutel: info.sleutel, px};
+  if (Math.abs(px - PLPX) > 0.004){ const s_ = r.scrollTop; teken(); const r2 = document.querySelector(".pl-rechts"); if (r2) r2.scrollTop = s_; }
+}
+// zonder het voorbeeld 'tijdelijk' te tonen: een dag op de achtergrond opnieuw ophalen
+async function verversDag(dag){
+  try {
+    const j = await (await post("dag", {datum: dag})).json();
+    if (!j.ok) return;
+    dagen[dag] = j.afspraken;
+    if (!afsSleep && !sleep && !kaartSleep && !plSleep) (taak ? tekenTaak() : teken());
+  } catch(e){}
+}
+const botsingenVoor = (start, minuten) => {
+  const lijst = Array.isArray(dagen[staat.planDag]) ? dagen[staat.planDag] : [], e = start + minuten * 60000;
+  return lijst.filter(a => !a.heledag && !a.vrij && Date.parse(a.start) < e && Date.parse(a.eind) > start);
+};
+// voorbeeld tijdens het slepen van een taak: het blok op het kwartier waar hij landt, met tijd en botsing
+function toonVoorbeeld(k){
+  const binnen = document.getElementById("pl-binnen"), tl = document.getElementById("pl-tijdlijn");
+  const onder = document.elementFromPoint(k.x, k.y);
+  let m = binnen && onder && onder.closest && onder.closest("#pl-tijdlijn") ? minuutOp(k.y) : null;
+  let vb = document.getElementById("pl-voorbeeld");
+  if (m === null){
+    vb?.remove(); tl?.classList.remove("doel"); k.start = null;
+    k.spook.hidden = false; k.spook.style.left = k.x + "px"; k.spook.style.top = k.y + "px";
+    return;
+  }
+  const van = Number(binnen.dataset.van);
+  m = Math.max(0, Math.min(24 * 60 - k.duur, m));
+  k.start = dagBegin(staat.planDag) + m * 60000;
+  if (!vb){ vb = document.createElement("div"); vb.id = "pl-voorbeeld"; vb.className = "tb concept voorbeeld"; binnen.append(vb); }
+  vb.style.top = (m - van) * PLPX + "px"; vb.style.height = Math.max(16, k.duur * PLPX - 2) + "px";
+  const botst = botsingenVoor(k.start, k.duur);
+  vb.classList.toggle("botst", botst.length > 0);
+  vb.innerHTML = `<b>${esc(k.taak.omschrijving)}</b><span>${blokTijdVan(k.start, k.duur)}${botst.length ? ` · overlaps ${esc(botst[0].titel)}` : ""}</span>`;
+  tl.classList.add("doel"); k.spook.hidden = true;
+}
+// bij de rand van de agenda scrolt hij mee, zolang je sleept
+let randLus = null;
+function randScroll(){
+  if (randLus) return;
+  const stap = () => {
+    const k = kaartSleep, r = document.querySelector(".pl-rechts");
+    if (!k || !k.bezig || !r){ randLus = null; return; }
+    const b = r.getBoundingClientRect(), rand = 48;
+    let v = 0;
+    if (k.x >= b.left && k.x <= b.right){
+      if (k.y < b.top + rand) v = -Math.ceil((b.top + rand - k.y) / 4);
+      else if (k.y > b.bottom - rand) v = Math.ceil((k.y - (b.bottom - rand)) / 4);
+    }
+    if (v){ const voor = r.scrollTop; r.scrollTop += v; if (r.scrollTop !== voor) toonVoorbeeld(k); }
+    randLus = requestAnimationFrame(stap);
+  };
+  randLus = requestAnimationFrame(stap);
+}
+// loslaten op de agenda: meteen inplannen, met Undo; het blok kun je daarna nog verslepen of oprekken
+async function planMetSlepen(t, start, minuten){
+  const dag = isoDag(new Date(start));
+  t.gepland = lokaalIso(start); t.minuten = minuten;
+  if (Array.isArray(dagen[dag])) dagen[dag] = [...dagen[dag], {titel: t.omschrijving, start: lokaalIso(start),
+    eind: lokaalIso(start + minuten * 60000), heledag: false, vrij: false, kalender: D.agenda_naam || ""}];
+  teken();
+  const j = await stil("taak-plannen", {id: t.id, start: lokaalIso(start), minuten});
+  if (!j.ok){ t.gepland = null; toast(j.melding, true); laad(); return verversDag(dag); }
+  toast(j.melding, false, {label: "Undo", doe: async () => {
+    const r = await stil("afspraak-weg", {id: t.id});
+    toast(r.melding, !r.ok); await laad(); verversDag(dag);
+  }});
+  await laad();
+  verversDag(dag);
 }
 
 function minuutOp(clientY){
@@ -3316,8 +3408,11 @@ function plaats(id, clientY){
 document.addEventListener("pointerdown", ev => {
   if (staat.tab !== "planning") return;
   const kaartEl = ev.target.closest("[data-kaart]");
-  if (kaartEl && !ev.target.closest("button") && ev.pointerType !== "touch"){
-    kaartSleep = {id: Number(kaartEl.dataset.kaart), x0: ev.clientX, y0: ev.clientY, spook: null};
+  if (kaartEl && !ev.target.closest("button, a, input, textarea, select, summary") && ev.pointerType !== "touch" && ev.button === 0){
+    ev.preventDefault();                       // geen tekst selecteren als je een kaart oppakt
+    window.getSelection()?.removeAllRanges();
+    kaartSleep = {id: Number(kaartEl.dataset.kaart), x0: ev.clientX, y0: ev.clientY, x: ev.clientX, y: ev.clientY,
+                  spook: null, kaartEl, bezig: false, start: null};
     return;
   }
   const blok = ev.target.closest("#pl-blok");
@@ -3328,12 +3423,18 @@ document.addEventListener("pointerdown", ev => {
 });
 document.addEventListener("pointermove", ev => {
   if (kaartSleep){
-    if (!kaartSleep.spook && Math.hypot(ev.clientX - kaartSleep.x0, ev.clientY - kaartSleep.y0) > 6){
-      const t = D.taken.find(x => x.id === kaartSleep.id);
-      kaartSleep.spook = Object.assign(document.createElement("div"), {className: "spook", textContent: `${t.omschrijving} · ${duurTekst(t.minuten || 30)}`});
-      document.body.append(kaartSleep.spook);
+    const k = kaartSleep;
+    k.x = ev.clientX; k.y = ev.clientY;
+    if (!k.bezig && Math.hypot(ev.clientX - k.x0, ev.clientY - k.y0) > 5){
+      k.taak = D.taken.find(x => x.id === k.id);
+      if (!k.taak){ kaartSleep = null; return; }
+      k.bezig = true; k.duur = k.taak.minuten || 30;
+      document.documentElement.classList.add("sleept-taak"); k.kaartEl.classList.add("opgepakt"); sluitPop();
+      k.spook = Object.assign(document.createElement("div"), {className: "spook", textContent: `${k.taak.omschrijving} · ${duurTekst(k.duur)}`});
+      document.body.append(k.spook);
+      randScroll();
     }
-    if (kaartSleep.spook){ kaartSleep.spook.style.left = ev.clientX + "px"; kaartSleep.spook.style.top = ev.clientY + "px"; }
+    if (k.bezig) toonVoorbeeld(k);
     return;
   }
   if (!plSleep || !plaatsing) return;
@@ -3349,8 +3450,14 @@ document.addEventListener("pointermove", ev => {
 document.addEventListener("pointerup", ev => {
   if (kaartSleep){
     const k = kaartSleep; kaartSleep = null;
-    if (k.spook){ k.spook.remove(); if (!plaats(k.id, ev.clientY)) toast("Drop the task on a time in the day", true); }
-    else { gekozenKaart = gekozenKaart === k.id ? null : k.id; teken(); }   // klik zonder slepen: kiezen
+    if (k.bezig){
+      k.spook?.remove(); document.getElementById("pl-voorbeeld")?.remove();
+      document.getElementById("pl-tijdlijn")?.classList.remove("doel");
+      document.documentElement.classList.remove("sleept-taak"); k.kaartEl.classList.remove("opgepakt");
+      if (k.start !== null) planMetSlepen(k.taak, k.start, k.duur);
+      return;
+    }
+    gekozenKaart = gekozenKaart === k.id ? null : k.id; teken();   // klik zonder slepen: kiezen, dan een tijd aantikken
     return;
   }
   if (plSleep){ plSleep = null; return teken(); }
@@ -3384,8 +3491,8 @@ document.addEventListener("click", async ev => {
     teken();
     const j = await stil("taak-plannen", {id: p.id, start: lokaalIso(p.start), minuten: p.minuten});
     toast(j.melding, !j.ok);
-    delete dagen[dag];
-    laad();
+    await laad();
+    verversDag(dag);
   }
 });
 
