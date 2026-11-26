@@ -91,10 +91,10 @@ def afzender_voorstellen(store: Store) -> dict:
 
 
 def volgende_ronde(cfg: Config) -> str | None:
-    """Eerstvolgende vaste mailronde op een werkdag, als 'ma 12:45' of '12:45' (vandaag)."""
+    """Eerstvolgende vaste mailronde op een werkdag, als 'Mon 12:45' of '12:45' (vandaag)."""
     werk = lees_werktijd(cfg.agenda)
     nu = datetime.now()
-    dagen_nl = ["ma", "di", "wo", "do", "vr", "za", "zo"]
+    dagen_nl = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     for plus in range(8):
         d = nu + timedelta(days=plus)
         if d.isoweekday() not in werk.dagen:

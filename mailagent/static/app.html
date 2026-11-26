@@ -590,6 +590,7 @@ textarea#concept::placeholder,#a-tekst::placeholder{color:#8a929b}
 .logo{position:relative}
 .logo .inklap{margin-left:auto;width:28px;height:28px}
 .greep{position:absolute;top:0;bottom:0;width:9px;margin-left:-4px;cursor:col-resize;z-index:6;touch-action:none}
+.greep:focus-visible{outline:none;background:linear-gradient(90deg,transparent 3px,var(--t2) 3px,var(--t2) 6px,transparent 6px)}
 .greep::after{content:"";position:absolute;left:4px;top:0;bottom:0;width:1px;background:transparent;transition:background var(--snel)}
 .greep:hover::after,.greep.actief::after{background:var(--accent);width:2px;left:3.5px}
 #greep-zij{left:var(--zij-b,220px)}
@@ -963,7 +964,7 @@ main{grid-row:2;grid-column:2 / -1;min-width:0}
 
 <div class="dek" id="dek"></div>
 <div class="balk" id="balk"></div>
-<div class="toasts" id="toasts"></div>
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
 
 <script>
 const TOKEN = "__TOKEN__";
@@ -1132,6 +1133,7 @@ async function actie(naam, data){
 async function meteen(ids, naam, data, set = verborgen){
   await animeerWeg(ids);
   ids.forEach(i => set.add(i));
+  staat.focusNa = true;
   teken();
   const ok = await actie(naam, data);
   ids.forEach(i => set.delete(i));
@@ -1432,6 +1434,20 @@ async function zetTakenKlaar(id){
   laad();
 }
 
+// Focus na een actie: op de rij van de mail die nu open staat, anders de eerste rij. Alleen als de focus verloren
+// ging (op de pagina zelf, in het paneel of op iets wat niet meer bestaat), nooit weg uit een veld waarin je typt.
+function zetLijstFocus(){
+  const a = document.activeElement, p = document.getElementById("paneel");
+  if (a && a !== document.body && a.isConnected && !p.contains(a)) return;
+  if (a && p.contains(a) && a.matches("input, textarea, select")) return;
+  const sel = staat.tab === "opruimen" ? `main .rij[data-kies="${staat.lees}"]` : `main .rij[data-open="${staat.open}"]`;
+  const rij = document.querySelector(sel) || document.querySelector("main .rij[data-open], main .rij[data-kies]");
+  if (rij){ rij.focus({preventScroll: true}); rij.scrollIntoView({block: "nearest"}); }
+}
+function werkPaneelInertBij(){
+  const p = document.getElementById("paneel");
+  if (p) p.inert = !(p.classList.contains("open") || drieKolommen());
+}
 function bewaarTekst(id, concept){
   const it = [...D.zelf, ...D.wacht].find(x => x.id === id);
   if (it) it.concept = concept;
@@ -1443,9 +1459,11 @@ function toast(tekst, fout, knop){
   const t = document.createElement("div");
   t.className = "toast" + (fout ? " fout" : "");
   t.innerHTML = ik(fout ? "alert" : "check") + `<div>${esc(tekst)}</div>` +
-    (knoppen.length ? `<div class="knoppen">${knoppen.map((k, i) => `<button class="knop" data-i="${i}">${esc(k.label)}</button>`).join("")}</div>` : "");
+    (knoppen.length ? `<div class="knoppen">${knoppen.map((k, i) => `<button class="knop" data-i="${i}"${k.label === "Undo" ? ' title="Undo (Z)"' : ""}>${esc(k.label)}</button>`).join("")}</div>` : "");
   t.querySelectorAll("button").forEach(b => b.addEventListener("click", () => { t.remove(); knoppen[Number(b.dataset.i)].doe(); }));
-  document.getElementById("toasts").append(t);
+  const bak = document.getElementById("toasts");
+  bak.append(t);
+  while (bak.children.length > 2) bak.firstElementChild.remove();   // hooguit twee tegelijk
   setTimeout(() => t.remove(), fout || /⌘V/.test(tekst) ? 12000 : knoppen.length ? 8000 : 3500);   // instructie: langer in beeld
 }
 
@@ -1509,7 +1527,7 @@ function teken(){
   const opruimN = filter(D.info).length + filter(D.overgeslagen).length;
   const weergaven = [["te_doen","inbox","To do",teDoen().length],["planning","calendar","Planning",inPlan],["opruimen","sparkle","Tidy up",opruimN]];
   document.getElementById("nav").innerHTML =
-    weergaven.map(([k,i,l,n]) => `<button class="nav${staat.tab===k?" actief":""}" data-tab="${k}" title="${l}${n ? " · " + n : ""}">${ik(i)}<span class="navtekst">${l}</span>${n ? `<span class="tel">${n}</span>` : ""}${k === "te_doen" && heeftUrgent() ? `<span class="nav-dot" title="Something needs attention"></span>` : ""}</button>`).join("");
+    weergaven.map(([k,i,l,n]) => `<button class="nav${staat.tab===k?" actief":""}" data-tab="${k}"${staat.tab===k ? ' aria-current="page"' : ""} aria-label="${l}${n ? ", " + n : ""}" title="${l}${n ? " · " + n : ""}">${ik(i)}<span class="navtekst">${l}</span>${n ? `<span class="tel">${n}</span>` : ""}${k === "te_doen" && heeftUrgent() ? `<span class="nav-dot" title="Something needs attention"></span>` : ""}</button>`).join("");
   projectMenu = () => `<div class="pf-menu" role="menu">`
     + [{naam:"alles"}, ...D.projecten].map(p => `
     <button class="nav${p.naam===staat.project?" actief":""}" data-project="${esc(p.naam)}" title="${esc(naamProject(p.naam))}">
@@ -1533,10 +1551,15 @@ function teken(){
     `<span class="segment td-schakel" role="tablist" aria-label="Open or handled">
       <button class="${staat.td !== "afgehandeld" ? "aan" : ""}" data-td="open" role="tab" aria-selected="${staat.td !== "afgehandeld"}">Open${teDoen().length ? ` · ${teDoen().length}` : ""}</button>
       <button class="${staat.td === "afgehandeld" ? "aan" : ""}" data-td="afgehandeld" role="tab" aria-selected="${staat.td === "afgehandeld"}" title="What you cleared from To do in the past three weeks">Handled${nAfg ? ` · ${nAfg}` : ""}</button></span>`;
+  // de rij met de focus onthouden: hertekenen vervangt de rijen, en anders raak je met het toetsenbord je plek kwijt
+  const fr = document.activeElement && document.activeElement.closest && document.activeElement.closest("main .rij");
+  const focusSel = fr ? (fr.dataset.open ? `[data-open="${fr.dataset.open}"]` : fr.dataset.kies ? `[data-kies="${fr.dataset.kies}"]` : null) : null;
   if (staat.tab === "te_doen" && staat.td === "afgehandeld") inhoud.innerHTML = tekenAfgehandeld();
   else if (staat.tab === "te_doen") inhoud.innerHTML = (wordtDrie ? "" : tekenVandaag()) + tekenVoortgang() + tekenWachtOp() + tekenBeoordelen(teDoen()) + tekenBelangrijk();
   else if (staat.tab === "planning"){ inhoud.innerHTML = tekenPlanning(); requestAnimationFrame(pasPlHoogteAan); }
   else inhoud.innerHTML = tekenOpruimen();
+  if (focusSel){ const terug = document.querySelector(`main .rij${focusSel}`); if (terug) terug.focus({preventScroll: true}); else staat.focusNa = true; }
+  if (staat.focusNa){ staat.focusNa = false; requestAnimationFrame(zetLijstFocus); }
   tekenBalk();
   const dk = document.getElementById("dagkol"), dagZichtbaar = metDag || app.classList.contains("dag-open");
   const dkHtml = dagZichtbaar ? tekenDagkol() : "";
@@ -1881,19 +1904,26 @@ function tekenLeegPaneel(){
 }
 
 // na Gedaan: de mail meteen een plek geven, of laten staan
-async function gedaanMelding(id){
+let laatsteGedaan = null;   // {id, tijd}: E en V werken acht seconden lang op deze mail
+async function gedaanMelding(id, onderwerp = ""){
+  laatsteGedaan = {id, tijd: Date.now()};
+  const kort = onderwerp.length > 48 ? onderwerp.slice(0, 46) + "…" : onderwerp;
+  const tekst = kort ? `Done: \u201c${kort}\u201d. Press E to archive it or V to file it.` : "Done. Move it as well?";
   const knoppen = (voorstel) => [
     {label: "Archive", doe: () => verplaatsMetUndo([id], "archief")},
     ...(voorstel ? [{label: `Move to ${voorstel.split("/").pop()}`, doe: () => verplaatsMetUndo([id], "map:" + voorstel)}] : []),
     {label: "Folder…", doe: () => openKiezer(id, null, [id])},
     {label: "Undo", doe: async () => { const r = await stil("niet-gedaan", {id}); toast(r.melding, !r.ok); staat.open = id; laad(); }}];
   // eerst meteen de melding; het mapvoorstel volgt als het er snel is
-  toast("Done. Move it as well?", false, knoppen(null));
+  toast(tekst, false, knoppen(null));
   const melding = document.getElementById("toasts").lastElementChild;
+  if (melding) melding.dataset.gedaan = id;
   const j = await Promise.race([stil("mappen", {id}), new Promise(r => setTimeout(() => r(null), 2500))]);
   if (j && j.ok && j.voorstellen.length && melding && melding.isConnected){
     melding.remove();
-    toast("Done. Move it as well?", false, knoppen(j.voorstellen[0].map));
+    toast(tekst, false, knoppen(j.voorstellen[0].map));
+    const nieuw = document.getElementById("toasts").lastElementChild;
+    if (nieuw) nieuw.dataset.gedaan = id;
   }
 }
 
@@ -2820,6 +2850,7 @@ function openPaneel(id){ staat.open = id; staat.wacht = null; staat.detail = nul
   document.querySelector(`.rij[data-open="${id}"]`)?.scrollIntoView({block:"nearest"}); }
 function sluitPaneel(){
   staat.open = null; staat.wacht = null; staat.detail = null; taak = null; antwoord = null;
+  staat.focusNa = true;   // na het tekenen staat de focus weer op de lijst, niet aan het begin van de pagina
   if (staat.tab === "opruimen") staat.lees = null;
   document.querySelectorAll(".rij.gekozen[data-open]").forEach(r => r.classList.remove("gekozen"));
   document.getElementById("dek").classList.remove("open");
@@ -2995,7 +3026,7 @@ document.addEventListener("click", async ev => {
   if (t.id === "sluit") return sluitPaneel();
   if (t.id === "ophalen"){ D.ophalen.bezig = true; teken(); return actie("ophalen").then(laad); }
   if (t.id === "gedaan"){
-    const id = Number(document.getElementById("paneel").dataset.id);
+    const id = Number(document.getElementById("paneel").dataset.id), onderwerp = vindItem(id)?.onderwerp || "";
     const volgende = drieKolommen() ? volgendeNa(id) : null;
     sluitPaneel(); if (volgende !== null) staat.open = volgende;
     await animeerWeg([id]); verborgen.add(id); teken();
@@ -3003,7 +3034,7 @@ document.addEventListener("click", async ev => {
     if (!j.ok){ toast(j.melding, true); return laad(); }
     laad();
     if (t.dataset.metmap){ return openKiezer(id, null, [id]); }
-    gedaanMelding(id);
+    gedaanMelding(id, onderwerp);
     return;
   }
   if (t.id === "verzenden"){
@@ -3109,10 +3140,18 @@ document.addEventListener("pointerup", ev => {
 });
 document.getElementById("dek").addEventListener("click", sluitPaneel);
 document.addEventListener("mousedown", ev => { if (ev.shiftKey && ev.target.closest && ev.target.closest(".rij[data-kies]")) ev.preventDefault(); });
+let overlayTerug = null;
+function sluitOverlay(){
+  document.querySelector(".overlay")?.remove();
+  if (overlayTerug && overlayTerug.isConnected) overlayTerug.focus(); else zetLijstFocus();
+  overlayTerug = null;
+}
 function toonSneltoetsen(){
-  if (document.querySelector(".overlay")) return document.querySelector(".overlay").remove();
+  if (document.querySelector(".overlay")) return sluitOverlay();
+  overlayTerug = document.activeElement;
   const o = document.createElement("div");
   o.className = "overlay";
+  o.setAttribute("role", "dialog"); o.setAttribute("aria-modal", "true"); o.setAttribute("aria-label", "Keyboard shortcuts");
   o.innerHTML = `<div class="vel"><h3>Keyboard shortcuts</h3><dl>
     <dt><kbd>J</kbd> <kbd>K</kbd></dt><dd>Next and previous email</dd>
     <dt><kbd>⌘</kbd> <kbd>↵</kbd></dt><dd>Prepare reply in Apple Mail</dd>
@@ -3131,15 +3170,23 @@ function toonSneltoetsen(){
     <dt><kbd>⇧</kbd> <kbd>J</kbd> <kbd>K</kbd></dt><dd>Extend selection</dd>
     <dt><kbd>⌘</kbd> <kbd>A</kbd></dt><dd>Select everything in Tidy up</dd>
     <dt><kbd>Esc</kbd></dt><dd>Close</dd>
-    <dt><kbd>?</kbd></dt><dd>This overview</dd></dl></div>`;
-  o.addEventListener("click", () => o.remove());
+    <dt><kbd>Z</kbd></dt><dd>Undo the last action (as long as its message shows)</dd>
+    <dt><kbd>?</kbd></dt><dd>This overview</dd></dl>
+    <div style="text-align:right;margin-top:12px"><button class="knop klein" id="sneltoetsen-dicht">Close</button></div></div>`;
+  o.addEventListener("click", () => sluitOverlay());
   document.body.append(o);
+  o.querySelector("#sneltoetsen-dicht").focus();
 }
 
 document.addEventListener("keydown", ev => {
   const inVeld = ev.target.closest && ev.target.closest("input, textarea, select");
   if (ev.key === "?" && !inVeld){ ev.preventDefault(); return toonSneltoetsen(); }
-  if (ev.key === "Escape" && document.querySelector(".overlay")) return document.querySelector(".overlay").remove();
+  if (ev.key === "Escape" && document.querySelector(".overlay")) return sluitOverlay();
+  if (ev.key === "Tab" && document.querySelector(".overlay")){ ev.preventDefault(); return document.querySelector(".overlay button")?.focus(); }
+  if ((ev.key === "z" || ev.key === "Z") && !inVeld && !ev.metaKey && !ev.ctrlKey && !ev.altKey){
+    const knop = [...document.querySelectorAll("#toasts .toast button")].reverse().find(b => b.textContent.trim() === "Undo");
+    if (knop){ ev.preventDefault(); return knop.click(); }
+  }
   if (ev.key === "Escape" && kaartSleep && kaartSleep.bezig){ const k = kaartSleep; k.start = null; kaartSleep = null;
     k.spook?.remove(); document.getElementById("pl-voorbeeld")?.remove(); document.getElementById("pl-tijdlijn")?.classList.remove("doel");
     document.documentElement.classList.remove("sleept-taak"); k.kaartEl.classList.remove("opgepakt"); return; }
@@ -3166,7 +3213,7 @@ document.addEventListener("keydown", ev => {
     const doel = staat.gekozen.size ? [...staat.gekozen] : (id === null ? [] : [id]);
     if (!doel.length) return;
     if (ev.key === "e") return verplaats(doel, "archief");
-    if (ev.key === "#" || ev.key === "Delete" || ev.key === "Backspace"){ ev.preventDefault(); return verplaats(doel, "prullenbak"); }
+    if (ev.key === "#"){ ev.preventDefault(); return verplaats(doel, "prullenbak"); }
     if (ev.key === "v"){ ev.preventDefault(); return openKiezer(doel[0], document.querySelector('#paneel [data-opbergen]'), doel); }
     if (ev.key === "t" && id !== null) return openTaak(id);
     if (ev.key === " " && id !== null){ ev.preventDefault(); staat.gekozen.has(id) ? staat.gekozen.delete(id) : staat.gekozen.add(id); staat.anker = id; return teken(); }
@@ -3180,10 +3227,16 @@ document.addEventListener("keydown", ev => {
   const lijst = teDoen().map(i => i.id), i = lijst.indexOf(id);
   if (ev.key === "j" || ev.key === "ArrowDown"){ ev.preventDefault(); if (lijst.length) openPaneel(lijst[Math.min(lijst.length-1, i+1)]); return; }
   if (ev.key === "k" || ev.key === "ArrowUp"){ ev.preventDefault(); if (lijst.length) openPaneel(lijst[Math.max(0, i-1)]); return; }
+  if ((ev.key === "e" || ev.key === "v") && laatsteGedaan && Date.now() - laatsteGedaan.tijd < 8000){
+    ev.preventDefault();
+    const g = laatsteGedaan.id; laatsteGedaan = null;
+    document.querySelectorAll(".toast[data-gedaan]").forEach(t => t.remove());
+    return ev.key === "e" ? verplaatsMetUndo([g], "archief") : openKiezer(g, null, [g]);
+  }
   if (id === null) return;
   if (ev.key === "e") return verplaats([id], "archief");
   if (ev.key === "v"){ ev.preventDefault(); return openKiezer(id, document.querySelector('#paneel [data-opbergen]')); }
-  if (ev.key === "#" || ev.key === "Delete" || ev.key === "Backspace"){ ev.preventDefault(); return verplaats([id], "prullenbak"); }
+  if (ev.key === "#"){ ev.preventDefault(); return verplaats([id], "prullenbak"); }
   if (ev.key === "x") return document.getElementById("afwijzen")?.click();
   if (ev.key === "d") return document.getElementById("gedaan")?.click();
   if (ev.key === "D"){ const g = document.getElementById("gedaan"); if (g){ g.dataset.metmap = "1"; g.click(); } return; }
@@ -3520,13 +3573,15 @@ async function openKiezer(id, anker, ids){
   sluitKiezer();
   const el = document.createElement("div");
   el.className = "kiezer";
+  el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "File in a folder");
+  const terug = document.activeElement;
   el.innerHTML = `<input type="text" id="kiezer-zoek" placeholder="Find a folder…" autocomplete="off"><div class="opties"><div class="leeg2">Loading folders…</div></div>`;
   document.body.append(el);
   const r = anker ? anker.getBoundingClientRect() : {left: innerWidth/2 - 190, top: innerHeight/3, bottom: innerHeight/3};
   const boven = r.top > innerHeight * 0.55;
   el.style.left = Math.max(16, Math.min(innerWidth - el.offsetWidth - 16, r.left - 40)) + "px";
   if (boven) el.style.bottom = (innerHeight - r.top + 8) + "px"; else el.style.top = (r.bottom + 8) + "px";
-  kiezer = {id, ids: ids && ids.length ? ids : [id], mappen: [], voorstellen: [], zoek: "", index: 0, el, inbox: "", archief: "", nieuwKan: false};
+  kiezer = {id, ids: ids && ids.length ? ids : [id], mappen: [], voorstellen: [], zoek: "", index: 0, el, inbox: "", archief: "", nieuwKan: false, terug};
   el.querySelector("input").focus();
   const j = await stil("mappen", {id});
   if (!kiezer || kiezer.id !== id) return;
@@ -3584,7 +3639,12 @@ async function maakMap(naam){
   sluitKiezer();
   verplaats(ids, "map:" + j.pad);
 }
-function sluitKiezer(){ if (kiezer){ kiezer.el.remove(); kiezer = null; } }
+function sluitKiezer(){
+  if (!kiezer) return;
+  const terug = kiezer.terug;
+  kiezer.el.remove(); kiezer = null;
+  if (terug && terug.isConnected && terug !== document.body) terug.focus(); else zetLijstFocus();
+}
 function kiesMap(map){
   const ids = kiezer.ids; sluitKiezer();
   verplaats(ids, "map:" + map);
@@ -3695,6 +3755,22 @@ document.addEventListener("pointerup", () => {
 });
 zetBreedtes();
 document.querySelectorAll("[data-ikoon]").forEach(el => el.innerHTML = ik(el.dataset.ikoon));
+new MutationObserver(werkPaneelInertBij).observe(document.getElementById("paneel"), {attributes: true, attributeFilter: ["class"]});
+window.addEventListener("resize", werkPaneelInertBij);
+werkPaneelInertBij();
+// de scheidslijn naast de lijst ook met het toetsenbord: pijltjes links en rechts, Home zet hem terug
+(() => {
+  const g = document.getElementById("greep-lijst");
+  g.tabIndex = 0;
+  g.setAttribute("aria-label", "List width: use the left and right arrow keys, Home resets it");
+  g.addEventListener("keydown", ev => {
+    const max = Math.max(320, innerWidth - 64 - 420 - (breedDag() ? 320 : 0));
+    if (ev.key === "ArrowLeft" || ev.key === "ArrowRight") breedte.lijst = Math.round(Math.max(280, Math.min(max, breedte.lijst + (ev.key === "ArrowRight" ? 24 : -24))));
+    else if (ev.key === "Home") breedte.lijst = STANDAARD.lijst;
+    else return;
+    ev.preventDefault(); zetBreedtes(); bewaarBreedtes(); g.setAttribute("aria-valuenow", breedte.lijst);
+  });
+})();
 
 // ---------------- thema: Automatic (Paper overdag, Dark 's avonds via macOS), Paper, Light, Dark ----------------
 const THEMAS = [["auto", "Automatic", "follows macOS"], ["paper", "Paper", ""], ["light", "Light", ""], ["dark", "Dark", ""]];
