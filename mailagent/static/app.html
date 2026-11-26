@@ -205,6 +205,11 @@ body.blok-slepen{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .pop-deelnemen{display:inline-flex;margin-top:10px;text-decoration:none}
 .pop-taak{margin-top:10px;padding-top:10px;border-top:1px solid var(--lijn)}
 .pop-acties{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.pop-les{margin-top:8px;font-size:13px}
+.pop-les>summary{cursor:pointer;color:var(--zacht);display:flex;gap:6px;align-items:center}
+.pop-les>summary svg{width:14px;height:14px}
+.pop-les-k{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:8px}
+div.pop-les{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .pop-voet{display:flex;justify-content:flex-end;margin-top:10px;padding-top:8px;border-top:1px solid var(--lijn)}
 @media (max-width:700px){ .afs-pop{left:8px!important;right:8px;bottom:8px;top:auto!important;width:auto;border-radius:14px} }
 .nu-lijn{position:absolute;left:-8px;right:0;height:0;border-top:2px solid var(--hoog);z-index:4;pointer-events:none}
@@ -1148,6 +1153,21 @@ function deelnameLink(a){
   return m ? m[0] : null;
 }
 function sluitPop(){ document.getElementById("afs-pop")?.remove(); }
+// zelf leren wat een les is: titel, organisator of agenda; ook terugdraaien
+function lesKeuze(a){
+  const org = a.organisator && (a.organisator.adres || a.organisator.naam);
+  const r = a.les_regel;
+  if (r) return `<div class="pop-les"><span class="meta">${r.les ? "Les" : "Geen les"} door jouw regel (${esc(r.soort)}: ${esc(r.waarde)})</span>
+      <button class="knop klein" data-lesweg="${r.id}">Regel weghalen</button></div>`;
+  if (a.soort === "les") return `<details class="pop-les"><summary>Geen les?</summary>
+      <button class="knop klein" data-lesregel="titel" data-waarde="${esc(a.titel)}" data-les="0">Afspraken met deze titel zijn geen les</button></details>`;
+  return `<details class="pop-les"><summary>${ik("les")}Dit is een les</summary>
+      <div class="pop-les-k">
+        <button class="knop klein" data-lesregel="titel" data-waarde="${esc(a.titel)}" data-les="1">Alles met deze titel</button>
+        ${org ? `<button class="knop klein" data-lesregel="organisator" data-waarde="${esc(org)}" data-label="${esc(a.organisator.naam || org)}" data-les="1">Alles van ${esc(a.organisator.naam || org)}</button>` : ""}
+        ${a.kalender && a.kalender !== D.agenda_naam ? `<button class="knop klein" data-lesregel="kalender" data-waarde="${esc(a.kalender)}" data-les="1">Alles in de agenda ‘${esc(a.kalender)}’</button>` : ""}
+      </div></details>`;
+}
 function openAfspraak(i, anker){
   const lijst = dagen[staat.planDag], a = Array.isArray(lijst) ? lijst[i] : null;
   if (!a) return;
@@ -1161,7 +1181,7 @@ function openAfspraak(i, anker){
   el.innerHTML = `
     <div class="pop-kop"><b>${esc(t ? t.omschrijving : a.titel)}</b><button class="ikoon" data-popdicht="1" title="Sluiten (Esc)">${ik("x")}</button></div>
     <div class="pop-r">${ik("clock")}<span>${esc(dagTekst)} · ${tijd}${a.vrij ? " · telt als vrij" : ""}${isFocus(a) ? " · beschermd" : ""}</span></div>
-    ${!t && a.soort === "les" ? `<div class="pop-r">${ik("les")}<span>Les</span></div>` : ""}
+    ${!t && a.soort === "les" ? `<div class="pop-r">${ik("les")}<span>Les${a.les_regel ? " (jouw regel)" : ""}</span></div>` : ""}
     ${!t && a.soort === "overleg" ? `<div class="pop-r">${ik("mensen")}<span>Vergadering met anderen; verzetten doe je in Outlook</span></div>` : ""}
     ${a.locatie ? `<div class="pop-r">${ik("pin")}<span>${linkjes(a.locatie)}</span></div>` : ""}
     ${a.kalender ? `<div class="pop-r">${ik("calendar")}<span>${esc(a.kalender)}</span></div>` : ""}
@@ -1176,6 +1196,7 @@ function openAfspraak(i, anker){
           <button class="knop klein" data-verzet="${t.id}" data-start="${esc(a.start)}" title="Uit je agenda halen en meteen op een ander moment zetten">${ik("clock")}Verzetten</button>
           <button class="knop klein" data-uitagenda="${t.id}" title="Uit je agenda; de taak blijft staan bij Nog in te plannen">${ik("x")}Uit agenda</button></div></div>`
       : a.notities ? `<details class="pop-notities"${link ? "" : " open"}><summary>Notities</summary><div>${linkjes(a.notities)}</div></details>` : ""}
+    ${!t && !a.vrij ? lesKeuze(a) : ""}
     <div class="pop-voet"><button class="knop klein" data-agendaopen="${esc(a.start)}">${ik("calendar")}Open in Agenda</button></div>`;
   document.body.append(el);
   // naast de afspraak, binnen het venster; op een smal scherm onderin (CSS)
@@ -1201,6 +1222,12 @@ document.addEventListener("click", async ev => {
   const d = b.dataset;
   if (d.popdicht) return sluitPop();
   if (d.agendaopen){ stil("agenda-openen", {start: d.agendaopen}); return; }
+  if (d.lesregel || d.lesweg){
+    sluitPop();
+    const j = d.lesweg ? await stil("les-regel-weg", {id: Number(d.lesweg)})
+                       : await stil("les-regel", {soort: d.lesregel, waarde: d.waarde, label: d.label, les: d.les === "1"});
+    toast(j.melding, !j.ok); legeDagen(); return teken();
+  }
   if (d.uitagenda){
     sluitPop();
     const j = await stil("afspraak-weg", {id: Number(d.uitagenda)});

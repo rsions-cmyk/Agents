@@ -25,7 +25,7 @@ from urllib.parse import parse_qs, urlparse
 from .config import Config
 from datetime import date, datetime, timedelta
 
-from .agenda import lees_werktijd, maak_agenda, soort_afspraak, vrije_momenten
+from .agenda import les_regel_bij, lees_werktijd, maak_agenda, soort_afspraak, vrije_momenten
 from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
@@ -143,6 +143,7 @@ def verzamel(cfg: Config, store: Store, ophalen: dict) -> dict:
         "ophalen": {"bezig": ophalen["bezig"], "laatste": ophalen["laatste"]},
         "werktijd": {"begin": werk.begin.strftime("%H:%M"), "eind": werk.eind.strftime("%H:%M"), "dagen": sorted(werk.dagen)},
         "agenda_aan": bool((cfg.agenda or {}).get("kalender")),
+        "agenda_naam": (cfg.agenda or {}).get("kalender"),
         "vandaag_afgehandeld": store.vandaag_afgehandeld(),
         "volgende_ronde": volgende_ronde(cfg),
         "wacht_op": [wacht_dict(store, w) for w in store.wacht_op_lijst("wacht")],
@@ -503,10 +504,24 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                         lijst = [{"titel": "Bezet", "start": b, "eind": e, "heledag": False, "vrij": False, "kalender": ""}
                                  for b, e in ag.bezet(van, tot)]
                     lessen = (cfg.agenda or {}).get("lessen") or {}
+                    regels = store.les_regels()
                     return self._json({"ok": True, "afspraken": [
                         {**a, "start": a["start"].isoformat(timespec="minutes"), "eind": a["eind"].isoformat(timespec="minutes"),
-                         "soort": soort_afspraak(a, lessen)}
+                         "soort": soort_afspraak(a, lessen, regels), "les_regel": les_regel_bij(a, regels)}
                         for a in lijst]})
+                elif actie == "les-regel":
+                    soort = v.get("soort")
+                    waarde = (v.get("waarde") or "").strip()
+                    if soort not in ("titel", "organisator", "kalender") or not waarde:
+                        return self._json({"ok": False, "melding": "Onbekende regel"})
+                    store.zet_les_regel(soort, waarde, bool(v.get("les", True)))
+                    wat = {"titel": f"met de titel \u2018{waarde}\u2019", "organisator": f"van {v.get('label') or waarde}",
+                           "kalender": f"in de agenda \u2018{waarde}\u2019"}[soort]
+                    melding = (f"Afspraken {wat} gelden voortaan als les" if v.get("les", True)
+                               else f"Afspraken {wat} gelden voortaan niet als les")
+                elif actie == "les-regel-weg":
+                    store.verwijder_les_regel(int(v["id"]))
+                    melding = "Regel weggehaald"
                 elif actie == "taak-maak":
                     start = datetime.fromisoformat(v["start"]).astimezone() if v.get("start") else None
                     stappen = [s.strip() for s in v.get("stappen", []) if s.strip()]

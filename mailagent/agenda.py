@@ -87,10 +87,31 @@ LES_WOORDEN = ["college", "hoorcollege", "werkcollege", "responsiecollege", "lec
                "les", "lessen", "lesson", "class", "seminar", "colloquium", "tentamen", "exam"]
 
 
-def soort_afspraak(a: dict, lessen: dict | None = None) -> str:
-    """'les', 'overleg' (met anderen) of '' (eigen afspraak). Lessen herken je aan de agenda (bijvoorbeeld een
-    roosteragenda), de organisator of woorden in titel of locatie; in te stellen bij agenda: lessen: in config.yaml."""
+def les_regel_bij(a: dict, regels) -> Optional[dict]:
+    """De regel die je zelf in de app maakte en die bij deze afspraak past: titel gaat voor organisator, die
+    voor agenda."""
+    titel = str(a.get("titel", "")).strip().lower()
+    org = a.get("organisator") or {}
+    wie = {str(org.get("adres", "")).lower(), str(org.get("naam", "")).lower()} - {""}
+    kalender = str(a.get("kalender", "")).lower()
+    for soort, past in (("titel", lambda w: titel == w or titel.startswith(w + " ")),
+                        ("organisator", lambda w: w in wie), ("kalender", lambda w: w == kalender)):
+        for r in regels or []:
+            if r["soort"] == soort and past(r["waarde"]):
+                return dict(r)
+    return None
+
+
+def soort_afspraak(a: dict, lessen: dict | None = None, regels=None) -> str:
+    """'les', 'overleg' (met anderen) of '' (eigen afspraak). Eerst je eigen regels uit de app ('Dit is een les'),
+    dan de agenda (bijvoorbeeld een roosteragenda), de organisator of woorden in titel of locatie; in te stellen
+    bij agenda: lessen: in config.yaml."""
     import re
+    regel = les_regel_bij(a, regels)
+    if regel is not None:
+        if regel["les"]:
+            return "les"
+        return "overleg" if any(not d.get("ik") for d in a.get("deelnemers") or []) else ""
     lessen = lessen or {}
     kalenders = [k.lower() for k in lessen.get("kalenders", [])]
     organisatoren = [o.lower() for o in lessen.get("organisatoren", [])]

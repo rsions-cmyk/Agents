@@ -99,6 +99,14 @@ CREATE TABLE IF NOT EXISTS verstuurd (
     tekst TEXT,                      -- alleen wat je zelf schreef, zonder citaat
     verwijzingen TEXT                -- In-Reply-To en References
 );
+CREATE TABLE IF NOT EXISTS les_regels (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    soort TEXT NOT NULL,         -- titel | organisator | kalender
+    waarde TEXT NOT NULL,        -- kleine letters
+    les INTEGER NOT NULL,        -- 1: dit is een les, 0: dit is geen les
+    aangemaakt TEXT NOT NULL,
+    UNIQUE (soort, waarde)
+);
 CREATE TABLE IF NOT EXISTS gemeld (
     sleutel TEXT PRIMARY KEY,
     tijd TEXT NOT NULL
@@ -380,6 +388,20 @@ class Store:
 
     def zet_context(self, item_id: int, context: list[dict]) -> None:
         self.db.execute("UPDATE items SET context=? WHERE id=?", (json.dumps(context, ensure_ascii=False), item_id))
+        self.db.commit()
+
+    def les_regels(self) -> list[sqlite3.Row]:
+        return self.db.execute("SELECT * FROM les_regels ORDER BY id").fetchall()
+
+    def zet_les_regel(self, soort: str, waarde: str, les: bool) -> int:
+        self.db.execute("INSERT INTO les_regels(soort, waarde, les, aangemaakt) VALUES (?,?,?,?) "
+                        "ON CONFLICT(soort, waarde) DO UPDATE SET les=excluded.les",
+                        (soort, waarde.strip().lower(), 1 if les else 0, nu()))
+        self.db.commit()
+        return self.db.execute("SELECT id FROM les_regels WHERE soort=? AND waarde=?", (soort, waarde.strip().lower())).fetchone()["id"]
+
+    def verwijder_les_regel(self, regel_id: int) -> None:
+        self.db.execute("DELETE FROM les_regels WHERE id=?", (regel_id,))
         self.db.commit()
 
     def is_gemeld(self, sleutel: str) -> bool:

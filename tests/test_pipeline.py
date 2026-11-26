@@ -1257,3 +1257,19 @@ def test_soort_afspraak_les_overleg_eigen():
     assert soort_afspraak({"titel": "DDE Y1 blok B", "kalender": "Rooster"}, {"kalenders": ["Rooster"]}) == "les"
     assert soort_afspraak({"titel": "Gesprek", "organisator": {"adres": "rooster@buas.nl"}},
                           {"organisatoren": ["rooster@buas.nl"]}) == "les"
+
+
+def test_zelf_geleerde_lesregels(omgeving):
+    from mailagent.agenda import soort_afspraak
+
+    cfg, store, bronnen = omgeving
+    vrijdag = {"titel": "TMO Y2 A Strategy", "kalender": "Calendar", "organisator": {"adres": "rooster@buas.nl"},
+               "deelnemers": [{"naam": "Rob", "ik": True}, {"naam": "Groep", "ik": False}]}
+    assert soort_afspraak(vrijdag, {}, store.les_regels()) == "overleg"      # zonder regel: geen les
+    store.zet_les_regel("organisator", "rooster@buas.nl", True)               # 'Alles van rooster@buas.nl'
+    assert soort_afspraak(vrijdag, {}, store.les_regels()) == "les"
+    maandag = {**vrijdag, "titel": "DDE Y1 B Research methods"}
+    assert soort_afspraak(maandag, {}, store.les_regels()) == "les"           # zelfde organisator, andere titel
+    store.zet_les_regel("titel", "Werkcollege intervisie", False)             # 'geen les' gaat voor de woorden
+    assert soort_afspraak({"titel": "Werkcollege intervisie"}, {}, store.les_regels()) == ""
+    assert soort_afspraak({"titel": "Werkcollege TMO"}, {}, store.les_regels()) == "les"
