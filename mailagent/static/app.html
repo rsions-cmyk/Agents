@@ -363,6 +363,12 @@ kbd{font:600 11px var(--romp,inherit);font-family:inherit;padding:1px 6px;border
 
 /* planning (voorstel B) */
 .planning-grid{display:grid;grid-template-columns:minmax(300px,430px) minmax(0,1fr);gap:18px;align-items:start}
+/* de agenda staat apart rechts en blijft staan als je door de lijst scrolt */
+@media (min-width:761px){
+  .app.tab-planning main{padding-bottom:24px}
+  .pl-rechts{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto;padding:12px;border:1px solid var(--lijn);
+    border-radius:var(--r2, 14px);background:var(--vlak2);box-shadow:var(--schaduw)}
+}
 .kaarten{display:flex;flex-direction:column;gap:8px}
 .kaart{background:var(--vlak);border:1px solid var(--lijn);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:5px;cursor:grab;user-select:none;-webkit-user-select:none}
 .kaart:hover{border-color:var(--zacht)}
@@ -953,6 +959,7 @@ async function zetTerug(id){
 function teken(){
   if(!D) return;
   const app = document.getElementById("app"), wordtDrie = drieKolommen();
+  app.classList.toggle("tab-planning", staat.tab === "planning");
   if (app.classList.contains("drie") !== wordtDrie){
     // wisselen tussen vaste kolom en schuifpaneel zonder zichtbare schuifbeweging
     const p = document.getElementById("paneel");
@@ -2417,7 +2424,7 @@ function tekenPlanning(){
           <button class="knop klein" id="pl-annuleer">Annuleren</button><button class="knop klein goed" id="pl-bevestig">${ik("check")}Inplannen</button></div>` : ""}
       ${plTijdlijnHTML()}`;
   }
-  return `${afsluitHTML(open)}<div class="planning-grid">${links}<div>${rechts}</div></div>`;
+  return `${afsluitHTML(open)}<div class="planning-grid">${links}<div class="pl-rechts">${rechts}</div></div>`;
 }
 
 const isFocus = a => /\b(focus|schrijven|deep work|writing)\b/i.test(a.titel || "");
@@ -2459,7 +2466,7 @@ function plTijdlijnHTML(){
   }
   // de werkdag vult de hoogte van het venster; nooit kleiner dan vroeger, nooit absurd groot
   const heledagN = lijst.filter(a => a.heledag).length;
-  PLPX = Math.max(0.8, Math.min(2.6, (window.innerHeight - 250 - (heledagN ? 34 : 0)) / (tot - van)));
+  PLPX = Math.max(0.8, Math.min(2.6, (window.innerHeight - 150 - (heledagN ? 34 : 0) - (lijst.length ? 22 : 0)) / (tot - van)));
   const y = m => (m - van) * PLPX;
   let h = "";
   if (uurMin(w.begin) > van) h += `<div class="buiten" style="top:0;height:${y(uurMin(w.begin))}px"></div>`;
