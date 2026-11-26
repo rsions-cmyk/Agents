@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Concierge</title>
-<meta name="application-name" content="Concierge">
-<meta name="apple-mobile-web-app-title" content="Concierge">
+<title>attaché</title>
+<meta name="application-name" content="attaché">
+<meta name="apple-mobile-web-app-title" content="attaché">
 <meta name="description" content="Je mail, taken en agenda, voorbereid door Claude. Versturen doe je zelf.">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.webmanifest">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Young+Serif&display=swap">
 <style>
 :root{
   --bg:#f4f4f2;--vlak:#ffffff;--vlak2:#fafaf8;--tekst:#1c1c1e;--zacht:#6e6e73;--lijn:#e5e5e2;
@@ -606,11 +606,13 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
 .overlay dl{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;margin:0}
 .overlay dt{text-align:right}
 .overlay dd{margin:0;color:var(--zacht)}
-/* merk: Concierge, een receptiebel in messing op diepblauw */
-.logo .blok.merk{background:none;width:30px;height:30px;border-radius:8px;overflow:hidden;box-shadow:0 1px 2px rgba(14,27,51,.25)}
+/* merk: attaché. De é uit Young Serif; het oog is een gekanteld koffertje, het accent messing. */
+.logo .blok.merk{background:none;width:30px;height:30px;border-radius:8px;overflow:hidden;box-shadow:0 1px 2px rgba(14,20,30,.3)}
 .logo .blok.merk svg.merkteken{width:30px;height:30px;stroke:none;fill:initial;stroke-width:0}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .logo .blok.merk{box-shadow:0 0 0 1px rgba(255,255,255,.1)}}
-.woordmerk{font-family:ui-serif,"New York","Iowan Old Style",Georgia,serif;font-weight:600;font-size:19px;letter-spacing:.005em;color:var(--tekst)}
+.woordmerk{font-family:"Young Serif",ui-serif,Georgia,serif;font-weight:400;font-size:21px;letter-spacing:-.005em;color:var(--tekst);line-height:1}
+.woordmerk-e{color:#b5852f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .woordmerk-e{color:#ddb769}}
 /* afgehandeld */
 .td-schakel button{white-space:nowrap}
 .rij.afg .afg-chip{flex:none}
@@ -650,23 +652,11 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
 <body>
 <div class="app" id="app">
   <aside class="zij">
-    <div class="logo"><span class="blok merk"><svg class="merkteken" aria-hidden="true" viewBox="0 0 512 512">
-  <defs>
-    <linearGradient id="c-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d3358"/><stop offset="1" stop-color="#0e1b33"/></linearGradient>
-    <linearGradient id="c-messing" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f0d496"/><stop offset=".5" stop-color="#c99a4b"/><stop offset="1" stop-color="#94692b"/></linearGradient>
-    <linearGradient id="c-voet" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b98a40"/><stop offset="1" stop-color="#7d5822"/></linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="112" fill="url(#c-bg)"/>
-  <g stroke="#e3be72" stroke-width="11" stroke-linecap="round" fill="none">
-    <path d="M168 130l20 16M154 176l26 2M344 130l-20 16M358 176l-26 2"/>
-  </g>
-  <rect x="248" y="160" width="16" height="64" rx="6" fill="url(#c-messing)"/>
-  <ellipse cx="256" cy="158" rx="40" ry="12" fill="url(#c-messing)"/>
-  <path d="M134 334a122 122 0 0 1 244 0z" fill="url(#c-messing)"/>
-  <path d="M166 300A94 94 0 0 1 206 248" stroke="#fff6dc" stroke-opacity=".5" stroke-width="13" stroke-linecap="round" fill="none"/>
-  <rect x="114" y="338" width="284" height="44" rx="12" fill="url(#c-voet)"/>
-  <rect x="114" y="338" width="284" height="10" rx="5" fill="#e3be72" fill-opacity=".55"/>
-</svg></span><span class="navtekst woordmerk">Concierge</span>
+    <div class="logo"><span class="blok merk"><svg class="merkteken" aria-hidden="true" viewBox="0 0 512 512"><defs>
+<linearGradient id="ambg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#243047"/><stop offset="1" stop-color="#10151f"/></linearGradient>
+<linearGradient id="amms" gradientUnits="userSpaceOnUse" x1="180" y1="0" x2="330" y2="0"><stop offset="0" stop-color="#b98a35"/><stop offset=".5" stop-color="#f3dd9a"/><stop offset="1" stop-color="#b48434"/></linearGradient>
+<mask id="amm" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512"><rect width="512" height="512" fill="#fff"/>
+<path transform="translate(242.17 268.50) rotate(-26.56) scale(.5)" d="M-72.92 29.18V-10.49Q-72.92 -35.29 -48.12 -35.29H34.54Q59.33 -35.29 59.33 -10.49V29.18Q59.33 47.37 41.15 47.37H-54.73Q-72.92 47.37 -72.92 29.18ZM-26.63 -32.29V-43.77Q-26.63 -54.13 -16.26 -54.13H2.68Q13.05 -54.13 13.05 -43.77V-32.29Z" fill="#000"/></mask></defs><rect width="512" height="512" rx="112" fill="url(#ambg)"/><g transform="translate(256 256) scale(1.0) translate(-256 -256)"><path d="M221.6 330.6 Q227.9 346.2 241.9 358.5 Q255.8 370.8 277.4 370.8 Q289.3 370.8 302.3 364.1 Q315.3 357.4 325.0 343.2 Q326.1 341.4 328.0 341.4 Q329.8 341.4 331.9 342.5 Q333.9 343.6 342.9 348.8 Q344.3 349.9 344.3 351.8 Q344.3 354.4 342.1 358.1 Q331.7 377.4 313.8 389.7 Q296.0 402.0 267.3 402.0 Q236.5 402.0 214.2 388.2 Q191.8 374.5 179.7 351.8 Q167.7 329.1 167.7 302.3 Q167.7 276.6 175.3 258.2 Q182.9 239.8 195.6 228.5 Q208.2 217.1 224.0 211.7 Q239.8 206.3 256.2 206.3 Q274.8 206.3 288.9 213.6 Q303.1 220.8 312.9 232.0 Q322.8 243.2 327.8 255.6 Q332.8 268.1 332.8 278.9 Q332.8 281.9 329.5 283.3 Z" fill="#efe8d8" mask="url(#amm)"/><path d="M225.3 182.2 Q237.2 166.9 244.1 156.5 Q251.0 146.1 255.6 136.6 Q260.3 127.1 265.1 115.2 Q266.6 111.9 270.9 110.9 Q275.2 110.0 278.9 110.0 Q289.7 110.0 297.3 114.6 Q304.9 119.3 304.9 129.0 Q304.9 143.1 295.8 154.5 Q286.7 165.8 273.9 174.2 Q261.0 182.5 249.5 187.7 Q248.0 188.5 246.3 189.2 Q244.7 190.0 242.8 190.0 Q241.3 190.0 239.1 188.9 Z" fill="url(#amms)"/></g></svg></span><span class="navtekst woordmerk" aria-label="attaché">attach<span class="woordmerk-e">é</span></span>
       <button class="ikoon inklap" id="inklappen" title="Zijbalk inklappen ( [ )" aria-label="Zijbalk in- of uitklappen"><span data-ikoon="paneel"></span></button></div>
     <div id="nav" style="display:contents"></div>
     <div class="onder">

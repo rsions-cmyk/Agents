@@ -1,8 +1,8 @@
-# Concierge
+# attaché
 
-<img src="mailagent/static/apple-touch-icon.png" width="72" alt="Concierge: een receptiebel in messing op diepblauw">
+<img src="mailagent/static/dock-icoon.png" width="96" alt="attaché: een é met een koffertje als oog en een messing accent">
 
-Concierge bereidt je mail, taken en agenda voor; versturen doe je zelf. De naam en de receptiebel komen uit de hotellerie: een conciërge regelt veel voor je, maar vraagt eerst wat je wilt. In de code heet het pakket nog `mailagent`, zodat paden, achtergrondtaken en commando's blijven werken.
+attaché bereidt je mail, taken en agenda voor; versturen doe je zelf. Een attaché is de assistent van een diplomaat, een attachékoffer draagt je papieren, en bijlagen in je mail heten in het Engels *attachments*. Het logo is de é uit Young Serif (SIL Open Font License, via Google Fonts): het oog van de letter is een gekanteld koffertje met een klein hengsel, het accent is messing. In de code heet het pakket nog `mailagent`, zodat paden, achtergrondtaken en commando's blijven werken. De vectorbestanden van het logo staan in `ontwerp/`: het merkteken, een vierkante versie, de Dock-versie in het macOS-raster en een kleine versie zonder hengsel voor 16 en 32 pixels.
 
 Eerste onderdeel van een persoonlijk agentsysteem, gebaseerd op het idee van een chief of staff met directeuren per domein. Dit onderdeel regelt e-mail voor drie projecten: **onderwijs**, **onderzoek** en **ISTTE-bestuurswerk**, plus een bak **overig**. Het draait op je eigen MacBook.
 
@@ -59,7 +59,7 @@ Na elke run staat er een overzicht per project in `data/overzicht.md`.
 
 **Zoeken.** ⌘K (of `/`) zet de cursor in het zoekveld bovenin. De app zoekt in alle mail die hij verwerkte (afzender, onderwerp, tekst, samenvatting en je eigen antwoord), in je taken en in Wacht op antwoord. Alle woorden moeten voorkomen. Met de pijltjes en Enter open je een treffer op de plek waar hij hoort: Te doen, Opruimen, Planning, of het detailpaneel als hij al is afgehandeld. Mail die de app nooit ophaalde (ouder dan `terugkijken_dagen` bij de eerste ronde) zoek je in Mail zelf.
 
-**Icoon in je Dock.** De app heeft een eigen icoon (de bel). Een Dock-app die je eerder met Safari > File > Add to Dock maakte, houdt het oude plaatje. Gooi die weg (hij staat in de map Programma's in je thuismap) en zet de pagina opnieuw in het Dock; de naam staat dan al op Concierge.
+**Icoon in je Dock.** Een Dock-app die je eerder met Safari > File > Add to Dock maakte, houdt het oude plaatje. Gooi die weg (hij staat in de map Programma's in je thuismap) en zet de pagina opnieuw in het Dock; de naam staat dan al op attaché. Welk plaatje Safari kiest, verschilt per versie. Neemt hij het verkeerde, klik dan in het venster van Add to Dock op het icoon en kies `mailagent/static/dock-icoon.png`. Later wijzigen kan in de instellingen van de web-app.
 
 **Opbergen in een map.** Naast archiveren kun je een mail in een eigen map zetten, bijvoorbeeld ENTER÷IFITT: met de mapknop of toets `V`. De kiezer zet bovenaan waar je mail van deze afzender eerder opborg, mappen die je vaak voor dit project gebruikt, en mappen waarvan de naam in het onderwerp staat. Typ om te zoeken, `↵` om op te bergen. De mappenlijst wordt eenmaal per sessie uit Apple Mail gehaald; "Vernieuwen" haalt hem opnieuw op.
 

@@ -1,12 +1,12 @@
 {
-  "name": "Concierge",
-  "short_name": "Concierge",
+  "name": "attaché",
+  "short_name": "attaché",
   "description": "Je mail, taken en agenda, voorbereid door Claude. Versturen doe je zelf.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#0e1b33",
-  "theme_color": "#0e1b33",
+  "background_color": "#10151f",
+  "theme_color": "#10151f",
   "lang": "nl",
   "icons": [
     {
@@ -18,6 +18,12 @@
       "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
+    },
+    {
+      "src": "/dock-icoon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/favicon.svg",

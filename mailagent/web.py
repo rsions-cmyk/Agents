@@ -38,7 +38,8 @@ APP_HTML = Path(__file__).with_name("static") / "app.html"
 # vaste bestanden naast de app: logo, Dock-icoon (Safari > File > Add to Dock) en manifest
 BESTANDEN = {
     "/favicon.svg": ("favicon.svg", "image/svg+xml"),
-    "/favicon.ico": ("icon-192.png", "image/png"),
+    "/favicon.ico": ("dock-icoon.png", "image/png"),          # sommige Safari-versies nemen dit voor het Dock
+    "/dock-icoon.png": ("dock-icoon.png", "image/png"),
     "/apple-touch-icon.png": ("apple-touch-icon.png", "image/png"),
     "/apple-touch-icon-precomposed.png": ("apple-touch-icon.png", "image/png"),
     "/icon-192.png": ("icon-192.png", "image/png"),
