@@ -381,6 +381,37 @@ class AppleAgenda:
         return (f"deadline op {DAGEN[dag.weekday()]} {dag.day} {MAANDEN[dag.month - 1]} in je agenda, "
                 f"herinnering de dag ervoor om 09:00" + ("" if slot or not self.prive else "; niet privé"))
 
+    def maak_voorlopig(self, titel: str, start: datetime, eind: datetime, notities: str) -> str:
+        """Moment voorlopig vasthouden: telt als 'misschien' (tentative), met slotje, zonder herinnering."""
+        ev = self.EK.EKEvent.eventWithEventStore_(self.store)
+        ev.setTitle_(titel)
+        ev.setStartDate_(self._nsdate(start))
+        ev.setEndDate_(self._nsdate(eind))
+        ev.setNotes_(notities)
+        kalender = self._kalender()
+        ev.setCalendar_(kalender)
+        ev.setAvailability_(self.EK.EKEventAvailabilityTentative)
+        if self.prive:
+            self._maak_prive(ev, kalender)
+        ok, fout = self.store.saveEvent_span_error_(ev, self.EK.EKSpanThisEvent, None)
+        if not ok:
+            raise RuntimeError(f"Voorlopige afspraak niet opgeslagen: {fout}")
+        return str(ev.eventIdentifier() or "")
+
+    def bevestig_voorlopig(self, afspraak_id: str, titel: str) -> str:
+        """Van voorlopig naar echt: nieuwe titel, bezet, herinnering."""
+        ev = self.store.eventWithIdentifier_(afspraak_id)
+        if ev is None:
+            raise RuntimeError("de voorlopige afspraak staat niet meer in je agenda")
+        ev.setTitle_(titel)
+        ev.setAvailability_(self.EK.EKEventAvailabilityBusy)
+        if self.herinnering_minuten and not (ev.alarms() or []):
+            ev.addAlarm_(self.EK.EKAlarm.alarmWithRelativeOffset_(-60 * int(self.herinnering_minuten)))
+        ok, fout = self.store.saveEvent_span_error_(ev, self.EK.EKSpanThisEvent, None)
+        if not ok:
+            raise RuntimeError(f"Afspraak niet bevestigd: {fout}")
+        return f"bevestigd: {nl_moment(self._dt(ev.startDate()))}"
+
     def test_afspraak(self) -> tuple[object, dict]:
         """Testafspraak morgen 07:30 tot 07:45, om herinnering en slotje in Outlook te controleren."""
         morgen = (datetime.now().astimezone() + timedelta(days=1)).replace(hour=7, minute=30, second=0, microsecond=0)

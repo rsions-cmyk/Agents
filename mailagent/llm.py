@@ -190,6 +190,52 @@ class ClaudeLLM:
         data = self._vraag(system, gebruiker, SCHEMA_VERWACHTINGEN, self.cfg.sorteren_effort)
         return Verwachtingen.model_validate(data)
 
+    def afspraak_uit_mail(self, mail: Email, tekst: str, achtergrond: str | None = None) -> dict:
+        """Wat voor afspraak de afzender wil: met wie, waarover, hoe lang, waar, voorgestelde momenten, grenzen."""
+        from datetime import date as _date
+        vandaag = _date.today()
+        dagen = ["maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag", "zondag"]
+        system = (
+            f"Vandaag is het {dagen[vandaag.weekday()]} {vandaag.isoformat()}. In de mail vraagt iemand de eigenaar om "
+            "een afspraak (overleg, koffie, call, vergadering). Haal eruit: met wie (namen), het onderwerp in een paar "
+            "woorden, de duur in minuten als die genoemd of duidelijk is, de locatie of 'online' als die genoemd is, en "
+            "de momenten die in de mail worden voorgesteld, elk als datum met een tijdvak (van en tot, HH:MM; "
+            "'middag' is 12:00-17:00, 'ochtend' 09:00-12:00, 'vóór 11:30' is 09:00-11:30). Reken relatieve data als "
+            "'volgende week dinsdag' om naar een datum. Noem ook de vroegste en de laatste datum als de mail die "
+            "stelt. Verzin niets: wat niet in de mail of de achtergrond staat, blijft leeg.\n\n" + ACHTERGROND_REGEL
+            + "\n" + VEILIGHEID
+        )
+        schema = {"type": "object", "properties": {
+            "met": {"type": "string"}, "onderwerp": {"type": "string"},
+            "duur_minuten": {"type": ["integer", "null"]}, "locatie": {"type": ["string", "null"]},
+            "voorgesteld": {"type": "array", "items": {"type": "object", "properties": {
+                "dag": {"type": "string", "description": "YYYY-MM-DD"}, "van": {"type": ["string", "null"]},
+                "tot": {"type": ["string", "null"]}, "omschrijving": {"type": "string"}},
+                "required": ["dag", "van", "tot", "omschrijving"], "additionalProperties": False}},
+            "vroegst": {"type": ["string", "null"]}, "uiterlijk": {"type": ["string", "null"]}},
+            "required": ["met", "onderwerp", "duur_minuten", "locatie", "voorgesteld", "vroegst", "uiterlijk"],
+            "additionalProperties": False}
+        return self._vraag(system, achtergrond_blok(achtergrond) + mail_blok(mail, tekst), schema, self.cfg.sorteren_effort)
+
+    def concept_met_momenten(self, mail: Email, tekst: str, concept: str, momenten: list[str], niet: list[str],
+                             locatie: str | None, voorbeelden: list[dict] | None = None) -> str:
+        """Het concept-antwoord herschrijven met de momenten die de eigenaar kiest."""
+        system = (
+            "Je herschrijft het concept-antwoord van de eigenaar op een verzoek om een afspraak. Stel precies de "
+            "momenten voor die hij kiest, in de taal en de toon van het concept (of van de mail als er geen concept is). "
+            "Kan een moment dat de afzender voorstelde niet, zeg dat dan kort en vriendelijk. Vervang plekken als "
+            "[AANVULLEN: ...] over tijd en plaats; noem een locatie alleen als die gegeven is, anders vraag je wat de "
+            "ander voorkeur heeft. Houd de rest van het concept zoals het is. Geen onderwerpregel.\n\n" + VEILIGHEID
+        )
+        gebruiker = (mail_blok(mail, tekst) + f"\n\n<concept>\n{concept}\n</concept>\n\nVoor te stellen momenten:\n"
+                     + "\n".join(f"- {m}" for m in momenten)
+                     + (("\n\nKan niet (door de afzender voorgesteld):\n" + "\n".join(f"- {m}" for m in niet)) if niet else "")
+                     + (f"\n\nLocatie: {locatie}" if locatie else ""))
+        data = self._vraag(system, gebruiker, {"type": "object", "properties": {"concept": {"type": "string"}},
+                                               "required": ["concept"], "additionalProperties": False},
+                           self.cfg.uitwerken_effort)
+        return str(data.get("concept") or "").strip()
+
     def deel_afspraken_in(self, afspraken: list[dict]) -> list[dict]:
         """Soort per agenda-afspraak: les, afdeling, overleg of eigen. afspraken: [{nr, ...velden}]."""
         system = (

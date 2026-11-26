@@ -30,7 +30,7 @@ from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
 from .opmaak import externe_afbeeldingen, html_uit_bron, veilig
-from .pipeline import RondeBezig, achtergrond_voor_item, haal_uit_agenda, verzet_taak, afzender_adres, deadline_in_agenda, ochtend, voorstellen_voor, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
+from .pipeline import RondeBezig, achtergrond_voor_item, afspraak_momenten, bevestig_voorlopig, geef_voorlopig_vrij, haal_uit_agenda, houd_vast, verzet_taak, afzender_adres, deadline_in_agenda, ochtend, voorstellen_voor, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
 from .melding import meld
 from .store import Store
 
@@ -560,14 +560,67 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                         sleutel = afspraak_sleutel(a)
                         g = geleerd.get(sleutel)
                         soort, waarom = soort_bepalen(a, lessen, regels, g)
-                        if g is None and not a.get("heledag") and not a.get("vrij"):
+                        if g is None and not a.get("heledag") and not a.get("vrij") and not (a.get("id") and store.voorlopig(a["id"])):
                             onbekend.append(a)
                         uit.append({**a, "start": a["start"].isoformat(timespec="minutes"),
                                     "eind": a["eind"].isoformat(timespec="minutes"), "sleutel": sleutel,
+                                    "voorlopig": bool(a.get("id")) and store.voorlopig(a["id"]) is not None,
                                     "soort": soort, "soort_waarom": waarom, "soort_door": (g or {}).get("door", ""),
                                     "les_regel": les_regel_bij(a, regels)})
                     bezig = deel_in_op_achtergrond(onbekend) if onbekend else indelen["bezig"]
                     return self._json({"ok": True, "afspraken": uit, "bezig": bool(bezig)})
+                elif actie == "afspraak-voorstel":
+                    it = store.item(int(v["id"]))
+                    if it is None:
+                        return self._json({"ok": False, "melding": "Mail niet gevonden"})
+                    mail = Email(bron=it["bron"], bron_id=it["bron_id"], van=it["van"] or "", aan=it["aan"] or "",
+                                 onderwerp=it["onderwerp"] or "", datum=datetime.fromisoformat(it["datum"]), tekst=it["tekst"] or "")
+                    verzoek = json.loads(it["afspraak"]) if it["afspraak"] and not v.get("opnieuw") else None
+                    if verzoek is None:
+                        if not mag_naar_claude(cfg, mail):
+                            return self._json({"ok": False, "melding": "Deze afzender gaat niet naar Claude; plan de afspraak zelf"})
+                        extra, _ = achtergrond_voor_item(cfg, store, it)
+                        verzoek = llm_factory().afspraak_uit_mail(mail, anonimiseer(cfg, mail.tekst), extra or None)
+                        store.zet_afspraak_verzoek(it["id"], verzoek)
+                    morgen = date.today() + timedelta(days=1)
+                    def dag(x, standaard):
+                        try:
+                            return date.fromisoformat(str(x)[:10]) if x else standaard
+                        except ValueError:
+                            return standaard
+                    vanaf = dag(v.get("vanaf"), max(morgen, dag(verzoek.get("vroegst"), morgen)))
+                    uiterlijk = dag(v.get("uiterlijk"), dag(verzoek.get("uiterlijk"), vanaf + timedelta(days=14)))
+                    if uiterlijk < vanaf:
+                        uiterlijk = vanaf + timedelta(days=7)
+                    duur = max(15, min(480, int(v.get("duur") or verzoek.get("duur_minuten") or 30)))
+                    dagdeel = v.get("dagdeel") if v.get("dagdeel") in ("ochtend", "middag") else ""
+                    ag, fout = agenda()
+                    momenten = afspraak_momenten(cfg, ag, verzoek, vanaf, uiterlijk, dagdeel, duur) if ag else {"voorgesteld": [], "vrij": []}
+                    return self._json({"ok": True, "verzoek": verzoek, **momenten, "agenda_fout": fout if ag is None else None,
+                                       "vw": {"vanaf": vanaf.isoformat(), "uiterlijk": uiterlijk.isoformat(), "dagdeel": dagdeel, "duur": duur}})
+                elif actie == "afspraak-concept":
+                    it = store.item(int(v["id"]))
+                    mail = Email(bron=it["bron"], bron_id=it["bron_id"], van=it["van"] or "", aan=it["aan"] or "",
+                                 onderwerp=it["onderwerp"] or "", datum=datetime.fromisoformat(it["datum"]), tekst=it["tekst"] or "")
+                    if not mag_naar_claude(cfg, mail):
+                        return self._json({"ok": False, "melding": "Deze afzender gaat niet naar Claude; zet de momenten zelf in je antwoord"})
+                    concept = llm_factory().concept_met_momenten(
+                        mail, anonimiseer(cfg, mail.tekst), v.get("concept") or it["concept"] or "",
+                        [str(m) for m in v.get("momenten", [])], [str(m) for m in v.get("niet", [])], v.get("locatie"))
+                    store.zet_concept(it["id"], concept)
+                    return self._json({"ok": True, "concept": concept})
+                elif actie == "afspraak-vasthouden":
+                    ag, fout = agenda()
+                    with mail_slot:
+                        melding = houd_vast(store, ag, int(v["id"]), [str(m) for m in v.get("momenten", [])],
+                                            int(v.get("duur") or 30), v.get("onderwerp") or "Afspraak", v.get("met") or "")
+                elif actie in ("voorlopig-bevestig", "voorlopig-vrij"):
+                    ag, fout = agenda()
+                    if ag is None:
+                        return self._json({"ok": False, "melding": fout or "geen agenda gekoppeld"})
+                    with mail_slot:
+                        melding = (bevestig_voorlopig if actie == "voorlopig-bevestig" else geef_voorlopig_vrij)(store, ag, v["afspraak"])
+                    melding = melding[:1].upper() + melding[1:]
                 elif actie == "afspraak-soort":
                     sleutel = v.get("sleutel") or ""
                     if not sleutel:

@@ -185,6 +185,24 @@ details.origineel pre{white-space:pre-wrap;font:13px/1.5 -apple-system,sans-seri
 .pop-soort .knop svg{width:13px;height:13px}
 .pop-soort .knop.aan{border-color:var(--accent);color:var(--accent);font-weight:600}
 .meta-r{color:var(--zacht);font-size:12.5px;padding-left:23px}
+.afs.soort-voorlopig{background:var(--vlak);border:1.5px dashed var(--accent);border-left:4px dashed var(--accent);color:var(--accent)}
+.lg-voorlopig svg{color:var(--accent)}
+.afspr{border:1px solid var(--lijn);border-radius:12px;padding:12px 14px;background:var(--vlak)}
+.afspr .label{margin-bottom:8px}
+.af-wie{font-weight:600;margin-bottom:8px}
+.af-vw{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;font-size:13px;color:var(--zacht);margin-bottom:6px}
+.af-vw input,.af-vw select{font:inherit;padding:5px 8px;border:1px solid var(--lijn);border-radius:8px;background:var(--vlak2);color:var(--tekst)}
+.af-kop{font-size:11px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--zacht);margin:10px 0 4px}
+.af-r{display:flex;align-items:center;gap:10px;padding:5px 2px;font-size:13.5px;cursor:pointer}
+.af-r>span:nth-of-type(1){flex:1}
+.af-niet{cursor:default;color:var(--zacht)}
+.af-r.af-niet>span.af-leeg{width:13px;flex:none}
+.af-r.af-niet>span:nth-of-type(2){flex:1}
+.af-ok{color:var(--ok);font-size:12.5px;font-weight:600}
+.af-bezet{color:var(--hoog);font-size:12.5px}
+.af-acties{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px}
+.af-vast{display:inline-flex;gap:6px;align-items:center;font-size:13px}
+.af-uitleg{margin-top:8px;font-size:12px}
 .afs.soort-taak{background:var(--vlak);border-style:dashed;border-left:3px solid var(--zacht);color:var(--tekst)}
 .legenda{display:flex;flex-wrap:wrap;gap:12px;margin:0 2px 6px;font-size:11.5px;color:var(--zacht)}
 .legenda .lg{display:inline-flex;align-items:center;gap:5px}
@@ -731,6 +749,102 @@ async function controleerTaken(){
   laad();
 }
 
+// Afspraak plannen: wat de afzender voorstelt, of jij dan kunt, vrije momenten binnen jouw voorwaarden,
+// en de gekozen momenten in het concept (met Claude), voorlopig in je agenda of in Outlook
+const afspr = {};   // item-id -> {laden, fout, data, gekozen:Set(iso), vast, bezig}
+const langDag = iso => new Date(iso).toLocaleDateString("nl-NL", {weekday: "long", day: "numeric", month: "long"});
+const momentKort = (iso, duur) => `${new Date(iso).toLocaleDateString("nl-NL", {weekday: "short", day: "numeric", month: "short"})} ${tijdVan(Date.parse(iso))}–${tijdVan(Date.parse(iso) + duur * 60000)}`;
+async function laadAfspraak(id, vw, opnieuw){
+  const oud = afspr[id];
+  afspr[id] = {laden: true, gekozen: oud ? oud.gekozen : new Set(), vast: oud ? oud.vast : false};
+  teken();
+  const j = await stil("afspraak-voorstel", {id, ...(vw || {}), opnieuw: !!opnieuw});
+  afspr[id] = {laden: false, fout: j.ok ? null : j.melding, data: j.ok ? j : null, gekozen: new Set(), vast: afspr[id].vast};
+  if (j.ok){   // wat jij kunt, standaard aangevinkt: eerst uit de mail, anders de eerste twee vrije momenten
+    const uitMail = j.voorgesteld.filter(x => x.vrij).map(x => x.vrij);
+    (uitMail.length ? uitMail : j.vrij.slice(0, 2)).forEach(m => afspr[id].gekozen.add(m));
+  }
+  teken();
+}
+function afspraakHTML(it){
+  const a = afspr[it.id];
+  const kop = `<div class="label">${ik("mensen")}Afspraak plannen</div>`;
+  if (!a) return `<div class="afspr">${kop}<button class="knop" data-afsprladen="${it.id}">${ik("sparkle")}Momenten zoeken</button>
+      <span class="meta">Claude leest wat de afzender voorstelt; de app kijkt in je agenda.</span></div>`;
+  if (a.laden) return `<div class="afspr">${kop}<span class="meta">Claude leest de mail en de app kijkt in je agenda…</span></div>`;
+  if (a.fout) return `<div class="afspr">${kop}<div class="melding fout">${ik("alert")}<div>${esc(a.fout)}</div></div></div>`;
+  const d = a.data, v = d.verzoek, vw = d.vw;
+  const rij = (iso, tekst, extra) => `<label class="af-r"><input type="checkbox" data-afkies="${it.id}" value="${esc(iso)}"${a.gekozen.has(iso) ? " checked" : ""}>
+      <span>${tekst}</span>${extra || ""}</label>`;
+  const metDatum = x => `${esc(x.omschrijving)} <span class="meta">(${esc(kortDatum(x.dag))})</span>`;
+  const uitMail = d.voorgesteld.map(x => x.vrij
+      ? rij(x.vrij, metDatum(x), `<span class="af-ok">vrij ${tijdVan(Date.parse(x.vrij))}–${tijdVan(Date.parse(x.vrij) + vw.duur * 60000)}</span>`)
+      : `<div class="af-r af-niet"><span class="af-leeg"></span><span>${metDatum(x)}</span><span class="af-bezet">${x.verleden ? "voorbij"
+          : x.te_vroeg ? "vóór je startdatum" : "bezet" + (x.botsingen.length ? ": " + esc(x.botsingen.join(", ")) : "")}</span></div>`).join("");
+  const vrij = d.vrij.filter(m => !d.voorgesteld.some(x => x.vrij === m)).map(m => rij(m, esc(momentKort(m, vw.duur)))).join("");
+  const n = a.gekozen.size;
+  return `<div class="afspr">${kop}
+    <div class="af-wie">${esc(v.met || "de afzender")} · ${vw.duur} min${v.onderwerp ? " · " + esc(v.onderwerp) : ""}${v.locatie ? " · " + esc(v.locatie) : ""}</div>
+    <div class="af-vw">
+      <label>Niet vóór <input type="date" data-afvw="vanaf" data-id="${it.id}" value="${esc(vw.vanaf)}"></label>
+      <label>Uiterlijk <input type="date" data-afvw="uiterlijk" data-id="${it.id}" value="${esc(vw.uiterlijk)}"></label>
+      <select data-afvw="dagdeel" data-id="${it.id}" aria-label="Dagdeel"><option value="">Hele dag</option><option value="ochtend"${vw.dagdeel === "ochtend" ? " selected" : ""}>Ochtend</option><option value="middag"${vw.dagdeel === "middag" ? " selected" : ""}>Middag</option></select>
+      <select data-afvw="duur" data-id="${it.id}" aria-label="Duur">${[15, 30, 45, 60, 90, 120].map(m => `<option value="${m}"${m === vw.duur ? " selected" : ""}>${duurTekst(m)}</option>`).join("")}</select>
+    </div>
+    ${d.agenda_fout ? `<div class="melding">${ik("alert")}<div>${esc(d.agenda_fout)}</div></div>` : ""}
+    ${d.voorgesteld.length ? `<div class="af-kop">Voorgesteld in de mail</div>${uitMail}` : ""}
+    <div class="af-kop">Vrij in jouw agenda${vw.dagdeel ? " (" + vw.dagdeel + ")" : ""}</div>
+    ${vrij || `<div class="meta">Geen vrij moment tussen ${esc(kortDatum(vw.vanaf))} en ${esc(kortDatum(vw.uiterlijk))}. Verruim je voorwaarden.</div>`}
+    <div class="af-acties">
+      <button class="knop klein goed" data-afconcept="${it.id}"${n && !a.bezig ? "" : " disabled"}>${ik("sparkle")}${a.bezig ? "Claude schrijft…" : n === 1 ? "Dit moment in het concept" : `Deze ${n} momenten in het concept`}</button>
+      <label class="af-vast"><input type="checkbox" data-afvast="${it.id}"${a.vast ? " checked" : ""}> Voorlopig vasthouden in je agenda</label>
+      <button class="knop klein" data-afoutlook="${it.id}"${n ? "" : " disabled"} title="Nieuwe afspraak in Outlook op het web voor het eerste gekozen moment, met tijd en onderwerp ingevuld. Voeg daar ${esc(v.met || "de ander")} toe; Outlook laat zien of die kan.">${ik("calendar")}Openen in Outlook</button>
+      <button class="knop klein" data-afopnieuw="${it.id}" title="Claude leest de mail opnieuw">Opnieuw lezen</button>
+    </div>
+    <div class="meta af-uitleg">De agenda van ${esc(v.met || "de ander")} kan de app niet zien. In Outlook zie je die beschikbaarheid wel als je hem of haar uitnodigt.</div>
+  </div>`;
+}
+function outlookLink(startIso, duur, onderwerp, locatie, tekst){
+  const z = ms => new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z");
+  const b = Date.parse(startIso);
+  return "https://outlook.office.com/calendar/action/compose?rru=addevent"
+    + `&subject=${encodeURIComponent(onderwerp || "Afspraak")}&startdt=${z(b)}&enddt=${z(b + duur * 60000)}`
+    + (locatie ? `&location=${encodeURIComponent(locatie)}` : "") + (tekst ? `&body=${encodeURIComponent(tekst)}` : "");
+}
+document.addEventListener("change", ev => {
+  const t = ev.target;
+  if (t.dataset.afkies){ const a = afspr[Number(t.dataset.afkies)]; if (a){ t.checked ? a.gekozen.add(t.value) : a.gekozen.delete(t.value); teken(); } }
+  if (t.dataset.afvast){ const a = afspr[Number(t.dataset.afvast)]; if (a){ a.vast = t.checked; } }
+  if (t.dataset.afvw){
+    const id = Number(t.dataset.id), a = afspr[id];
+    if (!a || !a.data) return;
+    const vw = {...a.data.vw, [t.dataset.afvw]: t.dataset.afvw === "duur" ? Number(t.value) : t.value};
+    laadAfspraak(id, vw);
+  }
+});
+async function afspraakNaarConcept(id){
+  const a = afspr[id], it = [...D.zelf, ...D.wacht].find(x => x.id === id);
+  if (!a || !a.data || !it) return;
+  const vw = a.data.vw, gekozen = [...a.gekozen].sort();
+  const momenten = gekozen.map(m => `${langDag(m)} ${tijdVan(Date.parse(m))}–${tijdVan(Date.parse(m) + vw.duur * 60000)}`);
+  const niet = a.data.voorgesteld.filter(x => !x.vrij).map(x => x.omschrijving);
+  const veld = document.getElementById("concept");
+  a.bezig = true; teken();
+  const j = await stil("afspraak-concept", {id, concept: veld ? veld.value : it.concept, momenten, niet, locatie: a.data.verzoek.locatie});
+  a.bezig = false;
+  if (!j.ok){ toast(j.melding, true); return teken(); }
+  it.concept = j.concept;
+  const v2 = document.getElementById("concept"); if (v2) v2.value = j.concept;
+  let melding = "De momenten staan in je concept. Lees het na en zet het in Mail of verstuur het.";
+  if (a.vast){
+    const h = await stil("afspraak-vasthouden", {id, momenten: gekozen, duur: vw.duur, onderwerp: a.data.verzoek.onderwerp, met: a.data.verzoek.met});
+    melding += " " + (h.ok ? h.melding + "." : h.melding);
+    legeDagen();
+  }
+  toast(melding);
+  teken();
+}
+
 // Welke eerdere mail Claude als achtergrond gebruikte voor dit concept en deze taken
 function achtergrondHTML(context, van){
   const ik_ = afzender(van || ""), wieNaam = w => (w || "").toLowerCase() === (ik_.adres || "").toLowerCase() ? ik_.naam : w;
@@ -1202,7 +1316,11 @@ function openAfspraak(i, anker){
   el.innerHTML = `
     <div class="pop-kop"><b>${esc(t ? t.omschrijving : a.titel)}</b><button class="ikoon" data-popdicht="1" title="Sluiten (Esc)">${ik("x")}</button></div>
     <div class="pop-r">${ik("clock")}<span>${esc(dagTekst)} · ${tijd}${a.vrij ? " · telt als vrij" : ""}${isFocus(a) ? " · beschermd" : ""}</span></div>
-    ${!t && !a.vrij && !a.heledag ? soortHTML(a) : ""}
+    ${a.voorlopig ? `<div class="pop-r">${ik("clock")}<span><b>Voorlopig vastgehouden</b> voor een afspraak die je voorstelde</span></div>
+      <div class="pop-acties"><button class="knop klein goed" data-bevestig="${esc(a.id)}">${ik("check")}Bevestigen</button>
+        <button class="knop klein" data-vrijgeven="${esc(a.id)}">Vrijgeven</button></div>
+      <div class="meta-r">Bevestigen maakt dit de echte afspraak en geeft de andere voorgestelde momenten vrij.</div>`
+      : !t && !a.vrij && !a.heledag ? soortHTML(a) : ""}
     ${a.locatie ? `<div class="pop-r">${ik("pin")}<span>${linkjes(a.locatie)}</span></div>` : ""}
     ${a.kalender ? `<div class="pop-r">${ik("calendar")}<span>${esc(a.kalender)}</span></div>` : ""}
     ${a.organisator && (a.organisator.naam || a.organisator.adres) ? `<div class="pop-r">${ik("mail")}<span>Georganiseerd door ${esc(a.organisator.naam || a.organisator.adres)}</span></div>` : ""}
@@ -1242,6 +1360,11 @@ document.addEventListener("click", async ev => {
   const d = b.dataset;
   if (d.popdicht) return sluitPop();
   if (d.agendaopen){ stil("agenda-openen", {start: d.agendaopen}); return; }
+  if (d.bevestig || d.vrijgeven){
+    sluitPop();
+    const j = await stil(d.bevestig ? "voorlopig-bevestig" : "voorlopig-vrij", {afspraak: d.bevestig || d.vrijgeven});
+    toast(j.melding, !j.ok); legeDagen(); return teken();
+  }
   if (d.zetsoort){
     sluitPop();
     const j = await stil("afspraak-soort", {sleutel: d.sleutel, soort: d.zetsoort === "auto" ? null : d.zetsoort,
@@ -1548,7 +1671,9 @@ function tekenBalk(){
 
 function tekenPaneel(it){
   const p = document.getElementById("paneel");
-  const sig = JSON.stringify([it, bewerkt[it.id] || null, schrijft.has(it.id), drieKolommen()]);
+  const af = afspr[it.id];
+  const sig = JSON.stringify([it, bewerkt[it.id] || null, schrijft.has(it.id), drieKolommen(),
+                              af ? [af.laden, af.fout, af.data, [...af.gekozen], af.vast, af.bezig] : null]);
   if (p.dataset.sig === sig && Number(p.dataset.id) === it.id && p.classList.contains("open")) return;   // niets veranderd
   p.dataset.sig = sig;
   const a = afzender(it.van), [ai, al] = ACTIES[it.actie] || ["mail", it.actie];
@@ -1579,6 +1704,7 @@ function tekenPaneel(it){
       ${it.samenvatting && it.samenvatting !== it.onderwerp ? `<div class="melding info">${ik("sparkle")}<div>${esc(it.samenvatting)}</div></div>` : ""}
       ${zelf ? `<div class="melding fout">${ik("alert")}<div>${esc(it.opmerking || it.reden || "Bekijk deze mail zelf.")}</div></div>` : ""}
       ${it.vragen && !beantwoord ? `<div class="melding">${ik("alert")}<div><b>Beslissing voor jou</b><br>${esc(it.vragen)}</div></div>` : ""}
+      ${!beantwoord && (it.actie === "agenda" || afspr[it.id]) ? afspraakHTML(it) : ""}
       ${beantwoord ? `<details class="al-beantwoord"${zelfdeMail && p.querySelector("details.al-beantwoord")?.open ? " open" : ""}><summary>Concept, achtergrond en taken toch tonen</summary>
         ${it.vragen ? `<div class="melding" style="margin-bottom:12px">${ik("alert")}<div><b>Beslissing voor jou</b><br>${esc(it.vragen)}</div></div>` : ""}` : ""}
       <div><div class="label">${ik("reply")}Concept-antwoord</div>
@@ -1595,12 +1721,13 @@ function tekenPaneel(it){
             <button class="knop klein" data-klaarzetten="${it.id}" title="Alle taken naar Planning, zonder nu te antwoorden. De mail en het concept blijven bij de taken.">${ik("calendar")}Taken klaarzetten</button></div>
           <div class="tk-uitleg">Antwoord je nu, dan vervalt de antwoordtaak en gaan de andere taken mee naar Planning.</div></div></div>
       ${beantwoord ? `</details>` : ""}
-      ${it.agenda ? `<div class="melding info">${ik("calendar")}<div><b>Agendavoorstel</b><br>${esc(it.agenda)}</div></div>` : ""}
+      ${!(it.actie === "agenda" || afspr[it.id]) && it.agenda ? `<div class="melding info">${ik("calendar")}<div><b>Agendavoorstel</b><br>${esc(it.agenda)}</div></div>` : ""}
       <details class="origineel" data-orig="${it.id}"><summary>${ik("mail")}Oorspronkelijke mail</summary>${p.querySelector(`details[data-orig="${it.id}"]`)?.open ? mailWeergave(it.id, it.tekst) : ""}</details>
     </div>
     <div class="p-voet voet-acties">
       <div class="groepje">
         <button class="knop ikoonknop" data-maaktaak="${it.id}" title="Taak maken en inplannen (T)">${ik("calendar")}<kbd>T</kbd></button>
+        ${it.actie === "agenda" ? "" : `<button class="knop ikoonknop" data-afsprladen="${it.id}" title="Afspraak plannen met de afzender">${ik("mensen")}</button>`}
         <button class="knop ikoonknop" data-opbergen="${it.id}" title="Opbergen in een map (V)">${ik("folder")}<kbd>V</kbd></button>
         <button class="knop ikoonknop" data-een="archief" data-id="${it.id}" title="Archiveren zonder antwoord (E)">${ik("archive")}<kbd>E</kbd></button>
         <button class="knop ikoonknop" id="afwijzen" title="Afwijzen: het voorstel klopt niet (X)">${ik("x")}<kbd>X</kbd></button>
@@ -1659,9 +1786,10 @@ function afsprakenHTML(lijst, d0, van, tot, schaal, kalenderInTitel, klikbaar){
   });
   bezet.forEach(a => {
     const hoog = Math.max(14, (a.e-a.b)*schaal - 2), n = a.n, sleep = klikbaar && sleepbaar(a);
-    const taak = klikbaar ? appTaakBij(a) : null, soort = taak ? "taak" : isFocus(a) ? "" : (a.soort || "");
+    const taak = klikbaar ? appTaakBij(a) : null, soort = a.voorlopig ? "voorlopig" : taak ? "taak" : isFocus(a) ? "" : (a.soort || "");
     const anderen = (a.deelnemers || []).filter(d => !d.ik).length;
     const voor = soort === "overleg" ? `<span class="afs-ik" title="Vergadering met ${anderen} ${anderen === 1 ? "ander" : "anderen"}">${ik("mensen")}${anderen}</span>`
+      : soort === "voorlopig" ? `<span class="afs-ik" title="Voorlopig vastgehouden">${ik("clock")}</span>`
       : soort === "les" ? `<span class="afs-ik" title="Les">${ik("les")}</span>`
       : soort === "afdeling" ? `<span class="afs-ik" title="Overleg van de afdeling of het team">${ik("afdeling")}${anderen || ""}</span>`
       : soort === "taak" ? `<span class="afs-ik" title="Taak uit de app">${ik("check")}<span class="stip" style="background:${kleur(taak.project)}"></span></span>` : "";
@@ -1931,6 +2059,15 @@ document.addEventListener("click", async ev => {
   if (d.wacht && t.classList.contains("rij")){ staat.wacht = Number(d.wacht); staat.open = null; taak = null; antwoord = null; return teken(); }
   if (t.id === "w-claude") return schrijfHerinnering(Number(d.wachtid));
   if (t.id === "w-kopieer") return kopieerHerinnering(Number(d.wachtid));
+  if (d.afsprladen) return laadAfspraak(Number(d.afsprladen));
+  if (d.afopnieuw) return laadAfspraak(Number(d.afopnieuw), afspr[Number(d.afopnieuw)]?.data?.vw, true);
+  if (d.afconcept) return afspraakNaarConcept(Number(d.afconcept));
+  if (d.afoutlook){
+    const a = afspr[Number(d.afoutlook)]; if (!a || !a.data || !a.gekozen.size) return;
+    const m = [...a.gekozen].sort()[0], v = a.data.verzoek;
+    window.open(outlookLink(m, a.data.vw.duur, v.onderwerp || "Afspraak", v.locatie, `Afspraak met ${v.met || ""}`), "_blank", "noopener");
+    return;
+  }
   if (t.id === "controleer") return controleerTaken();
   if (d.vandaagdicht){ try { localStorage.setItem("mailagent-vandaag-dicht", isoDag(new Date())); } catch(e){} return teken(); }
   if (d.vandaagopen){ try { localStorage.removeItem("mailagent-vandaag-dicht"); } catch(e){} return teken(); }
@@ -2335,8 +2472,8 @@ function plTijdlijnHTML(){
             <b>${esc(t ? t.omschrijving : "Taak")}</b><span id="pl-tijd">${blokTijdVan(plaatsing.start, plaatsing.minuten)}</span><div class="rek"></div></div>`;
   }
   const heledag = lijst.map((a, i) => ({...a, i})).filter(a => a.heledag);
-  const soorten = new Set(lijst.filter(a => !a.heledag).map(a => appTaakBij(a) ? "taak" : isFocus(a) ? "focus" : a.vrij ? "" : (a.soort || "eigen")));
-  const legenda = [["les", "les", "Les"], ["afdeling", "afdeling", "Afdeling of team"], ["overleg", "mensen", "Met anderen"], ["taak", "check", "Taak uit de app"], ["focus", "clock", "Beschermd"], ["eigen", "calendar", "Eigen afspraak"]]
+  const soorten = new Set(lijst.filter(a => !a.heledag).map(a => a.voorlopig ? "voorlopig" : appTaakBij(a) ? "taak" : isFocus(a) ? "focus" : a.vrij ? "" : (a.soort || "eigen")));
+  const legenda = [["voorlopig", "clock", "Voorlopig"], ["les", "les", "Les"], ["afdeling", "afdeling", "Afdeling of team"], ["overleg", "mensen", "Met anderen"], ["taak", "check", "Taak uit de app"], ["focus", "clock", "Beschermd"], ["eigen", "calendar", "Eigen afspraak"]]
     .filter(([k]) => soorten.has(k)).map(([k, i, l]) => `<span class="lg lg-${k}">${ik(i)}${l}</span>`).join("");
   return (legenda && soorten.size > 1 ? `<div class="legenda">${legenda}</div>` : "") + (heledag.length ? `<div class="heledag">${heledag.map(a => `<span class="klik" data-afs="${a.i}" tabindex="0">${esc(a.titel)}</span>`).join("")}</div>` : "") +
     `<div class="tijdlijn" id="pl-tijdlijn"><div class="tl-binnen" id="pl-binnen" data-van="${van}" style="height:${(tot-van)*PLPX}px">${h}</div></div>`;

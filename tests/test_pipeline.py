@@ -50,6 +50,17 @@ class NepLLM:
         return TakenOordeel(taken=[TaakOordeel(taak_id=i, klaar=any(w in antwoord.lower() for w in t.lower().split()[:1]),
                                                reden="test") for i, t in taken])
 
+    def afspraak_uit_mail(self, mail, tekst, achtergrond=None):
+        from datetime import date, timedelta
+        maandag = date.today() + timedelta(days=(7 - date.today().weekday()) % 7 or 7)
+        return {"met": "Peter Warner", "onderwerp": "Koffie over Erasmus+", "duur_minuten": 30, "locatie": None,
+                "voorgesteld": [{"dag": maandag.isoformat(), "van": "12:00", "tot": "17:00", "omschrijving": "maandagmiddag"},
+                                {"dag": (maandag + timedelta(days=1)).isoformat(), "van": "09:00", "tot": "11:30", "omschrijving": "dinsdag vóór 11:30"}],
+                "vroegst": None, "uiterlijk": None}
+
+    def concept_met_momenten(self, mail, tekst, concept, momenten, niet, locatie, voorbeelden=None):
+        return "Hi Peter, " + (" of ".join(momenten)) + (". Niet: " + ", ".join(niet) if niet else "")
+
     def deel_afspraken_in(self, afspraken):
         self.gezien.extend(a.get("titel", "") for a in afspraken)
         uit = []
@@ -1319,3 +1330,46 @@ def test_afspraken_indelen_door_claude_en_jouw_keuze(omgeving):
     assert soort_bepalen(staff, {}, [], g) == ("eigen", "jouw keuze")
     # zonder Claude herkent de app een groot overleg ook zelf als afdeling
     assert soort_bepalen({**staff, "id": "X"}, {}, [], None)[0] == "afdeling"
+
+
+def test_afspraak_plannen_momenten_vasthouden_bevestigen(omgeving):
+    from datetime import date, datetime, time, timedelta
+    from mailagent.pipeline import afspraak_momenten, bevestig_voorlopig, houd_vast
+
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    it = store.items(status="wacht")[0]
+    verzoek = NepLLM().afspraak_uit_mail(None, "")
+    maandag = date.fromisoformat(verzoek["voorgesteld"][0]["dag"])
+
+    class Ag(NepAgenda2):
+        def __init__(self):
+            super().__init__(); self.voorlopig, self.weg, self.bevestigd = [], [], []
+            del self.afspraken                # de lijst van NepAgenda2 zou de methode hieronder verbergen
+        def afspraken(self, van, tot):     # maandagmiddag vol, dinsdagochtend vrij
+            b = datetime.combine(maandag, time(12, 0)).astimezone()
+            return [{"titel": "Teamoverleg", "start": b, "eind": b + timedelta(hours=5), "heledag": False, "vrij": False}]
+        def bezet(self, van, tot):
+            return [(a["start"], a["eind"]) for a in self.afspraken(van, tot)]
+        def maak_voorlopig(self, titel, start, eind, notities):
+            self.voorlopig.append((titel, start)); return f"V{len(self.voorlopig)}"
+        def bevestig_voorlopig(self, aid, titel):
+            self.bevestigd.append((aid, titel)); return "bevestigd"
+        def verwijder_afspraak(self, aid):
+            self.weg.append(aid); return True
+    ag = Ag()
+    vanaf = maandag + timedelta(days=2)          # 'na dinsdag'
+    m = afspraak_momenten(cfg, ag, verzoek, vanaf, vanaf + timedelta(days=7), "middag", 30)
+    assert m["voorgesteld"][0]["vrij"] is None and "Teamoverleg" in m["voorgesteld"][0]["botsingen"]   # maandag bezet
+    assert m["voorgesteld"][1]["vrij"] is None and m["voorgesteld"][1]["te_vroeg"]                   # dinsdag: vóór 'niet vóór'
+    m0 = afspraak_momenten(cfg, ag, verzoek, maandag, maandag + timedelta(days=7), "", 30)
+    assert "T09:" in m0["voorgesteld"][1]["vrij"]                                                    # zonder grens kan dinsdag wel
+    vrij = [datetime.fromisoformat(x) for x in m["vrij"]]
+    assert vrij and all(x.date() >= vanaf and x.hour >= 13 for x in vrij)          # niet vóór, en 's middags
+    assert len({x.date() for x in vrij}) == len(vrij)                              # hoogstens één per dag
+
+    houd_vast(store, ag, it["id"], [m["vrij"][0], m["vrij"][1]], 30, "Koffie over Erasmus+", "Peter Warner")
+    assert [t for t, _ in ag.voorlopig] == ["Voorlopig: Koffie over Erasmus+ (Peter Warner)"] * 2
+    assert "1 andere momenten vrijgegeven" in bevestig_voorlopig(store, ag, "V2")
+    assert ag.bevestigd == [("V2", "Koffie over Erasmus+ (Peter Warner)")] and ag.weg == ["V1"]
+    assert store.voorlopige(it["id"]) == []

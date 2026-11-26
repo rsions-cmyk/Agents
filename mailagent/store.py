@@ -115,6 +115,12 @@ CREATE TABLE IF NOT EXISTS afspraak_soorten (
     titel TEXT,
     aangemaakt TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS voorlopig (
+    afspraak_id TEXT PRIMARY KEY,   -- voorlopig vastgehouden moment in je agenda
+    item_id INTEGER NOT NULL,       -- de mail met het verzoek
+    titel TEXT, start TEXT, eind TEXT,
+    aangemaakt TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS gemeld (
     sleutel TEXT PRIMARY KEY,
     tijd TEXT NOT NULL
@@ -158,7 +164,8 @@ class Store:
             self.db.execute("ALTER TABLE items ADD COLUMN eigen_antwoord TEXT")
         if "vorige_status" not in itemkolommen:
             self.db.execute("ALTER TABLE items ADD COLUMN vorige_status TEXT")
-        for kolom in ("lijkt_beantwoord", "bewijs", "deadline_in_agenda", "context"):   # context: gebruikte achtergrond
+        for kolom in ("lijkt_beantwoord", "bewijs", "deadline_in_agenda", "context",   # context: gebruikte achtergrond
+                      "afspraak"):                                                     # afspraak: verzoek uit de mail (JSON)
             if kolom not in itemkolommen:
                 self.db.execute(f"ALTER TABLE items ADD COLUMN {kolom} TEXT")
         wachtkolommen = {r["name"] for r in self.db.execute("PRAGMA table_info(wacht_op)")}
@@ -413,6 +420,27 @@ class Store:
 
     def wis_afspraak_soort(self, sleutel: str) -> None:
         self.db.execute("DELETE FROM afspraak_soorten WHERE sleutel=?", (sleutel,))
+        self.db.commit()
+
+    def zet_afspraak_verzoek(self, item_id: int, verzoek: dict) -> None:
+        self.db.execute("UPDATE items SET afspraak=? WHERE id=?", (json.dumps(verzoek, ensure_ascii=False), item_id))
+        self.db.commit()
+
+    def bewaar_voorlopig(self, afspraak_id: str, item_id: int, titel: str, start: str, eind: str) -> None:
+        self.db.execute("INSERT OR REPLACE INTO voorlopig(afspraak_id, item_id, titel, start, eind, aangemaakt) VALUES (?,?,?,?,?,?)",
+                        (afspraak_id, item_id, titel, start, eind, nu()))
+        self.db.commit()
+
+    def voorlopige(self, item_id: int | None = None) -> list[sqlite3.Row]:
+        if item_id is None:
+            return self.db.execute("SELECT * FROM voorlopig ORDER BY start").fetchall()
+        return self.db.execute("SELECT * FROM voorlopig WHERE item_id=? ORDER BY start", (item_id,)).fetchall()
+
+    def voorlopig(self, afspraak_id: str) -> Optional[sqlite3.Row]:
+        return self.db.execute("SELECT * FROM voorlopig WHERE afspraak_id=?", (afspraak_id,)).fetchone()
+
+    def wis_voorlopig(self, afspraak_id: str) -> None:
+        self.db.execute("DELETE FROM voorlopig WHERE afspraak_id=?", (afspraak_id,))
         self.db.commit()
 
     def les_regels(self) -> list[sqlite3.Row]:

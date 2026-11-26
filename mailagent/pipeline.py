@@ -871,6 +871,105 @@ def voorstellen_voor(agenda, cfg: Config, taken: list, vanaf: datetime) -> dict[
     return uit
 
 
+def afspraak_momenten(cfg: Config, agenda, verzoek: dict, vanaf, uiterlijk, dagdeel: str, duur: int) -> dict:
+    """Bij een verzoek om een afspraak: of jij kunt op de momenten uit de mail, en vrije momenten binnen jouw
+    voorwaarden (niet vóór, uiterlijk, ochtend of middag, duur). Hoogstens één voorstel per dag."""
+    from datetime import date as _date, time as _time
+    from .agenda import Werktijd, _volgend_kwartier, lees_werktijd, vrije_momenten
+    werk = lees_werktijd(cfg.agenda)
+    vandaag = _date.today()
+
+    def dag_van(x):
+        try:
+            return _date.fromisoformat(str(x)[:10])
+        except ValueError:
+            return None
+
+    def tijd_van(x, standaard):
+        try:
+            return _time.fromisoformat(str(x)[:5]) if x else standaard
+        except ValueError:
+            return standaard
+    voorstellen = [(p, dag_van(p.get("dag"))) for p in verzoek.get("voorgesteld") or []]
+    voorstellen = [(p, d) for p, d in voorstellen if d]
+    begin = min([vanaf] + [d for _, d in voorstellen])
+    eind = max([uiterlijk] + [d for _, d in voorstellen])
+    van_dt = datetime.combine(begin, _time(0)).astimezone()
+    tot_dt = datetime.combine(eind + timedelta(days=1), _time(0)).astimezone()
+    if hasattr(agenda, "afspraken"):
+        alle = [a for a in agenda.afspraken(van_dt, tot_dt) if not a["heledag"] and not a.get("vrij")]
+    else:
+        alle = [{"titel": "Bezet", "start": b, "eind": e} for b, e in agenda.bezet(van_dt, tot_dt)]
+    bezet = [(a["start"], a["eind"]) for a in alle]
+    lengte = timedelta(minutes=duur)
+    uit_mail = []
+    for p, d in voorstellen:
+        start = datetime.combine(d, tijd_van(p.get("van"), werk.begin)).astimezone()
+        einde = datetime.combine(d, tijd_van(p.get("tot"), werk.eind)).astimezone()
+        gevonden, t = None, _volgend_kwartier(max(start, datetime.now().astimezone()))
+        while d >= vandaag and t + lengte <= einde:
+            botsing = next((e for b, e in sorted(bezet) if b < t + lengte and e > t), None)
+            if botsing is None:
+                gevonden = t
+                break
+            t = _volgend_kwartier(max(botsing, t + timedelta(minutes=15)))
+        botsingen = [a["titel"] for a in alle if a["start"] < einde and a["eind"] > start][:3]
+        uit_mail.append({"omschrijving": p.get("omschrijving") or d.isoformat(), "dag": d.isoformat(),
+                         "vrij": gevonden.isoformat(timespec="minutes") if gevonden and d >= vanaf else None,
+                         "botsingen": botsingen, "verleden": d < vandaag, "te_vroeg": vandaag <= d < vanaf})
+    w = Werktijd(dagen=werk.dagen, begin=werk.begin, eind=werk.eind,
+                 dagen_vooruit=max(1, (uiterlijk - vanaf).days + 1))
+    if dagdeel == "ochtend":
+        w.eind = min(werk.eind, _time(12, 0))
+    elif dagdeel == "middag":
+        w.begin = max(werk.begin, _time(13, 0))
+    nu_ = max(datetime.now().astimezone(), datetime.combine(vanaf, _time(0)).astimezone())
+    vrij = vrije_momenten(bezet, duur, nu_, w, uiterlijk, aantal=4)
+    return {"voorgesteld": uit_mail, "vrij": [m.isoformat(timespec="minutes") for m in vrij]}
+
+
+def houd_vast(store: Store, agenda, item_id: int, momenten: list[str], duur: int, onderwerp: str, met: str) -> str:
+    """Aangeboden momenten voorlopig in je agenda, zodat er niets anders in komt. Na een klik."""
+    if agenda is None or not hasattr(agenda, "maak_voorlopig"):
+        raise ValueError("voorlopig vasthouden kan niet in deze agenda")
+    item = store.item(item_id)
+    titel = onderwerp + (f" ({met})" if met else "")
+    for m in momenten:
+        start = datetime.fromisoformat(m).astimezone()
+        eind = start + timedelta(minutes=duur)
+        aid = agenda.maak_voorlopig(f"Voorlopig: {titel}", start, eind,
+                                    f"Voorgesteld aan {met or 'de afzender'}, naar aanleiding van: {item['onderwerp'] if item else ''}")
+        store.bewaar_voorlopig(aid, item_id, titel, start.isoformat(timespec="minutes"), eind.isoformat(timespec="minutes"))
+    return (f"{len(momenten)} momenten voorlopig vastgehouden" if len(momenten) != 1 else "1 moment voorlopig vastgehouden")
+
+
+def bevestig_voorlopig(store: Store, agenda, afspraak_id: str) -> str:
+    """Het gekozen moment wordt een echte afspraak; de andere voorlopige momenten van dit verzoek gaan weg."""
+    v = store.voorlopig(afspraak_id)
+    if v is None:
+        raise ValueError("dit is geen voorlopig moment van de app")
+    melding = agenda.bevestig_voorlopig(afspraak_id, v["titel"])
+    weg = 0
+    for ander in store.voorlopige(v["item_id"]):
+        if ander["afspraak_id"] != afspraak_id:
+            try:
+                agenda.verwijder_afspraak(ander["afspraak_id"])
+            except Exception as e:
+                log.warning("voorlopig moment niet weg: %s", e)
+            store.wis_voorlopig(ander["afspraak_id"])
+            weg += 1
+    store.wis_voorlopig(afspraak_id)
+    return melding + (f"; {weg} andere momenten vrijgegeven" if weg else "")
+
+
+def geef_voorlopig_vrij(store: Store, agenda, afspraak_id: str) -> str:
+    if store.voorlopig(afspraak_id) is None:
+        raise ValueError("dit is geen voorlopig moment van de app")
+    agenda.verwijder_afspraak(afspraak_id)
+    store.wis_voorlopig(afspraak_id)
+    return "Moment vrijgegeven"
+
+
 def deadline_in_agenda(store: Store, agenda, soort: str, rij_id: int) -> str:
     """Deadline van een taak of mail als hele-dag-afspraak in je agenda. Alleen na een klik."""
     from datetime import date as _date
