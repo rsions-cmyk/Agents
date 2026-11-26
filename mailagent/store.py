@@ -131,7 +131,8 @@ class Store:
                              ("soort", "TEXT"),           # 'antwoord' voor de taak 'Beantwoorden: …'
                              ("lijkt_klaar", "TEXT"),     # waarom de app denkt dat de taak al gedaan is
                              ("bewijs", "TEXT"),          # Message-ID van het verstuurde antwoord dat is bekeken
-                             ("deadline_in_agenda", "TEXT")):   # datum van de deadline-afspraak in je agenda
+                             ("deadline_in_agenda", "TEXT"),    # datum van de deadline-afspraak in je agenda
+                             ("afspraak_id", "TEXT")):          # de afspraak in je agenda (EventKit-id)
             if kolom not in kolommen:
                 self.db.execute(f"ALTER TABLE taken ADD COLUMN {kolom} {soort}")
         self.db.execute("UPDATE taken SET soort='antwoord' WHERE soort IS NULL "
@@ -273,6 +274,15 @@ class Store:
         self.db.commit()
 
     # --- al beantwoord, belangrijke afzenders, wacht op antwoord, meldingen ---
+    def zet_afspraak_id(self, taak_id: int, afspraak_id: str | None) -> None:
+        self.db.execute("UPDATE taken SET afspraak_id=? WHERE id=?", (afspraak_id, taak_id))
+        self.db.commit()
+
+    def ontplan_taak(self, taak_id: int) -> None:
+        self.db.execute("UPDATE taken SET gepland=NULL, afspraak_id=NULL WHERE id=?", (taak_id,))
+        self.db.commit()
+        self.log(None, f"taak {taak_id} uit de agenda gehaald")
+
     def zet_deadline_in_agenda(self, soort: str, rij_id: int, dag: str) -> None:
         tabel = "taken" if soort == "taak" else "items"
         self.db.execute(f"UPDATE {tabel} SET deadline_in_agenda=? WHERE id=?", (dag, rij_id))

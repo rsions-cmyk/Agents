@@ -1187,3 +1187,31 @@ def test_later_contact_als_vraag_en_jouw_antwoord_in_beeld(omgeving):
     store.wis_lijkt_beantwoord(it["id"])                                      # 'Nog niet'
     controleer_uitgaand(cfg, store, bronnen, NepLLM())
     assert store.item(it["id"])["lijkt_beantwoord"] is None                   # niet opnieuw voor dezelfde mail
+
+
+def test_taak_uit_agenda_en_onthouden_afspraak(omgeving):
+    from datetime import datetime, timedelta
+    from mailagent.pipeline import haal_uit_agenda, plan_bestaande_taak, zet_taken_klaar
+
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    it = store.items(status="wacht")[0]
+    zet_taken_klaar(store, bronnen, it["id"], "c", [{"omschrijving": "Rapport lezen", "minuten": 30}])
+    t = store.open_taken()[0]
+
+    class Ag(NepAgenda2):
+        def __init__(self):
+            super().__init__(); self.weg = []
+        def maak_afspraak(self, titel, start, eind, notities):
+            self.laatste_id = "EV-1"
+            return super().maak_afspraak(titel, start, eind, notities)
+        def verwijder_afspraak(self, afspraak_id):
+            self.weg.append(afspraak_id); return True
+    ag = Ag()
+    start = (datetime.now().astimezone() + timedelta(days=1)).replace(hour=10, minute=0, second=0, microsecond=0)
+    plan_bestaande_taak(store, ag, t["id"], start, 30)
+    assert store.taak(t["id"])["afspraak_id"] == "EV-1"                    # onthouden welke afspraak het is
+    assert "Nog in te plannen" in haal_uit_agenda(store, ag, t["id"])
+    assert ag.weg == ["EV-1"] and store.taak(t["id"])["gepland"] is None
+    with pytest.raises(ValueError):
+        haal_uit_agenda(store, ag, t["id"])                                   # staat al niet meer in de agenda

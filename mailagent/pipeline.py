@@ -207,7 +207,9 @@ def maak_taak(store: Store, bronnen: dict, agenda, item_id: int, titel: str, sta
         notities = "\n".join(f"- {s}" for s in stappen) + f"\n\nNaar aanleiding van: {item['onderwerp']} ({item['van']})"
         meldingen.append(agenda.maak_afspraak(afspraak_titel(titel, stappen), start, start + timedelta(minutes=minuten), notities))
         gepland = start.isoformat(timespec="minutes")
-    store.nieuwe_taak(item_id, item["project"], titel, deadline, minuten, stappen, gepland)
+    taak_id = store.nieuwe_taak(item_id, item["project"], titel, deadline, minuten, stappen, gepland)
+    if gepland:
+        store.zet_afspraak_id(taak_id, getattr(agenda, "laatste_id", None))
     meldingen.insert(0, "Taak gemaakt, mail gekoppeld")
     if vlag is not None:   # eerst markeren, dan pas eventueel archiveren
         fout = markeer_mail(store, bronnen, item_id, True, vlag)
@@ -240,7 +242,25 @@ def plan_bestaande_taak(store: Store, agenda, taak_id: int, start: datetime, min
     melding = agenda.maak_afspraak(afspraak_titel(t["omschrijving"], stappen), start,
                                    start + timedelta(minutes=minuten), notities.strip())
     store.plan_taak(taak_id, start.isoformat(timespec="minutes"), minuten)
+    store.zet_afspraak_id(taak_id, getattr(agenda, "laatste_id", None))
     return melding
+
+
+def haal_uit_agenda(store: Store, agenda, taak_id: int) -> str:
+    """Ingeplande taak weer uit je agenda: de afspraak weg, de taak terug bij 'Nog in te plannen'. Na een klik."""
+    if agenda is None:
+        raise ValueError("geen agenda gekoppeld")
+    t = store.taak(taak_id)
+    if t is None or not t["gepland"]:
+        raise ValueError("deze taak staat niet in je agenda")
+    afspraak = t["afspraak_id"]
+    if not afspraak and hasattr(agenda, "zoek_afspraak"):   # taken van vóór deze versie: zoeken op tijd en titel
+        afspraak = agenda.zoek_afspraak(datetime.fromisoformat(t["gepland"]),
+                                        afspraak_titel(t["omschrijving"], json.loads(t["stappen"] or "[]")))
+    weg = bool(afspraak) and hasattr(agenda, "verwijder_afspraak") and agenda.verwijder_afspraak(afspraak)
+    store.ontplan_taak(taak_id)
+    return ("Uit je agenda; de taak staat weer bij Nog in te plannen" if weg else
+            "De afspraak stond niet (meer) in je agenda; de taak staat weer bij Nog in te plannen")
 
 
 def open_antwoord(store: Store, bronnen: dict, item_id: int, tekst: str) -> str:

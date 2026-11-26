@@ -30,7 +30,7 @@ from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
 from .opmaak import externe_afbeeldingen, html_uit_bron, veilig
-from .pipeline import RondeBezig, achtergrond_voor_item, afzender_adres, deadline_in_agenda, ochtend, voorstellen_voor, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
+from .pipeline import RondeBezig, achtergrond_voor_item, haal_uit_agenda, afzender_adres, deadline_in_agenda, ochtend, voorstellen_voor, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
 from .melding import meld
 from .store import Store
 
@@ -610,6 +610,18 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                         morgen = datetime.combine(date.today() + timedelta(days=1), datetime.min.time()).astimezone()
                         voorstellen = voorstellen_voor(ag, cfg, open_, morgen)
                     return self._json({"ok": True, "voorstellen": voorstellen, "agenda_fout": fout})
+                elif actie == "afspraak-weg":
+                    ag, fout = agenda()
+                    if ag is None:
+                        return self._json({"ok": False, "melding": fout or "geen agenda gekoppeld"})
+                    melding = haal_uit_agenda(store, ag, int(v["id"]))
+                elif actie == "agenda-openen":
+                    # de app Agenda op de dag (en het uur) van deze afspraak
+                    seconden = int((datetime.fromisoformat(v["start"]) - datetime.now().astimezone()).total_seconds())
+                    script = ('on run argv\ntell application "Calendar"\nactivate\nswitch view to day view\n'
+                              'view calendar at ((current date) + ((item 1 of argv) as integer))\nend tell\nend run')
+                    subprocess.run(["osascript", "-e", script, str(seconden)], check=False, timeout=20, capture_output=True)
+                    melding = ""
                 elif actie == "deadline-voorstellen":
                     ag, fout = agenda()
                     if ag is None:

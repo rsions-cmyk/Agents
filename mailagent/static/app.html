@@ -170,6 +170,26 @@ details.origineel pre{white-space:pre-wrap;font:13px/1.5 -apple-system,sans-seri
 .afs-vrij{position:absolute;left:0;right:0;border-left:2px dashed var(--lijn);background:repeating-linear-gradient(180deg,transparent 0 10px,color-mix(in srgb,var(--lijn) 25%,transparent) 10px 11px);z-index:0;pointer-events:none}
 .afs-vrij span{position:absolute;right:6px;top:2px;font-size:10.5px;color:var(--zacht);opacity:.8;max-width:60%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .afs{z-index:1}
+.afs.klik{cursor:pointer}
+.afs.klik:hover,.afs.klik:focus-visible{border-color:var(--accent);color:var(--tekst);outline:none}
+.heledag .klik{cursor:pointer}
+.afs-pop{position:fixed;z-index:60;width:340px;max-height:min(560px,calc(100vh - 16px));overflow:auto;background:var(--vlak);
+  border:1px solid var(--lijn);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.18);padding:12px 14px;font-size:13.5px}
+.pop-kop{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px}
+.pop-kop b{flex:1;font-size:15px;line-height:1.35;overflow-wrap:anywhere}
+.pop-r{display:flex;gap:8px;align-items:flex-start;padding:3px 0;color:var(--tekst)}
+.pop-r>svg{width:15px;height:15px;flex:none;margin-top:2px;color:var(--zacht)}
+.pop-r a,.pop-notities a{color:var(--accent);overflow-wrap:anywhere}
+.pop-deel,.pop-notities{margin-top:6px}
+.pop-deel summary,.pop-notities summary{cursor:pointer;color:var(--zacht);display:flex;gap:8px;align-items:center}
+.pop-deel summary svg{width:15px;height:15px}
+.pop-d{display:flex;justify-content:space-between;gap:8px;padding:2px 0 2px 23px}
+.pop-notities>div{white-space:pre-wrap;margin-top:6px;max-height:220px;overflow:auto;padding:8px;background:var(--vlak2);border-radius:8px;font-size:12.5px}
+.pop-deelnemen{display:inline-flex;margin-top:10px;text-decoration:none}
+.pop-taak{margin-top:10px;padding-top:10px;border-top:1px solid var(--lijn)}
+.pop-acties{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.pop-voet{display:flex;justify-content:flex-end;margin-top:10px;padding-top:8px;border-top:1px solid var(--lijn)}
+@media (max-width:700px){ .afs-pop{left:8px!important;right:8px;bottom:8px;top:auto!important;width:auto;border-radius:14px} }
 .nu-lijn{position:absolute;left:-8px;right:0;height:0;border-top:2px solid var(--hoog);z-index:4;pointer-events:none}
 .nu-lijn::before{content:"";position:absolute;left:-4px;top:-5px;width:8px;height:8px;border-radius:50%;background:var(--hoog)}
 .tb{position:absolute;left:28%;right:0;background:var(--accent);color:var(--vlak);border-radius:8px;padding:3px 8px;font-size:12px;line-height:1.3;cursor:grab;box-shadow:0 2px 10px rgba(0,0,0,.18);touch-action:none;z-index:2;overflow:hidden}
@@ -569,6 +589,8 @@ const IKONEN = {
   list:'<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',
   sparkle:'<path d="M12 3l1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2z"/>',
   ster:'<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
+  pin:'<path d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+  mensen:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3 3 0 0 1 0 6M18 14.3c1.8.8 3 2.7 3 5.7"/>',
   wacht:'<path d="M6 3h12M6 21h12M7 3c0 5 10 5 10 9s-10 4-10 9M17 3c0 5-10 5-10 9s10 4 10 9"/>',
   alert:'<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
   calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>',
@@ -1037,6 +1059,89 @@ async function planTaakIn(id, start){
   return j.ok;
 }
 
+// Venstertje met details van een afspraak in Planning; bij een taak van de app ook de taak en wat je ermee kunt
+function appTaakBij(a){
+  return (D.taken || []).find(t => t.gepland && ((t.afspraak_id && t.afspraak_id === a.id) ||
+    (Math.abs(Date.parse(t.gepland) - Date.parse(a.start)) < 60000 && String(a.titel).startsWith(String(t.omschrijving).slice(0, 25)))));
+}
+const linkjes = tekst => esc(tekst).replace(/https?:\/\/[^\s<>"']+/g, u => `<a href="${u}" target="_blank" rel="noopener noreferrer">${u.length > 56 ? u.slice(0, 53) + "…" : u}</a>`);
+function deelnameLink(a){
+  const m = `${a.locatie || ""} ${a.url || ""} ${a.notities || ""}`.match(/https:\/\/teams\.microsoft\.com\/l\/meetup-join\/[^\s<>"']+|https:\/\/[\w.-]*zoom\.us\/j\/[^\s<>"']+|https:\/\/meet\.google\.com\/[a-z0-9-]+/i);
+  return m ? m[0] : null;
+}
+function sluitPop(){ document.getElementById("afs-pop")?.remove(); }
+function openAfspraak(i, anker){
+  const lijst = dagen[staat.planDag], a = Array.isArray(lijst) ? lijst[i] : null;
+  if (!a) return;
+  sluitPop();
+  const t = appTaakBij(a), link = deelnameLink(a), dl = a.deelnemers || [];
+  const tel = st => dl.filter(d => d.status === st).length;
+  const dagTekst = new Date(a.start).toLocaleDateString("nl-NL", {weekday: "long", day: "numeric", month: "long"});
+  const tijd = a.heledag ? "hele dag" : `${tijdVan(Date.parse(a.start))}–${tijdVan(Date.parse(a.eind))}`;
+  const el = document.createElement("div");
+  el.id = "afs-pop"; el.className = "afs-pop"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Details van de afspraak");
+  el.innerHTML = `
+    <div class="pop-kop"><b>${esc(t ? t.omschrijving : a.titel)}</b><button class="ikoon" data-popdicht="1" title="Sluiten (Esc)">${ik("x")}</button></div>
+    <div class="pop-r">${ik("clock")}<span>${esc(dagTekst)} · ${tijd}${a.vrij ? " · telt als vrij" : ""}${isFocus(a) ? " · beschermd" : ""}</span></div>
+    ${a.locatie ? `<div class="pop-r">${ik("pin")}<span>${linkjes(a.locatie)}</span></div>` : ""}
+    ${a.kalender ? `<div class="pop-r">${ik("calendar")}<span>${esc(a.kalender)}</span></div>` : ""}
+    ${a.organisator && (a.organisator.naam || a.organisator.adres) ? `<div class="pop-r">${ik("mail")}<span>Georganiseerd door ${esc(a.organisator.naam || a.organisator.adres)}</span></div>` : ""}
+    ${dl.length ? `<details class="pop-deel"><summary>${ik("mensen")}${dl.length} ${dl.length === 1 ? "deelnemer" : "deelnemers"}${tel("ja") ? ` · ${tel("ja")} ja` : ""}${tel("misschien") ? ` · ${tel("misschien")} misschien` : ""}${tel("nee") ? ` · ${tel("nee")} nee` : ""}</summary>
+        ${dl.map(d => `<div class="pop-d"><span>${esc(d.naam || d.adres)}${d.ik ? " (jij)" : ""}</span><span class="meta">${esc(d.status)}</span></div>`).join("")}</details>` : ""}
+    ${link ? `<a class="knop goed pop-deelnemen" href="${esc(link)}" target="_blank" rel="noopener noreferrer">${ik("forward")}Deelnemen aan de vergadering</a>` : ""}
+    ${t ? `<div class="pop-taak">
+        ${t.stappen && t.stappen.length ? `<ul class="stappen-klein">${t.stappen.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+        ${lijktGedaan(t)}${taakMail(t)}
+        <div class="pop-acties"><button class="knop klein goed" data-klaar="${t.id}">${ik("check")}Afvinken</button>
+          <button class="knop klein" data-verzet="${t.id}" data-start="${esc(a.start)}" title="Uit je agenda halen en meteen op een ander moment zetten">${ik("clock")}Verzetten</button>
+          <button class="knop klein" data-uitagenda="${t.id}" title="Uit je agenda; de taak blijft staan bij Nog in te plannen">${ik("x")}Uit agenda</button></div></div>`
+      : a.notities ? `<details class="pop-notities"${link ? "" : " open"}><summary>Notities</summary><div>${linkjes(a.notities)}</div></details>` : ""}
+    <div class="pop-voet"><button class="knop klein" data-agendaopen="${esc(a.start)}">${ik("calendar")}Open in Agenda</button></div>`;
+  document.body.append(el);
+  // naast de afspraak, binnen het venster; op een smal scherm onderin (CSS)
+  if (innerWidth > 700){
+    const r = anker.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight;
+    let x = r.left - w - 10;
+    if (x < 8) x = Math.min(innerWidth - w - 8, r.right + 10);
+    if (x < 8) x = 8;
+    el.style.left = x + "px";
+    el.style.top = Math.max(8, Math.min(innerHeight - h - 8, r.top - 8)) + "px";
+  }
+  el.querySelector("[data-popdicht]").focus();
+}
+document.addEventListener("click", async ev => {
+  const afs = ev.target.closest("#pl-tijdlijn .afs[data-afs], .heledag [data-afs]");
+  if (afs && staat.tab === "planning" && !plaatsing && !gekozenKaart){ ev.stopPropagation(); return openAfspraak(Number(afs.dataset.afs), afs); }
+  const pop = document.getElementById("afs-pop");
+  if (!pop) return;
+  if (!ev.target.closest("#afs-pop")) return sluitPop();
+  const b = ev.target.closest("button");
+  if (!b) return;
+  const d = b.dataset;
+  if (d.popdicht) return sluitPop();
+  if (d.agendaopen){ stil("agenda-openen", {start: d.agendaopen}); return; }
+  if (d.uitagenda){
+    sluitPop();
+    const j = await stil("afspraak-weg", {id: Number(d.uitagenda)});
+    toast(j.melding, !j.ok); legeDagen(); return laad();
+  }
+  if (d.verzet){
+    sluitPop();
+    const id = Number(d.verzet), t = D.taken.find(x => x.id === id);
+    const j = await stil("afspraak-weg", {id});
+    if (!j.ok) return toast(j.melding, true);
+    if (t){ t.gepland = null; plaatsing = {id, minuten: t.minuten || 30, start: Date.parse(d.start)}; }
+    legeDagen();
+    toast("Sleep het blok naar een nieuw moment en klik op Inplannen");
+    teken(); return laad();
+  }
+  if (d.klaar || d.mailopen || d.beantwoord) setTimeout(sluitPop, 0);   // die knoppen werken zoals op de kaart
+}, true);
+document.addEventListener("keydown", ev => {
+  if (ev.key === "Escape" && document.getElementById("afs-pop")){ ev.stopImmediatePropagation(); sluitPop(); }
+  if ((ev.key === "Enter" || ev.key === " ") && ev.target.matches && ev.target.matches("[data-afs]")){ ev.preventDefault(); openAfspraak(Number(ev.target.dataset.afs), ev.target); }
+}, true);
+
 // Wacht op antwoord: verstuurde mail met een vraag, zonder antwoord na een paar werkdagen
 const kortDatum = iso => new Date(iso.length > 10 ? iso : iso + "T12:00").toLocaleDateString("nl-NL", {day:"numeric", month:"short"});
 function tekenWachtOp(){
@@ -1388,6 +1493,7 @@ function momentTekst(iso, minuten){
 const vindItem = id => [...D.zelf, ...D.wacht, ...D.info, ...D.overgeslagen].find(i => i.id === id);
 let taak = null;   // {id, item, voorstel, minuten, inplannen, start(ms), dag, archiveren}
 const dagen = {};  // datum -> lijst afspraken | "laden" | {fout}
+const legeDagen = () => Object.keys(dagen).forEach(k => delete dagen[k]);   // agenda opnieuw ophalen
 const PX = 0.8;    // pixels per minuut in het dagoverzicht bij Taak maken
 let PLPX = 0.8;    // in Planning: zo dat de werkdag het paneel vult (zie plTijdlijnHTML)
 const kortTitel = t => String(t || "").split(" · begin met:")[0];
@@ -1399,9 +1505,9 @@ function nuLijn(dag, van, tot, schaal){
   return `<div class="nu-lijn" style="top:${(m - van) * schaal}px" title="Nu, ${tijdVan(nu.getTime())}"></div>`;
 }
 // afspraken: vrije als achtergrond, bezette naast elkaar als ze overlappen
-function afsprakenHTML(lijst, d0, van, tot, schaal, kalenderInTitel){
+function afsprakenHTML(lijst, d0, van, tot, schaal, kalenderInTitel, klikbaar){
   const y = m => (m - van) * schaal;
-  const alle = lijst.filter(a => !a.heledag).map(a => ({...a, b: Math.max(van, (Date.parse(a.start)-d0)/60000), e: Math.min(tot, (Date.parse(a.eind)-d0)/60000)}))
+  const alle = lijst.map((a, i) => ({...a, i})).filter(a => !a.heledag).map(a => ({...a, b: Math.max(van, (Date.parse(a.start)-d0)/60000), e: Math.min(tot, (Date.parse(a.eind)-d0)/60000)}))
                     .filter(a => a.e > a.b).sort((p, q) => p.b - q.b);
   let h = "";
   alle.filter(a => a.vrij && !isFocus(a)).forEach(a => {
@@ -1418,7 +1524,7 @@ function afsprakenHTML(lijst, d0, van, tot, schaal, kalenderInTitel){
   });
   bezet.forEach(a => {
     const hoog = Math.max(14, (a.e-a.b)*schaal - 2), n = a.n;
-    h += `<div class="afs${isFocus(a) ? " focus" : ""}${hoog < 30 ? " smal" : ""}" style="top:${y(a.b)}px;height:${hoog}px;left:${a.kol*100/n}%;width:calc(${100/n}% - 3px)${hoog < 30 ? `;line-height:${hoog - 2}px` : ""}"
+    h += `<div class="afs${isFocus(a) ? " focus" : ""}${hoog < 30 ? " smal" : ""}${klikbaar ? " klik" : ""}"${klikbaar ? ` data-afs="${a.i}" tabindex="0"` : ""} style="top:${y(a.b)}px;height:${hoog}px;left:${a.kol*100/n}%;width:calc(${100/n}% - 3px)${hoog < 30 ? `;line-height:${hoog - 2}px` : ""}"
       title="${esc(a.titel)}${kalenderInTitel && a.kalender ? " · " + esc(a.kalender) : ""}">${esc(kortTitel(a.titel))}${isFocus(a) ? " · beschermd" : ""}</div>`;
   });
   return h;
@@ -1744,7 +1850,7 @@ document.addEventListener("click", async ev => {
   if (taak && t.id === "t-archief"){ taak.archiveren = t.checked; return; }
   if (t.id === "sluit2") return sluitPaneel();
   if (d.project){ staat.project = d.project; staat.gekozen.clear(); staat.geenAuto = false; bewaar(); sluitPaneel(); return teken(); }
-  if (d.tab){ staat.tab = d.tab; staat.geenAuto = false; bewaar(); sluitPaneel(); return teken(); }
+  if (d.tab){ staat.tab = d.tab; staat.geenAuto = false; bewaar(); sluitPop(); sluitPaneel(); return teken(); }
   if (d.open){ return openPaneel(Number(d.open)); }
   if (d.klaar){ return vinkAf(Number(d.klaar)); }
   if (d.terug){ return zetTerug(Number(d.terug)); }
@@ -2077,14 +2183,14 @@ function plTijdlijnHTML(){
   if (uurMin(w.begin) > van) h += `<div class="buiten" style="top:0;height:${y(uurMin(w.begin))}px"></div>`;
   if (uurMin(w.eind) < tot) h += `<div class="buiten" style="top:${y(uurMin(w.eind))}px;height:${y(tot)-y(uurMin(w.eind))}px"></div>`;
   for (let m = van; m < tot; m += 30) h += `<div class="uur${m % 60 ? " half" : ""}" style="top:${y(m)}px">${m % 60 ? "" : `<span>${tweeCijfers(m/60)}:00</span>`}</div>`;
-  h += afsprakenHTML(lijst, d0, van, tot, PLPX, false) + nuLijn(staat.planDag, van, tot, PLPX);
+  h += afsprakenHTML(lijst, d0, van, tot, PLPX, false, true) + nuLijn(staat.planDag, van, tot, PLPX);
   if (plaatsing && isoDag(new Date(plaatsing.start)) === staat.planDag){
     const t = D.taken.find(x => x.id === plaatsing.id);
     h += `<div class="tb concept${plBotsingen().length ? " botst" : ""}" id="pl-blok" style="top:${y((plaatsing.start-d0)/60000)}px;height:${plaatsing.minuten*PLPX - 2}px">
             <b>${esc(t ? t.omschrijving : "Taak")}</b><span id="pl-tijd">${blokTijdVan(plaatsing.start, plaatsing.minuten)}</span><div class="rek"></div></div>`;
   }
-  const heledag = lijst.filter(a => a.heledag);
-  return (heledag.length ? `<div class="heledag">${heledag.map(a => `<span>${esc(a.titel)}</span>`).join("")}</div>` : "") +
+  const heledag = lijst.map((a, i) => ({...a, i})).filter(a => a.heledag);
+  return (heledag.length ? `<div class="heledag">${heledag.map(a => `<span class="klik" data-afs="${a.i}" tabindex="0">${esc(a.titel)}</span>`).join("")}</div>` : "") +
     `<div class="tijdlijn" id="pl-tijdlijn"><div class="tl-binnen" id="pl-binnen" data-van="${van}" style="height:${(tot-van)*PLPX}px">${h}</div></div>`;
 }
 
@@ -2155,6 +2261,7 @@ document.addEventListener("click", async ev => {
   const t = ev.target.closest("button");
   if (!t || staat.tab !== "planning") return;
   if (t.dataset.pldag !== undefined){
+    sluitPop();
     const stap = Number(t.dataset.pldag);
     staat.planDag = stap === 0 ? vandaagWerkdag() : isoDag(new Date(dagBegin(staat.planDag) + stap * 86400000 + 3600000));
     if (plaatsing){ const sm = plaatsing.start - dagBegin(isoDag(new Date(plaatsing.start))); plaatsing.start = dagBegin(staat.planDag) + sm; }

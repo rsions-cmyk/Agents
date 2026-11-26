@@ -158,14 +158,49 @@ class AppleAgenda:
         pred = self.store.predicateForEventsWithStartDate_endDate_calendars_(self._nsdate(van), self._nsdate(tot), kalenders)
         uit = []
         for ev in self.store.eventsMatchingPredicate_(pred) or []:
-            uit.append({
+            a = {
                 "titel": str(ev.title() or "Bezet"),
                 "start": self._dt(ev.startDate()), "eind": self._dt(ev.endDate()),
                 "heledag": bool(ev.isAllDay()),
                 "vrij": ev.availability() == self.EK.EKEventAvailabilityFree,
                 "kalender": str(ev.calendar().title()),
-            })
+            }
+            try:   # details voor het venstertje in Planning; blijven op deze Mac
+                a["id"] = str(ev.eventIdentifier() or "")
+                a["locatie"] = str(ev.location() or "")
+                a["notities"] = str(ev.notes() or "")[:4000]
+                a["url"] = str(ev.URL().absoluteString()) if ev.URL() else ""
+                a["organisator"] = self._deelnemer(ev.organizer()) if ev.organizer() else None
+                a["deelnemers"] = [self._deelnemer(d) for d in (ev.attendees() or [])][:40]
+            except Exception:
+                pass
+            uit.append(a)
         return uit
+
+    STATUS = {0: "", 1: "nog geen antwoord", 2: "ja", 3: "nee", 4: "misschien", 5: "gedelegeerd", 6: "klaar", 7: "bezig"}
+
+    def _deelnemer(self, d) -> dict:
+        url = str(d.URL().absoluteString()) if d.URL() else ""
+        return {"naam": str(d.name() or ""), "adres": url.replace("mailto:", ""),
+                "status": self.STATUS.get(int(d.participantStatus()), ""), "ik": bool(d.isCurrentUser())}
+
+    def zoek_afspraak(self, start: datetime, titel: str) -> Optional[str]:
+        """Id van de afspraak op `start` waarvan de titel met `titel` begint (voor taken van vóór deze versie)."""
+        pred = self.store.predicateForEventsWithStartDate_endDate_calendars_(
+            self._nsdate(start - timedelta(minutes=1)), self._nsdate(start + timedelta(minutes=1)), [self._kalender()])
+        for ev in self.store.eventsMatchingPredicate_(pred) or []:
+            if str(ev.title() or "").startswith(titel[:40]):
+                return str(ev.eventIdentifier())
+        return None
+
+    def verwijder_afspraak(self, afspraak_id: str) -> bool:
+        ev = self.store.eventWithIdentifier_(afspraak_id)
+        if ev is None:
+            return False
+        ok, fout = self.store.removeEvent_span_error_(ev, self.EK.EKSpanThisEvent, None)
+        if not ok:
+            raise RuntimeError(f"Afspraak niet verwijderd: {fout}")
+        return True
 
     def bezet(self, van: datetime, tot: datetime) -> list[tuple[datetime, datetime]]:
         return [(a["start"], a["eind"]) for a in self.afspraken(van, tot) if not a["heledag"] and not a["vrij"]]
@@ -210,7 +245,8 @@ class AppleAgenda:
         return ev, slot
 
     def maak_afspraak(self, titel: str, start: datetime, eind: datetime, notities: str) -> str:
-        _, slot = self._nieuwe_afspraak(titel, start, eind, notities)
+        ev, slot = self._nieuwe_afspraak(titel, start, eind, notities)
+        self.laatste_id = str(ev.eventIdentifier() or "")   # om de taak later te kunnen verzetten of weghalen
         extra = []
         if self.herinnering_minuten:
             extra.append(f"herinnering {self.herinnering_minuten} min vooraf")
