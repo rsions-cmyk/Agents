@@ -1,4 +1,8 @@
-# Agents: e-mailworkflow
+# Concierge
+
+<img src="mailagent/static/apple-touch-icon.png" width="72" alt="Concierge: een receptiebel in messing op diepblauw">
+
+Concierge bereidt je mail, taken en agenda voor; versturen doe je zelf. De naam en de receptiebel komen uit de hotellerie: een conciërge regelt veel voor je, maar vraagt eerst wat je wilt. In de code heet het pakket nog `mailagent`, zodat paden, achtergrondtaken en commando's blijven werken.
 
 Eerste onderdeel van een persoonlijk agentsysteem, gebaseerd op het idee van een chief of staff met directeuren per domein. Dit onderdeel regelt e-mail voor drie projecten: **onderwijs**, **onderzoek** en **ISTTE-bestuurswerk**, plus een bak **overig**. Het draait op je eigen MacBook.
 
@@ -54,6 +58,8 @@ Na elke run staat er een overzicht per project in `data/overzicht.md`.
 **Afgehandeld terugvinden.** Bovenaan Te doen wissel je tussen *Open* en *Afgehandeld*. Afgehandeld toont per dag wat je de afgelopen drie weken uit Te doen haalde: gedaan, in Mail gezet, verstuurd, afgewezen, taak gemaakt, gearchiveerd, opgeborgen of weggegooid. Klik er een aan en je ziet de mail, je antwoord en de taken die eruit kwamen. *Terug naar Te doen* zet hem weer in de lijst; gearchiveerde, opgeborgen of weggegooide mail gaat dan eerst terug naar je inbox. Een verstuurd antwoord blijft verstuurd.
 
 **Zoeken.** ⌘K (of `/`) zet de cursor in het zoekveld bovenin. De app zoekt in alle mail die hij verwerkte (afzender, onderwerp, tekst, samenvatting en je eigen antwoord), in je taken en in Wacht op antwoord. Alle woorden moeten voorkomen. Met de pijltjes en Enter open je een treffer op de plek waar hij hoort: Te doen, Opruimen, Planning, of het detailpaneel als hij al is afgehandeld. Mail die de app nooit ophaalde (ouder dan `terugkijken_dagen` bij de eerste ronde) zoek je in Mail zelf.
+
+**Icoon in je Dock.** De app heeft een eigen icoon (de bel). Een icoon dat je eerder met Safari > Archief > Zet in Dock maakte, houdt het oude plaatje: verwijder het uit het Dock en zet de pagina opnieuw in het Dock. De naam staat dan al op Concierge.
 
 **Opbergen in een map.** Naast archiveren kun je een mail in een eigen map zetten, bijvoorbeeld ENTER÷IFITT: met de mapknop of toets `V`. De kiezer zet bovenaan waar je mail van deze afzender eerder opborg, mappen die je vaak voor dit project gebruikt, en mappen waarvan de naam in het onderwerp staat. Typ om te zoeken, `↵` om op te bergen. De mappenlijst wordt eenmaal per sessie uit Apple Mail gehaald; "Vernieuwen" haalt hem opnieuw op.
 

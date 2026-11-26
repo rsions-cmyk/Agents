@@ -21,4 +21,4 @@ mailagent = "mailagent.cli:main"
 packages = ["mailagent", "mailagent.sources"]
 
 [tool.setuptools.package-data]
-mailagent = ["static/*.html"]
+mailagent = ["static/*.html", "static/*.svg", "static/*.png", "static/*.webmanifest"]

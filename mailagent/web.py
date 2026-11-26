@@ -35,6 +35,16 @@ from .melding import meld
 from .store import Store
 
 APP_HTML = Path(__file__).with_name("static") / "app.html"
+# vaste bestanden naast de app: logo, Dock-icoon (Safari > Archief > Zet in Dock) en manifest
+BESTANDEN = {
+    "/favicon.svg": ("favicon.svg", "image/svg+xml"),
+    "/favicon.ico": ("icon-192.png", "image/png"),
+    "/apple-touch-icon.png": ("apple-touch-icon.png", "image/png"),
+    "/apple-touch-icon-precomposed.png": ("apple-touch-icon.png", "image/png"),
+    "/icon-192.png": ("icon-192.png", "image/png"),
+    "/icon-512.png": ("icon-512.png", "image/png"),
+    "/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json"),
+}
 
 
 def item_dict(rij, volledig: bool = False) -> dict:
@@ -360,6 +370,9 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
             if pad == "/":
                 html = APP_HTML.read_text(encoding="utf-8").replace("__TOKEN__", token)
                 return self._stuur(html)
+            if pad in BESTANDEN:                      # logo en iconen: geen mail, dus geen sessiesleutel nodig
+                naam, soort = BESTANDEN[pad]
+                return self._stuur((APP_HTML.parent / naam).read_bytes(), soort=soort)
             if pad.startswith("/api/") and not self._token_ok():
                 return self._weiger()
             store = Store(db_pad)  # eigen verbinding per verzoek: verzoeken lopen naast elkaar
