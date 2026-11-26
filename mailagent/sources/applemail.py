@@ -568,6 +568,34 @@ end run
 '''
 
 
+SCRIPT_GELEZEN = HULP + r'''
+on run argv
+    set accountNaam to item 1 of argv
+    set mailboxNaam to item 2 of argv
+    tell application "Mail" to set mb to mailbox mailboxNaam of account accountNaam
+    repeat with i from 3 to count of argv
+        set delen to my splits(item i of argv, tab)
+        set berichtId to item 1 of delen
+        set berichtMid to ""
+        if (count of delen) > 1 then set berichtMid to item 2 of delen
+        tell application "Mail"
+            set m to missing value
+            try
+                set m to first message of mb whose id is (berichtId as integer)
+            end try
+            if m is missing value and berichtMid is not "" then
+                try
+                    set m to first message of mb whose message id is berichtMid
+                end try
+            end if
+            if m is not missing value then set read status of m to true
+        end tell
+    end repeat
+    return "ok"
+end run
+'''
+
+
 def _osascript(script: str, *args: str) -> str:
     try:
         r = subprocess.run(["osascript", "-", *args], input=script, capture_output=True, text=True, timeout=600)
@@ -721,6 +749,10 @@ class AppleMailBron:
             if len(delen) >= 2:
                 res[delen[0].strip()] = (delen[1].strip(), delen[2].strip() if len(delen) > 2 else None)
         return res
+
+    def markeer_gelezen(self, mails: list[tuple[str, str | None]]) -> None:
+        """Op gelezen zetten in Mail: wat je in attaché opende, heb je gelezen."""
+        _osascript(SCRIPT_GELEZEN, self.account, self.mailbox, *[f"{bid}\t{mid or ''}" for bid, mid in mails])
 
     def markeer(self, bron_id: str, message_id: str | None, aan: bool, kleur: int = 4) -> None:
         """Vlag zetten (aan) of weghalen. Kleur: 0 rood, 1 oranje, 2 geel, 3 groen, 4 blauw, 5 paars, 6 grijs."""

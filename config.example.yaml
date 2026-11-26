@@ -149,8 +149,12 @@ opvolgen:
   aan: true
   werkdagen: 3
 
-# Email you answer through the app (Reply in Mail or Send) is marked as read and moved to your archive once the
-# reply has gone: straight after Send, and after Reply in Mail as soon as you send the reply in Mail.
+# Handled email leaves your inbox, into the folder where it belongs: where you filed earlier email from that sender,
+# otherwise your usual folder for the project, otherwise the archive. Done, a task and Move tasks to Planning file it
+# at once, always with Undo. false: leave handled email in your inbox.
+opbergen_na_afhandelen: true
+# Email you answer through the app (Reply in Mail or Send) is marked as read and filed the same way once the reply has
+# gone: straight after Send, and after Reply in Mail as soon as you send the reply in Mail.
 # A draft you throw away leaves the email in your inbox. false: leave answered email where it is.
 archiveren_na_antwoord: true
 

@@ -288,18 +288,150 @@ def map_voorstellen(store: Store, item, mappen: list[str], aantal: int = 3) -> l
     return [{"map": m, "reden": reden[m]} for m in beste]
 
 
+AFGEHANDELD = ("gedaan", "taak", "goedgekeurd", "verzonden")   # uit To do, de stand blijft als de mail verhuist
+
+
+def kies_plek(store: Store, item) -> tuple[str, str]:
+    """Waar afgehandelde mail heen gaat: de map waar je eerdere mail van deze afzender opborg, anders de map die je
+    voor dit project bijna altijd kiest (minstens drie keer, en in 60% of meer), anders het archief. De app leert
+    alleen van mappen die jij kiest, niet van wat hij zelf opbergt."""
+    from collections import Counter
+    adres = afzender_adres(item["van"] or "")
+    keuzes = store.map_keuzes(item["bron"])
+    van_afzender = sorted((r for r in keuzes if r["adres"] == adres), key=lambda r: -r["aantal"])
+    if van_afzender:
+        return "map:" + van_afzender[0]["map"], "where you filed email from this sender before"
+    per_map = Counter()
+    for r in keuzes:
+        if r["project"] and r["project"] == item["project"]:
+            per_map[r["map"]] += r["aantal"]
+    if per_map:
+        m, n = per_map.most_common(1)[0]
+        if n >= 3 and n / sum(per_map.values()) >= 0.6:
+            return "map:" + m, f"your usual folder for {item['project']}"
+    return "archief", "no usual folder yet"
+
+
+def plek_naam(plek: str | None) -> str | None:
+    if not plek:
+        return None
+    return "your archive" if plek == "archief" else plek[4:].split("/")[-1] if plek.startswith("map:") else plek
+
+
+def _berg_op_bij_bron(bron, paren: list, slot) -> dict:
+    """paren: [(item, bron_id, doel)] -> per item-id de plek waar hij landde, of None. Een map die niet meer bestaat:
+    dan het archief."""
+    from collections import defaultdict
+    uit: dict = {}
+    per_doel = defaultdict(list)
+    for it, bid, doel in paren:
+        per_doel[doel].append((it, bid))
+    for doel, lijst in per_doel.items():
+        try:
+            with slot:
+                res = bron.verplaats([bid for _, bid in lijst], doel)
+        except Exception as e:
+            log.warning("opbergen in %s mislukt: %s", doel, e)
+            res = {}
+        mislukt = []
+        for it, bid in lijst:
+            if bid in res and res[bid] is None:
+                uit[it["id"]] = doel
+            else:
+                mislukt.append((it, bid))
+        if mislukt and doel != "archief":
+            try:
+                with slot:
+                    res2 = bron.verplaats([bid for _, bid in mislukt], "archief")
+            except Exception:
+                res2 = {}
+            for it, bid in mislukt:
+                uit[it["id"]] = "archief" if bid in res2 and res2[bid] is None else None
+        else:
+            for it, _ in mislukt:
+                uit[it["id"]] = None
+    return uit
+
+
+def berg_op(cfg: Config, store: Store, bronnen: dict, item_ids: list[int], slot=None) -> dict:
+    """Afgehandelde mail (Done, een taak, Move tasks to Planning, de achterstand) naar de plek waar hij hoort
+    (kies_plek). De stand blijft: Done blijft Done; opgeborgen_in onthoudt waar hij ging, voor Undo. Mail die al
+    niet meer in je inbox staat, laat de app staan. Geeft per item de plek, of None."""
+    from collections import defaultdict
+    from contextlib import nullcontext
+    if not cfg.opbergen_na_afhandelen:
+        return {}
+    slot = slot or nullcontext()
+    per_bron = defaultdict(list)
+    for i in item_ids:
+        it = store.item(i)
+        if it is not None and not it["opgeruimd"]:
+            per_bron[it["bron"]].append(it)
+    uit: dict = {}
+    for naam, items in per_bron.items():
+        bron = bronnen.get(naam)
+        if bron is None or not hasattr(bron, "verplaats"):
+            continue
+        huidig = {it["bron_id"]: it["bron_id"] for it in items}
+        if hasattr(bron, "beantwoord"):        # staat hij er nog, en onder welk nummer
+            try:
+                with slot:
+                    stand = bron.beantwoord([(it["bron_id"], it["thread_id"]) for it in items])
+            except Exception as e:
+                log.warning("%s: niet na te gaan wat er nog in je inbox staat: %s", naam, e)
+                continue
+            for it in list(items):
+                wat, nr = stand.get(it["bron_id"], ("nee", None))
+                if wat == "weg":
+                    store.zet_opgeruimd(it["id"], "weg")
+                    items.remove(it)
+                elif nr:
+                    huidig[it["bron_id"]] = nr
+        res = _berg_op_bij_bron(bron, [(it, huidig[it["bron_id"]], kies_plek(store, it)[0]) for it in items], slot)
+        for it in items:
+            plek = res.get(it["id"])
+            if plek:
+                store.zet_opgeborgen(it["id"], plek)
+                store.log(it["id"], f"opgeborgen na afhandelen: {plek}")
+        uit.update(res)
+    return uit
+
+
+def haal_terug_in_inbox(store: Store, bronnen: dict, it) -> None:
+    """Mail die de app na afhandelen opborg, terug naar je inbox (bij Undo en Back to To do)."""
+    if not it["opgeruimd"] or it["opgeruimd"] == "weg":
+        return
+    plek = it["opgeborgen_in"] or "archief"
+    bron = bronnen.get(it["bron"])
+    if bron is None or not hasattr(bron, "terugzetten") or not it["thread_id"]:
+        raise ValueError("couldn't bring the email back to your inbox")
+    nieuw = bron.terugzetten([it["thread_id"]], plek).get(it["thread_id"], "FOUT:no response")
+    if nieuw.startswith("FOUT"):
+        raise ValueError(f"couldn't bring the email back to your inbox ({nieuw[5:]})")
+    if nieuw != it["bron_id"]:
+        store.nieuw_bron_id(it["sleutel"], it["bron"], nieuw)
+    store.zet_opgeruimd(it["id"], None)
+
+
 def verplaats_items(store: Store, bronnen: dict, item_ids: list[int], doel: str) -> str:
     """Archiveren of naar de prullenbak, na een klik van de gebruiker. Niets wordt definitief verwijderd."""
     if doel not in ("archief", "prullenbak") and not (doel.startswith("map:") and len(doel) > 4):
         raise ValueError(f"onbekend doel: {doel}")
     per_bron: dict[str, list] = {}
+    gelukt, mislukt = 0, []
     for i in item_ids:
         item = store.item(i)
-        if item is None or item["status"] in ("gearchiveerd", "verwijderd", "opgeborgen"):
+        if item is None or item["status"] in ("gearchiveerd", "verwijderd", "opgeborgen", "verplaatst"):
             continue
+        if item["status"] in AFGEHANDELD and item["opgeruimd"] and item["opgeruimd"] != "weg":
+            try:                                # al opgeborgen: eerst terug, dan naar de nieuwe plek
+                haal_terug_in_inbox(store, bronnen, item)
+            except ValueError as e:
+                mislukt.append(f"{item['onderwerp'][:40]} ({e})")
+                continue
+            item = store.item(i)
         per_bron.setdefault(item["bron"], []).append(item)
 
-    gelukt, mislukt = 0, []
     nieuwe_status = {"archief": "gearchiveerd", "prullenbak": "verwijderd"}.get(doel, "opgeborgen")
     for bron_naam, items in per_bron.items():
         bron = bronnen.get(bron_naam)
@@ -313,7 +445,12 @@ def verplaats_items(store: Store, bronnen: dict, item_ids: list[int], doel: str)
             continue
         for it in items:
             fout = res.get(it["bron_id"], "no result")
-            if fout is None:
+            if fout is None and it["status"] in AFGEHANDELD:   # Done blijft Done; alleen de plek verandert
+                store.zet_opgeborgen(it["id"], doel)
+                if doel.startswith("map:"):
+                    store.onthoud_map(bron_naam, doel[4:], afzender_adres(it["van"] or ""), it["project"])
+                gelukt += 1
+            elif fout is None:
                 store.bewaar_vorige_status(it["id"], it["status"])
                 store.zet_status(it["id"], nieuwe_status, opmerking=doel[4:] if doel.startswith("map:") else None)
                 if doel.startswith("map:"):
@@ -462,6 +599,13 @@ def zet_terug(store: Store, bronnen: dict, item_ids: list[int]) -> str:
     gelukt, mislukt = 0, []
     for i in item_ids:
         it = store.item(i)
+        if it is not None and it["status"] in AFGEHANDELD and it["opgeruimd"] and it["opgeruimd"] != "weg":
+            try:
+                haal_terug_in_inbox(store, bronnen, it)
+                gelukt += 1
+            except ValueError as e:
+                mislukt.append(f"{it['onderwerp'][:40]} ({e})")
+            continue
         if it is None or it["status"] not in ("gearchiveerd", "verwijderd", "opgeborgen"):
             continue
         van = {"gearchiveerd": "archief", "verwijderd": "prullenbak"}.get(it["status"]) or f"map:{it['opmerking']}"
@@ -757,20 +901,17 @@ def ruim_beantwoord_op(cfg: Config, store: Store, bronnen: dict, item_ids: list[
                 klaar.append((it, huidig or it["bron_id"]))
         if not klaar:
             continue
-        try:
-            with slot:
-                res = bron.verplaats([bid for _, bid in klaar], "archief")
-        except Exception as e:
-            log.warning("%s: archiveren na je antwoord mislukt: %s", bron_naam, e)
-            continue
+        # niet zomaar het archief: de map waar mail van deze afzender of dit project hoort (kies_plek)
+        volledig = {it["id"]: store.item(it["id"]) for it, _ in klaar}
+        res = _berg_op_bij_bron(bron, [(volledig[it["id"]], bid, kies_plek(store, volledig[it["id"]])[0]) for it, bid in klaar], slot)
         for it, bid in klaar:
-            fout = res.get(bid, "no result")
-            if fout is None:
-                store.zet_opgeruimd(it["id"], datetime.now().astimezone().isoformat(timespec="seconds"))
-                store.log(it["id"], "na je antwoord gearchiveerd en op gelezen gezet")
+            plek = res.get(it["id"])
+            if plek:
+                store.zet_opgeborgen(it["id"], plek)
+                store.log(it["id"], f"na je antwoord opgeborgen ({plek}) en op gelezen gezet")
                 gelukt += 1
             else:
-                log.warning("%s: archiveren na je antwoord mislukt voor item %s: %s", bron_naam, it["id"], fout)
+                log.warning("%s: opbergen na je antwoord mislukt voor item %s", bron_naam, it["id"])
     return gelukt
 
 
@@ -1441,6 +1582,7 @@ def zet_taken_klaar_terug(store: Store, bronnen: dict, item_id: int, taak_ids: l
     item = store.item(item_id)
     if item is None or item["status"] != "taak":
         raise ValueError("this email is no longer a task")
+    haal_terug_in_inbox(store, bronnen, item)
     eigen = {t["id"] for t in store.open_taken() if t["item_id"] == item_id}
     store.verwijder_open_taken([i for i in taak_ids if i in eigen])
     store.zet_status(item_id, item["vorige_status"] or "wacht")
@@ -1459,10 +1601,12 @@ def markeer_gedaan(store: Store, item_id: int) -> str:
     return "Done"
 
 
-def zet_gedaan_terug(store: Store, item_id: int) -> str:
+def zet_gedaan_terug(store: Store, item_id: int, bronnen: dict | None = None) -> str:
     item = store.item(item_id)
     if item is None or item["status"] != "gedaan":
         raise ValueError("not marked as done")
+    if bronnen is not None:
+        haal_terug_in_inbox(store, bronnen, item)
     store.zet_status(item_id, item["vorige_status"] or "wacht")
     return "Back in To do"
 
@@ -1485,16 +1629,7 @@ def terug_naar_te_doen(store: Store, bronnen: dict, item_id: int) -> str:
         store.zet_status(item_id, terug)
         waar = "Tidy up" if terug in ("ter_info", "genegeerd") else "To do"
         return f"Back in {waar}; the email itself is still where you moved it in Mail"
-    if it["opgeruimd"] and it["opgeruimd"] != "weg":   # na je antwoord gearchiveerd: eerst terug naar de inbox
-        bron = bronnen.get(it["bron"])
-        if bron is None or not hasattr(bron, "terugzetten") or not it["thread_id"]:
-            raise ValueError("couldn't bring the email back from the archive")
-        nieuw = bron.terugzetten([it["thread_id"]], "archief").get(it["thread_id"], "FOUT:no response")
-        if nieuw.startswith("FOUT"):
-            raise ValueError(f"couldn't bring the email back from the archive ({nieuw[5:]})")
-        if nieuw != it["bron_id"]:
-            store.nieuw_bron_id(it["sleutel"], it["bron"], nieuw)
-        store.zet_opgeruimd(item_id, None)
+    haal_terug_in_inbox(store, bronnen, it)   # na afhandelen opgeborgen: eerst terug naar de inbox
     terug = it["vorige_status"] if it["vorige_status"] in ("wacht", "fout", "handmatig") else "wacht"
     store.zet_status(item_id, terug)
     store.wis_lijkt_beantwoord(item_id)

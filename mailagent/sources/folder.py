@@ -102,6 +102,9 @@ class MapBron:
                 resultaat[i] = "file not found"
         return resultaat
 
+    def markeer_gelezen(self, mails: list[tuple[str, str | None]]) -> None:
+        self.gelezen.update(bid for bid, _ in mails)
+
     def beantwoord(self, mails: list[tuple[str, str | None]]) -> dict[str, tuple[str, str | None]]:
         return {bid: ("weg" if not (self.pad / bid).exists() else "ja" if bid in self.beantwoorde else "nee", bid)
                 for bid, _ in mails}

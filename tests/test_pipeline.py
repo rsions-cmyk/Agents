@@ -1883,3 +1883,100 @@ def test_lege_inboxlijst_sluit_niets_af(omgeving):
     sinds = datetime.now().astimezone() - timedelta(days=100000)
     assert sluit_verplaatste(store, "test", NS(laatste_rijen=[]), sinds) == 0      # storing: niets weghalen
     assert all(r["niet_in_inbox"] is None for r in store.open_items_van_bron("test"))
+
+
+def test_afgehandelde_mail_slim_opgeborgen(omgeving):
+    """Opruimen in Exchange: Done zet de mail in de map waar je eerdere mail van die afzender opborg, anders in de
+    vaste map van het project, anders in het archief. De stand blijft Done; Undo haalt de mail terug."""
+    from mailagent.pipeline import (afzender_adres, berg_op, kies_plek, markeer_gedaan, ruim_beantwoord_op,
+                                    verplaats_items, zet_gedaan_terug)
+    from mailagent.web import item_dict
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    wacht = {r["onderwerp"]: r["id"] for r in store.items(status="wacht")}
+    a, b = wacht["Agenda board meeting December"], wacht["Uitstel portfolio stage"]
+    inbox = cfg.data_dir.parent / "mail"
+    ia = store.item(a)
+    store.onthoud_map("test", "ISTTE/Board", afzender_adres(ia["van"]), ia["project"])   # zo deed je het eerder
+    assert kies_plek(store, ia)[0] == "map:ISTTE/Board"
+    assert kies_plek(store, store.item(b))[0] == "archief"                          # nog geen vaste map
+
+    markeer_gedaan(store, a)
+    assert berg_op(cfg, store, bronnen, [a]) == {a: "map:ISTTE/Board"}
+    naam = store.item(a)["bron_id"]
+    assert (inbox / "_map_ISTTE_Board" / naam).exists() and store.item(a)["status"] == "gedaan"
+    afg = {r["id"]: item_dict(r) for r in store.afgehandeld_uit_te_doen()}
+    assert afg[a]["opgeborgen_in"] == "Board"
+    zet_gedaan_terug(store, a, bronnen)                                              # Undo: terug in je inbox
+    assert (inbox / naam).exists() and store.item(a)["status"] == "wacht" and store.item(a)["opgeruimd"] is None
+
+    # zelf een andere map kiezen voor afgehandelde mail: de stand blijft, de app onthoudt je keuze
+    markeer_gedaan(store, a); berg_op(cfg, store, bronnen, [a])
+    assert "moved" in verplaats_items(store, bronnen, [a], "map:ISTTE/Archief 2026")
+    assert store.item(a)["status"] == "gedaan" and store.item(a)["opgeborgen_in"] == "map:ISTTE/Archief 2026"
+    assert (inbox / "_map_ISTTE_Archief 2026" / store.item(a)["bron_id"]).exists()
+
+    # de vaste map van een project: minstens drie keer en in 60% of meer van de gevallen
+    for adres in ("x@buas.nl", "y@buas.nl", "z@buas.nl"):
+        store.onthoud_map("test", "Onderwijs", adres, "onderwijs")
+    assert kies_plek(store, store.item(b)) == ("map:Onderwijs", "your usual folder for onderwijs")
+    for adres in ("q@buas.nl", "r@buas.nl", "s@buas.nl"):
+        store.onthoud_map("test", "Overig", adres, "onderwijs")
+    assert kies_plek(store, store.item(b))[0] == "archief"                           # 3 van 6: geen duidelijke voorkeur
+
+    # een antwoord gaat ook naar zijn plek, niet zomaar naar het archief
+    store.onthoud_map("test", "Studenten", afzender_adres(store.item(b)["van"]), "onderwijs")
+    keur_goed(store, bronnen, b, "Beste Sanne,\n\nPrima.", verzenden=True)
+    ruim_beantwoord_op(cfg, store, bronnen)
+    assert store.item(b)["opgeborgen_in"] == "map:Studenten"
+
+
+def test_opbergen_valt_terug_op_het_archief_en_achterstand(omgeving):
+    from mailagent.pipeline import _berg_op_bij_bron, berg_op, markeer_gedaan
+    class Bron:
+        def __init__(self): self.verplaatst = []
+        def verplaats(self, ids, doel):
+            self.verplaatst.append(doel)
+            return {i: ("folder not found" if doel.startswith("map:") else None) for i in ids}
+    bron = Bron()
+    from contextlib import nullcontext
+    assert _berg_op_bij_bron(bron, [({"id": 1}, "7", "map:Weg")], nullcontext()) == {1: "archief"}
+    assert bron.verplaatst == ["map:Weg", "archief"]
+
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    a = store.items(status="wacht")[0]["id"]
+    markeer_gedaan(store, a)                                      # afgehandeld toen opbergen nog niet bestond
+    assert a in store.achterstand()
+    berg_op(cfg, store, bronnen, store.achterstand())
+    assert store.achterstand() == [] and store.item(a)["opgeborgen_in"] == "archief"
+
+
+def test_done_via_de_app_en_op_gelezen(omgeving):
+    import threading
+    import time
+    import urllib.request
+    from http.server import HTTPServer
+    from mailagent.web import maak_handler
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    a = store.items(status="wacht")[0]["id"]
+    server = HTTPServer(("127.0.0.1", 0), maak_handler(cfg, store, bronnen, NepLLM))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    basis = f"http://127.0.0.1:{server.server_port}"
+    try:
+        token = urllib.request.urlopen(basis + "/").read().decode().split('const TOKEN = "')[1].split('"')[0]
+        kop = {"Content-Type": "application/json", "X-Token": token}
+        post = lambda naam, data: json.loads(urllib.request.urlopen(urllib.request.Request(
+            basis + "/api/" + naam, data=json.dumps(data).encode(), method="POST", headers=kop)).read())
+        bid = store.item(a)["bron_id"]
+        assert post("gelezen", {"id": a})["ok"]
+        time.sleep(0.3)
+        assert bid in bronnen["test"].gelezen and store.item(a)["gelezen"]
+        j = post("gedaan", {"id": a})
+        assert j["ok"] and j["plek"] == "archief" and j["plek_naam"] == "your archive"
+        assert post("niet-gedaan", {"id": a})["ok"] and (cfg.data_dir.parent / "mail" / bid).exists()
+        j = post("gedaan", {"id": a, "opbergen": False})                           # Shift+D: je kiest zelf
+        assert j["plek"] is None and (cfg.data_dir.parent / "mail" / bid).exists()
+    finally:
+        server.shutdown()

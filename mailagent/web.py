@@ -30,7 +30,7 @@ from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
 from .opmaak import externe_afbeeldingen, html_uit_bron, veilig
-from .pipeline import RondeBezig, zet_afwijzen_terug, ruim_beantwoord_op, schone_open_punten, terug_naar_te_doen, agenda_check, lijkt_afspraak, achtergrond_voor_item, afspraak_momenten, bevestig_voorlopig, geef_voorlopig_vrij, haal_uit_agenda, houd_vast, verzet_taak, afzender_adres, deadline_in_agenda, ochtend, voorstellen_voor, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
+from .pipeline import RondeBezig, berg_op, plek_naam, zet_afwijzen_terug, ruim_beantwoord_op, schone_open_punten, terug_naar_te_doen, agenda_check, lijkt_afspraak, achtergrond_voor_item, afspraak_momenten, bevestig_voorlopig, geef_voorlopig_vrij, haal_uit_agenda, houd_vast, verzet_taak, afzender_adres, deadline_in_agenda, ochtend, voorstellen_voor, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
 from .melding import meld
 from .store import Store
 
@@ -53,6 +53,8 @@ def item_dict(rij, volledig: bool = False) -> dict:
     d = {k: rij[k] for k in ("id", "project", "actie", "prioriteit", "deadline", "samenvatting",
                              "status", "van", "onderwerp", "datum", "lijkt_beantwoord", "deadline_in_agenda")}
     d["opgeruimd"] = bool(rij["opgeruimd"]) and rij["opgeruimd"] != "weg" if "opgeruimd" in rij.keys() else False
+    d["opgeborgen_in"] = plek_naam(rij["opgeborgen_in"]) if d["opgeruimd"] and "opgeborgen_in" in rij.keys() else None
+    d["gelezen"] = bool(rij["gelezen"]) if "gelezen" in rij.keys() else False
     if volledig:
         d.update({
             "reden": rij["reden"], "concept": rij["concept"] or "", "agenda": rij["agenda"],
@@ -157,6 +159,7 @@ def verzamel(cfg: Config, store: Store, ophalen: dict) -> dict:
         "regels": [dict(r) for r in store.afzender_regels()],
         **afzender_voorstellen(store),
         "ophalen": {"bezig": ophalen["bezig"], "laatste": ophalen["laatste"]},
+        "achterstand": len(store.achterstand()) if cfg.opbergen_na_afhandelen else 0,
         "werktijd": {"begin": werk.begin.strftime("%H:%M"), "eind": werk.eind.strftime("%H:%M"), "dagen": sorted(werk.dagen)},
         "agenda_aan": bool((cfg.agenda or {}).get("kalender")),
         "agenda_naam": (cfg.agenda or {}).get("kalender"),
@@ -434,8 +437,38 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                         melding += "; the email goes to your archive"
                 elif actie == "gedaan":
                     melding = markeer_gedaan(store, int(v["id"]))
+                    plek = None
+                    if cfg.opbergen_na_afhandelen and v.get("opbergen", True):   # meteen naar de plek waar hij hoort
+                        plek = berg_op(cfg, store, bronnen, [int(v["id"])], slot=mail_slot).get(int(v["id"]))
+                    return self._json({"ok": True, "melding": melding, "plek": plek, "plek_naam": plek_naam(plek)})
                 elif actie == "niet-gedaan":
-                    melding = zet_gedaan_terug(store, int(v["id"]))
+                    with mail_slot:
+                        melding = zet_gedaan_terug(store, int(v["id"]), bronnen)
+                elif actie == "gelezen":
+                    it = store.item(int(v["id"]))
+                    bron = bronnen.get(it["bron"]) if it is not None else None
+                    if it is not None and not it["gelezen"] and bron is not None and hasattr(bron, "markeer_gelezen"):
+                        store.zet_gelezen(it["id"])
+                        def gelezen(bid=it["bron_id"], mid=it["thread_id"], b=bron):
+                            try:
+                                with mail_slot:
+                                    b.markeer_gelezen([(bid, mid)])
+                            except Exception as e:
+                                logging.getLogger("mailagent").warning("op gelezen zetten: %s", e)
+                        threading.Thread(target=gelezen, daemon=True).start()
+                    melding = ""
+                elif actie == "achterstand":
+                    ids = store.achterstand()
+                    plekken = berg_op(cfg, store, bronnen, ids, slot=mail_slot)
+                    in_map = sum(1 for p in plekken.values() if p and p.startswith("map:"))
+                    archief = sum(1 for p in plekken.values() if p == "archief")
+                    if not in_map and not archief:
+                        melding = "Nothing to tidy up: that email is no longer in your inbox"
+                    else:
+                        delen = ([f"{in_map} in {'its folder' if in_map == 1 else 'their folders'}"] if in_map else []) + \
+                                ([f"{archief} in your archive"] if archief else [])
+                        melding = (f"{in_map + archief} " + ("email" if in_map + archief == 1 else "emails") + " tidied up: "
+                                   + " and ".join(delen))
                 elif actie == "afwijzen":
                     wijs_af(store, int(v["id"]))
                     melding = "Dismissed"
@@ -498,11 +531,12 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                 elif actie == "taken-klaarzetten":
                     item_id = int(v["id"])
                     melding, ids = zet_taken_klaar(store, bronnen, item_id, v.get("concept"), v.get("taken") or [])
-                    if cfg.vlag_aan:
-                        def vlag(item_id=item_id):
-                            with mail_slot:
-                                markeer_mail(Store(db_pad), bronnen, item_id, True, cfg.vlag_kleur)
-                        threading.Thread(target=vlag, daemon=True).start()   # niet wachten op Apple Mail
+                    with mail_slot:           # eerst de vlag, dan pas opbergen: de vlag zoekt de mail in je inbox
+                        if cfg.vlag_aan:
+                            markeer_mail(store, bronnen, item_id, True, cfg.vlag_kleur)
+                    plek = berg_op(cfg, store, bronnen, [item_id], slot=mail_slot).get(item_id)
+                    if plek:
+                        melding += f"; the email is in {plek_naam(plek)}"
                     return self._json({"ok": True, "melding": melding, "taken": ids})
                 elif actie == "taken-controleren":
                     tel = controleer_uitgaand(cfg, store, bronnen, llm_factory(), slot=mail_slot)
@@ -739,6 +773,10 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                                             stappen, int(v.get("minuten") or 30), v.get("deadline") or None,
                                             start, bool(v.get("archiveren")),
                                             vlag=cfg.vlag_kleur if cfg.vlag_aan else None)
+                    if store.item(int(v["id"]))["status"] == "taak":   # de mail hoort nu bij de taak: opbergen
+                        plek = berg_op(cfg, store, bronnen, [int(v["id"])], slot=mail_slot).get(int(v["id"]))
+                        if plek:
+                            melding += f"; the email is in {plek_naam(plek)}"
                 elif actie == "taak-plannen":
                     ag, fout = agenda()
                     if ag is None:

@@ -177,7 +177,9 @@ class Store:
                       "opgeruimd",      # na je antwoord gearchiveerd (tijdstip), of 'weg' als hij al niet meer in de inbox stond
                       "open_punten",    # wat je in het concept nog moet beslissen of aanvullen (JSON)
                       "terug_in_inbox",   # wanneer je deze mail zelf terugzette in je inbox
-                      "niet_in_inbox"):   # sinds wanneer de mail niet meer in je inbox staat (fout 9)
+                      "niet_in_inbox",    # sinds wanneer de mail niet meer in je inbox staat (fout 9)
+                      "opgeborgen_in",    # waar de app de mail na afhandelen neerzette: 'archief' of 'map:<pad>'
+                      "gelezen"):         # wanneer je hem in attaché opende (en Mail hem op gelezen zette)
             if kolom not in itemkolommen:
                 self.db.execute(f"ALTER TABLE items ADD COLUMN {kolom} TEXT")
         wachtkolommen = {r["name"] for r in self.db.execute("PRAGMA table_info(wacht_op)")}
@@ -401,8 +403,23 @@ class Store:
             "AND i.afgehandeld >= ? ORDER BY i.afgehandeld", (sinds,)).fetchall()
 
     def zet_opgeruimd(self, item_id: int, waarde: str | None) -> None:
-        self.db.execute("UPDATE items SET opgeruimd=? WHERE id=?", (waarde, item_id))
+        self.db.execute("UPDATE items SET opgeruimd=?, opgeborgen_in=CASE WHEN ? IS NULL THEN NULL ELSE opgeborgen_in END "
+                        "WHERE id=?", (waarde, waarde, item_id))
         self.db.commit()
+
+    def zet_opgeborgen(self, item_id: int, plek: str) -> None:
+        """De app zette de mail na afhandelen hier neer ('archief' of 'map:<pad>'); de stand van het item blijft."""
+        self.db.execute("UPDATE items SET opgeruimd=?, opgeborgen_in=? WHERE id=?", (nu(), plek, item_id))
+        self.db.commit()
+
+    def zet_gelezen(self, item_id: int) -> None:
+        self.db.execute("UPDATE items SET gelezen=? WHERE id=?", (nu(), item_id))
+        self.db.commit()
+
+    def achterstand(self, dagen: int = 21) -> list[int]:
+        """Afgehandelde mail die de app nog niet opborg (van voor deze functie, of toen hij uit stond)."""
+        return [r["id"] for r in self.afgehandeld_uit_te_doen(dagen)
+                if r["status"] in ("gedaan", "taak", "verzonden") and not r["opgeruimd"]]
 
     def wis_lijkt_beantwoord(self, item_id: int) -> None:
         self.db.execute("UPDATE items SET lijkt_beantwoord=NULL WHERE id=?", (item_id,))

@@ -590,6 +590,8 @@ textarea#concept::placeholder,#a-tekst::placeholder{color:#8a929b}
 .logo{position:relative}
 .logo .inklap{margin-left:auto;width:28px;height:28px}
 .greep{position:absolute;top:0;bottom:0;width:9px;margin-left:-4px;cursor:col-resize;z-index:6;touch-action:none}
+.achterstand{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;margin:0 0 14px;border:1px solid var(--line);border-radius:10px;background:var(--s1);font-size:13.5px}
+.achterstand span{flex:1;min-width:180px}
 .greep:focus-visible{outline:none;background:linear-gradient(90deg,transparent 3px,var(--t2) 3px,var(--t2) 6px,transparent 6px)}
 .greep::after{content:"";position:absolute;left:4px;top:0;bottom:0;width:1px;background:transparent;transition:background var(--snel)}
 .greep:hover::after,.greep.actief::after{background:var(--accent);width:2px;left:3.5px}
@@ -1656,7 +1658,15 @@ async function openLees(id){
   document.querySelector(`.rij[data-kies="${id}"]`)?.scrollIntoView({block:"nearest"});
 }
 
+const gelezenGestuurd = new Set();
+function zetGelezen(id){
+  const it = vindItem(id);
+  if (!it || it.gelezen || gelezenGestuurd.has(id)) return;
+  gelezenGestuurd.add(id);
+  stil("gelezen", {id});
+}
 function tekenLees(id){
+  zetGelezen(id);
   const p = document.getElementById("paneel"), basis = opruimLijst().find(i => i.id === id);
   if (!basis) return;
   const m = leesCache[id], a = afzender(basis.van), gw = gewoonte(basis);
@@ -1698,7 +1708,7 @@ const AFG = {gedaan:["check","Done"], goedgekeurd:["mail","Reply in Mail"], verz
              genegeerd:["ban","Skipped"], wacht:["inbox","In To do"], fout:["alert","In To do"], handmatig:["inbox","In To do"]};
 const afgLabel = it => { const [i, l] = AFG[it.status] || ["mail", it.status];
   return [i, it.status === "opgeborgen" && it.opmerking ? `In ${String(it.opmerking).split("/").pop()}`
-            : it.opgeruimd ? `${l} · archived` : l]; };
+            : it.opgeruimd ? `${l} · ${it.opgeborgen_in && it.opgeborgen_in !== "your archive" ? "in " + it.opgeborgen_in : "archived"}` : l]; };
 const IN_TE_DOEN = ["wacht", "fout", "handmatig"];
 
 function dagKop(iso){
@@ -1712,9 +1722,11 @@ function dagKop(iso){
 function tekenAfgehandeld(){
   const lijst = filter(D.afgehandeld || []);
   if (!lijst.length) return leeg("Nothing handled yet", "What you clear from To do stays here for three weeks.");
+  const achter = D.achterstand ? `<div class="achterstand"><span>${D.achterstand === 1 ? "1 handled email is" : `${D.achterstand} handled emails are`} still in your inbox.</span>
+      <button class="knop klein" id="achterstand"${achterstandBezig ? " disabled" : ""}>${achterstandBezig ? "Tidying up…" : D.achterstand === 1 ? "Put it in its folder" : "Put them in their folders"}</button></div>` : "";
   const groepen = new Map();
   lijst.forEach(it => { const k = dagKop(it.afgehandeld); if (!groepen.has(k)) groepen.set(k, []); groepen.get(k).push(it); });
-  return [...groepen].map(([kop, items]) => `<div class="groep"><div class="groep-kop"><h2>${esc(kop)} · ${items.length}</h2></div>
+  return achter + [...groepen].map(([kop, items]) => `<div class="groep"><div class="groep-kop"><h2>${esc(kop)} · ${items.length}</h2></div>
     <div class="lijst">${items.map(it => { const a = afzender(it.van), [i, l] = afgLabel(it);
       return `<div class="rij afg${staat.detail === it.id ? " leest" : ""}" data-detail="${it.id}" tabindex="0">
         ${avatar(it, true)}
@@ -1904,10 +1916,20 @@ function tekenLeegPaneel(){
 }
 
 // na Gedaan: de mail meteen een plek geven, of laten staan
-let laatsteGedaan = null;   // {id, tijd}: E en V werken acht seconden lang op deze mail
-async function gedaanMelding(id, onderwerp = ""){
+let laatsteGedaan = null, achterstandBezig = false;   // {id, tijd}: E en V werken acht seconden lang op deze mail
+async function gedaanMelding(id, onderwerp = "", plek = null, plekNaam = null){
   laatsteGedaan = {id, tijd: Date.now()};
   const kort = onderwerp.length > 48 ? onderwerp.slice(0, 46) + "…" : onderwerp;
+  if (plek){   // al opgeborgen: zeggen waar, met Undo en een andere plek
+    const inMap = plek.startsWith("map:");
+    toast(`Done${kort ? `: \u201c${kort}\u201d` : ""}, ${inMap ? `filed in ${plekNaam}` : "archived"}. ${inMap ? "E archives it instead, V" : "V"} picks a folder.`, false, [
+      {label: "Undo", doe: async () => { const r = await stil("niet-gedaan", {id}); toast(r.melding, !r.ok); staat.open = id; laad(); }},
+      ...(inMap ? [{label: "Archive instead", doe: () => verplaatsMetUndo([id], "archief")}] : []),
+      {label: "Folder…", doe: () => openKiezer(id, null, [id])}]);
+    const m = document.getElementById("toasts").lastElementChild;
+    if (m) m.dataset.gedaan = id;
+    return;
+  }
   const tekst = kort ? `Done: \u201c${kort}\u201d. Press E to archive it or V to file it.` : "Done. Move it as well?";
   const knoppen = (voorstel) => [
     {label: "Archive", doe: () => verplaatsMetUndo([id], "archief")},
@@ -2493,6 +2515,7 @@ function tekenBalk(){
 
 function tekenPaneel(it){
   const p = document.getElementById("paneel");
+  zetGelezen(it.id);
   const af = afspr[it.id];
   const sig = JSON.stringify([it, bewerkt[it.id] || null, schrijft.has(it.id), drieKolommen(),
                               af ? [af.laden, af.fout, af.data, [...af.gekozen], af.vast, af.bezig] : null]);
@@ -2894,6 +2917,11 @@ document.addEventListener("click", async ev => {
     return velden[velden.length - 1]?.focus();
   }
   if (t.id === "c-claude") return schrijfConcept(Number(document.getElementById("paneel").dataset.id));
+  if (t.id === "achterstand"){
+    achterstandBezig = true; teken();
+    const j = await stil("achterstand", {});
+    achterstandBezig = false; toast(j.melding, !j.ok); return laad();
+  }
   if (t.id === "op-herschrijf") return herschrijfMetKeuzes(Number(document.getElementById("paneel").dataset.id));
   if (t.dataset.afplan){
     t.disabled = true;
@@ -3030,11 +3058,11 @@ document.addEventListener("click", async ev => {
     const volgende = drieKolommen() ? volgendeNa(id) : null;
     sluitPaneel(); if (volgende !== null) staat.open = volgende;
     await animeerWeg([id]); verborgen.add(id); teken();
-    const j = await stil("gedaan", {id}); verborgen.delete(id);
+    const j = await stil("gedaan", {id, opbergen: !t.dataset.metmap}); verborgen.delete(id);
     if (!j.ok){ toast(j.melding, true); return laad(); }
     laad();
     if (t.dataset.metmap){ return openKiezer(id, null, [id]); }
-    gedaanMelding(id, onderwerp);
+    gedaanMelding(id, onderwerp, j.plek, j.plek_naam);
     return;
   }
   if (t.id === "verzenden"){

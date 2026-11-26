@@ -46,6 +46,7 @@ class Config:
     opvolgen_aan: bool = True
     opvolgen_werkdagen: int = 3
     opruimen_na_antwoord: bool = True
+    opbergen_na_afhandelen: bool = True
     meldingen_aan: bool = True
     meldingen_minuten: int = 15
     ochtend_aan: bool = True
@@ -111,6 +112,7 @@ def laad(pad: str | Path = "config.yaml") -> Config:
         opvolgen_aan=bool((ruw.get("opvolgen") or {}).get("aan", True)),
         opvolgen_werkdagen=int((ruw.get("opvolgen") or {}).get("werkdagen", 3)),
         opruimen_na_antwoord=bool(ruw.get("archiveren_na_antwoord", True)),
+        opbergen_na_afhandelen=bool(ruw.get("opbergen_na_afhandelen", True)),
         meldingen_aan=bool((ruw.get("meldingen") or {}).get("aan", True)),
         meldingen_minuten=max(5, int((ruw.get("meldingen") or {}).get("elke_minuten", 15))),
         ochtend_aan=bool((ruw.get("meldingen") or {}).get("ochtend", True)),
