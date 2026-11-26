@@ -116,6 +116,25 @@ def les_regel_bij(a: dict, regels) -> Optional[dict]:
     return None
 
 
+def mag_agenda_naar_claude(agenda_cfg: dict | None, a: dict) -> bool:
+    """Alleen afspraken uit je werkagenda gaan naar Claude om ze in te delen. Standaard is dat de agenda bij
+    'kalender:' (met 'account:'); meer agenda's zet je bij 'naar_claude:', als "Account/Naam" of alleen "Naam".
+    Andere agenda's (gezin, privé) tellen wel als bezet, maar de app deelt ze alleen met zijn eigen regels in."""
+    ruw = agenda_cfg or {}
+    lijst = ruw.get("naar_claude")
+    if lijst is None:
+        k, acc = ruw.get("kalender"), ruw.get("account")
+        lijst = [f"{acc}/{k}" if acc else k] if k else []
+    toegestaan = {str(x).strip().lower() for x in lijst if str(x).strip()}
+    naam, acc = str(a.get("kalender", "")).strip().lower(), str(a.get("account", "")).strip().lower()
+    if not naam:
+        return False
+    if acc and f"{acc}/{naam}" in toegestaan:
+        return True
+    # zonder account in de afspraak, of een regel zonder account: dan telt de naam van de agenda
+    return naam in toegestaan or (not acc and any(t.split("/")[-1] == naam for t in toegestaan))
+
+
 def soort_bepalen(a: dict, lessen: dict | None, regels, geleerd: Optional[dict]) -> tuple[str, str]:
     """(soort, waarom). Volgorde: jouw keuze voor deze afspraak of reeks, jouw regels (titel, organisator,
     agenda), Claude, en dan de eenvoudige herkenning op woorden en deelnemers."""
@@ -243,6 +262,10 @@ class AppleAgenda:
                 "vrij": ev.availability() == self.EK.EKEventAvailabilityFree,
                 "kalender": str(ev.calendar().title()),
             }
+            try:
+                a["account"] = str(ev.calendar().source().title())
+            except Exception:
+                pass
             try:   # details voor het venstertje in Planning; blijven op deze Mac
                 a["id"] = str(ev.eventIdentifier() or "")
                 a["locatie"] = str(ev.location() or "")

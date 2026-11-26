@@ -111,6 +111,9 @@ agenda:
   dagen_vooruit: 10
   herinnering_minuten: 15        # reminder before every scheduled task (0 = none)
   prive: true                    # with a lock: colleagues only see that you are busy
+  # Only events from the calendar above go to Claude to be classified (class, meeting, ...). Calendars that only
+  # count as busy (family, personal) are classified by the app's own rules. To include more calendars:
+  # naar_claude: ["Exchange/Calendar", "iCloud/Werk"]
   # Classes get their own colour in Planning. By default the app recognises them by words such as
   # college, werkcollege, lecture, tutorial and les. If your classes are in a calendar of their own
   # (a timetable) or come from one organiser, add that here:

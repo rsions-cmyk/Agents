@@ -25,7 +25,7 @@ from urllib.parse import parse_qs, urlparse
 from .config import Config
 from datetime import date, datetime, timedelta
 
-from .agenda import SOORTEN, afspraak_sleutel, les_regel_bij, lees_werktijd, maak_agenda, soort_bepalen, vrije_momenten
+from .agenda import SOORTEN, afspraak_sleutel, mag_agenda_naar_claude, les_regel_bij, lees_werktijd, maak_agenda, soort_bepalen, vrije_momenten
 from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
@@ -254,8 +254,8 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                     org = a.get("organisator") or {}
                     proef = Email(bron="", bron_id="", van=org.get("adres") or org.get("naam") or "", aan="",
                                   onderwerp=a.get("titel") or "", datum=datetime.now().astimezone(), tekst="")
-                    if sleutel in gezien or not mag_naar_claude(cfg, proef):
-                        continue
+                    if sleutel in gezien or not mag_naar_claude(cfg, proef) or not mag_agenda_naar_claude(cfg.agenda, a):
+                        continue   # ook geen afspraken uit je gezins- of privé-agenda
                     gezien.add(sleutel)
                     dl = [d for d in a.get("deelnemers") or [] if not d.get("ik")]
                     notities = _re.sub(r"https?://\S+", "", a.get("notities") or "")[:300].strip()

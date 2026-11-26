@@ -1512,3 +1512,21 @@ def test_vergeet_bron(omgeving):
     assert store.db.execute("SELECT COUNT(*) FROM mails").fetchone()[0] == 0
     assert store.db.execute("SELECT COUNT(*) FROM items").fetchone()[0] == 0
     assert store.db.execute("SELECT item_id FROM taken WHERE omschrijving='Iets doen'").fetchone()[0] is None
+
+
+def test_alleen_werkagenda_naar_claude():
+    """Afspraken uit je gezins- of privé-agenda tellen als bezet, maar gaan niet naar Claude om ingedeeld te worden."""
+    from mailagent.agenda import mag_agenda_naar_claude
+    cfg = {"kalender": "Calendar", "account": "Exchange",
+           "bezet": ["Exchange/Calendar", "Exchange/Personal (Rob)", "iCloud/Werk", "iCloud/Gezin"]}
+    werk = {"kalender": "Calendar", "account": "Exchange"}
+    assert mag_agenda_naar_claude(cfg, werk)
+    assert not mag_agenda_naar_claude(cfg, {"kalender": "Gezin", "account": "iCloud"})
+    assert not mag_agenda_naar_claude(cfg, {"kalender": "Personal (Rob)", "account": "Exchange"})
+    assert not mag_agenda_naar_claude(cfg, {"kalender": "Werk", "account": "iCloud"})
+    assert mag_agenda_naar_claude(cfg, {"kalender": "Calendar"})                  # afspraak zonder account
+    # meer agenda's toestaan kan, met of zonder account
+    cfg2 = {**cfg, "naar_claude": ["Exchange/Calendar", "iCloud/Werk"]}
+    assert mag_agenda_naar_claude(cfg2, {"kalender": "Werk", "account": "iCloud"})
+    assert not mag_agenda_naar_claude(cfg2, {"kalender": "Gezin", "account": "iCloud"})
+    assert not mag_agenda_naar_claude({}, werk)                                      # geen agenda ingesteld
