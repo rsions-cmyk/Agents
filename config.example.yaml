@@ -110,6 +110,13 @@ agenda:
   dagen_vooruit: 10
   herinnering_minuten: 15        # herinnering vooraf bij elke ingeplande taak (0 = geen)
   prive: true                    # met slotje: collega's zien alleen dat je bezet bent
+  # Lessen krijgen in Planning hun eigen kleur. Standaard herkent de app ze aan woorden als
+  # college, werkcollege, lecture, tutorial en les. Staan je lessen in een eigen (rooster)agenda
+  # of komen ze van een vaste organisator, zet die dan hier:
+  # lessen:
+  #   kalenders: ["Rooster"]
+  #   organisatoren: ["rooster@buas.nl"]
+  #   trefwoorden: ["college", "werkcollege", "TMO", "DDE"]
 
 # Mail met een taak krijgt in Apple Mail een gekleurde vlag (in Outlook een opvolgvlag,
 # in Gmail een ster). Afvinken haalt de vlag weg. Hernoem die vlagkleur in Apple Mail naar

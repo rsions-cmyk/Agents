@@ -83,6 +83,29 @@ def vrije_momenten(bezet: list[tuple[datetime, datetime]], minuten: int, nu: dat
     return gevonden
 
 
+LES_WOORDEN = ["college", "hoorcollege", "werkcollege", "responsiecollege", "lecture", "tutorial", "practicum",
+               "les", "lessen", "lesson", "class", "seminar", "colloquium", "tentamen", "exam"]
+
+
+def soort_afspraak(a: dict, lessen: dict | None = None) -> str:
+    """'les', 'overleg' (met anderen) of '' (eigen afspraak). Lessen herken je aan de agenda (bijvoorbeeld een
+    roosteragenda), de organisator of woorden in titel of locatie; in te stellen bij agenda: lessen: in config.yaml."""
+    import re
+    lessen = lessen or {}
+    kalenders = [k.lower() for k in lessen.get("kalenders", [])]
+    organisatoren = [o.lower() for o in lessen.get("organisatoren", [])]
+    woorden = [w.lower() for w in lessen.get("trefwoorden", LES_WOORDEN)]
+    org = a.get("organisator") or {}
+    tekst = f"{a.get('titel', '')} {a.get('locatie', '')}".lower()
+    if (kalenders and str(a.get("kalender", "")).lower() in kalenders) \
+            or (organisatoren and any(o in f"{org.get('naam', '')} {org.get('adres', '')}".lower() for o in organisatoren)) \
+            or any(re.search(rf"\b{re.escape(w)}\b", tekst) for w in woorden):
+        return "les"
+    if any(not d.get("ik") for d in a.get("deelnemers") or []):
+        return "overleg"
+    return ""
+
+
 class Agenda(Protocol):
     def bezet(self, van: datetime, tot: datetime) -> list[tuple[datetime, datetime]]: ...
     def maak_afspraak(self, titel: str, start: datetime, eind: datetime, notities: str) -> str: ...

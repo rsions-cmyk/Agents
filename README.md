@@ -33,6 +33,8 @@ Na elke run staat er een overzicht per project in `data/overzicht.md`.
 
 **Achtergrond voor concepten en taken.** Voordat Claude een concept schrijft of taken voorstelt, verzamelt de app eerdere mail in hetzelfde gesprek (ook je antwoorden vanaf je telefoon of Outlook, uit Verzonden), andere recente mail met dezelfde persoon (vier maanden), open taken bij die persoon en vragen waarop je nog wacht. Alleen de nieuwe tekst van elke mail, zonder citaten, geanonimiseerd, en niets van afzenders op de lijst `nooit_naar_claude`. In het paneel zie je onder het concept welke achtergrond is gebruikt.
 
+**Planning.** De dag vult het paneel, met een rode lijn op het huidige moment. Klik op een afspraak voor details (deelnemers, notities, deelnemen aan Teams); sleep taken van de app en eigen afspraken naar een ander moment of maak ze langer met de onderrand. Vergaderingen met anderen (violet, met het aantal deelnemers) verzet je in Outlook. Lessen krijgen de kleur van Onderwijs; de app herkent ze aan woorden als college of lecture, of aan een roosteragenda of organisator bij `agenda: lessen:`.
+
 **Deadlines in je agenda.** Bij een taak of mail met een deadline zet "In agenda" een hele-dag-afspraak op die dag, met slotje, die niet als bezet telt, met een herinnering de dag ervoor om 09:00.
 
 **De mail blijft aan de taak vast.** Een taak gemaakt vanuit een mail houdt die mail erbij: in Taken zie je afzender en onderwerp, met "Open" (opent de mail in Apple Mail) en "Beantwoorden" (antwoord typen of door Claude laten schrijven, en openen in Apple Mail). De mail wordt niet gearchiveerd, tenzij je dat aanvinkt. Ook gearchiveerd blijft hij gekoppeld.

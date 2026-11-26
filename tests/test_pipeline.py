@@ -1244,3 +1244,16 @@ def test_taak_verzetten_door_slepen(omgeving):
     assert afspraak == "EV-9" and oud == start and b == nieuw and e - b == timedelta(minutes=45)
     rij = store.taak(t["id"])
     assert datetime.fromisoformat(rij["gepland"]) == nieuw and rij["minuten"] == 45
+
+
+def test_soort_afspraak_les_overleg_eigen():
+    from mailagent.agenda import soort_afspraak
+
+    mij = {"naam": "Rob", "ik": True}
+    assert soort_afspraak({"titel": "Werkcollege TMO Y2", "deelnemers": [mij, {"naam": "Klas", "ik": False}]}) == "les"
+    assert soort_afspraak({"titel": "Overleg ENTER27", "deelnemers": [mij, {"naam": "Peter", "ik": False}]}) == "overleg"
+    assert soort_afspraak({"titel": "Schrijven PhD", "deelnemers": []}) == ""
+    assert soort_afspraak({"titel": "Collega's bijpraten"}) == ""                     # 'college' niet in 'collega'
+    assert soort_afspraak({"titel": "DDE Y1 blok B", "kalender": "Rooster"}, {"kalenders": ["Rooster"]}) == "les"
+    assert soort_afspraak({"titel": "Gesprek", "organisator": {"adres": "rooster@buas.nl"}},
+                          {"organisatoren": ["rooster@buas.nl"]}) == "les"

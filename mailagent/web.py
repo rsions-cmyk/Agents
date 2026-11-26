@@ -25,7 +25,7 @@ from urllib.parse import parse_qs, urlparse
 from .config import Config
 from datetime import date, datetime, timedelta
 
-from .agenda import lees_werktijd, maak_agenda, vrije_momenten
+from .agenda import lees_werktijd, maak_agenda, soort_afspraak, vrije_momenten
 from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
@@ -502,8 +502,10 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                     else:
                         lijst = [{"titel": "Bezet", "start": b, "eind": e, "heledag": False, "vrij": False, "kalender": ""}
                                  for b, e in ag.bezet(van, tot)]
+                    lessen = (cfg.agenda or {}).get("lessen") or {}
                     return self._json({"ok": True, "afspraken": [
-                        {**a, "start": a["start"].isoformat(timespec="minutes"), "eind": a["eind"].isoformat(timespec="minutes")}
+                        {**a, "start": a["start"].isoformat(timespec="minutes"), "eind": a["eind"].isoformat(timespec="minutes"),
+                         "soort": soort_afspraak(a, lessen)}
                         for a in lijst]})
                 elif actie == "taak-maak":
                     start = datetime.fromisoformat(v["start"]).astimezone() if v.get("start") else None

@@ -9,12 +9,12 @@
 :root{
   --bg:#f4f4f2;--vlak:#ffffff;--vlak2:#fafaf8;--tekst:#1c1c1e;--zacht:#6e6e73;--lijn:#e5e5e2;
   --accent:#2f5d8a;--accent-zacht:#e8eff6;--ok:#2e7d32;--ok-zacht:#e7f3e8;--hoog:#c62828;--let:#b26a00;--let-zacht:#fff4e0;
-  --onderwijs:#2f6fd0;--onderzoek:#7b4fd0;--istte:#0f8a7a;--overig:#7a7a80;--schaduw:0 1px 2px rgba(0,0,0,.05),0 4px 16px rgba(0,0,0,.06);
+  --onderwijs:#2f6fd0;--overleg:#6a4bc4;--onderzoek:#7b4fd0;--istte:#0f8a7a;--overig:#7a7a80;--schaduw:0 1px 2px rgba(0,0,0,.05),0 4px 16px rgba(0,0,0,.06);
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#141416;--vlak:#1e1e21;--vlak2:#242428;--tekst:#ececf0;--zacht:#a1a1aa;--lijn:#2f2f35;
   --accent:#8ab4e8;--accent-zacht:#1f2a37;--ok:#7fc785;--ok-zacht:#1d2b1f;--hoog:#ff8a80;--let:#f0b45a;--let-zacht:#2e2617;
-  --onderwijs:#79a6f0;--onderzoek:#b292f0;--istte:#4fc7b5;--overig:#9a9aa2;--schaduw:0 1px 2px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.3);
+  --onderwijs:#79a6f0;--overleg:#b6a2f2;--onderzoek:#b292f0;--istte:#4fc7b5;--overig:#9a9aa2;--schaduw:0 1px 2px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.3);
 }}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--tekst);font:14px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
@@ -171,6 +171,18 @@ details.origineel pre{white-space:pre-wrap;font:13px/1.5 -apple-system,sans-seri
 .afs-vrij span{position:absolute;right:6px;top:2px;font-size:10.5px;color:var(--zacht);opacity:.8;max-width:60%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .afs{z-index:1}
 .afs.klik{cursor:pointer}
+.afs .afs-ik{display:inline-flex;align-items:center;gap:2px;margin-right:5px;font-weight:600;vertical-align:-2px}
+.afs .afs-ik svg{width:13px;height:13px}
+.afs .afs-ik .stip{width:7px;height:7px;margin-left:2px}
+.afs.soort-overleg{background:color-mix(in srgb,var(--overleg) 13%,var(--vlak));border-color:color-mix(in srgb,var(--overleg) 45%,var(--lijn));border-left:4px solid var(--overleg);color:var(--tekst)}
+.afs.soort-overleg .afs-ik{color:var(--overleg)}
+.afs.soort-les{background:color-mix(in srgb,var(--onderwijs) 14%,var(--vlak));border-color:color-mix(in srgb,var(--onderwijs) 45%,var(--lijn));border-left:4px solid var(--onderwijs);color:var(--tekst)}
+.afs.soort-les .afs-ik{color:var(--onderwijs)}
+.afs.soort-taak{background:var(--vlak);border-style:dashed;border-left:3px solid var(--zacht);color:var(--tekst)}
+.legenda{display:flex;flex-wrap:wrap;gap:12px;margin:0 2px 6px;font-size:11.5px;color:var(--zacht)}
+.legenda .lg{display:inline-flex;align-items:center;gap:5px}
+.legenda .lg svg{width:13px;height:13px}
+.lg-overleg svg{color:var(--overleg)} .lg-les svg{color:var(--onderwijs)} .lg-focus svg{color:var(--accent)}
 .afs.sleepbaar{cursor:grab;touch-action:none}
 .afs.sleepbaar .rek{position:absolute;left:0;right:0;bottom:0;height:7px;cursor:ns-resize}
 .afs.sleept{cursor:grabbing;z-index:5;box-shadow:0 6px 18px rgba(0,0,0,.18);border-color:var(--accent);color:var(--tekst);opacity:.95}
@@ -364,7 +376,7 @@ kbd{font:600 11px var(--romp,inherit);font-family:inherit;padding:1px 6px;border
   --bg:#eff1ef; --vlak:#ffffff; --vlak2:#f6f7f5; --vlak3:#e9ece8; --tekst:#151b21; --zacht:#5d6670; --lijn:#e1e4df;
   --accent:#24548a; --accent-zacht:#e7eef7; --accent-sterk:#1a4170;
   --ok:#21754a; --ok-zacht:#e3f1e8; --hoog:#b3261e; --let:#995a00; --let-zacht:#fcefd8;
-  --onderwijs:#2563c9; --onderzoek:#a3459c; --istte:#0f8a72; --overig:#6b7280;
+  --onderwijs:#2563c9; --overleg:#6a4bc4; --onderzoek:#a3459c; --istte:#0f8a72; --overig:#6b7280;
   --schaduw:0 1px 2px rgba(16,24,32,.05),0 2px 8px rgba(16,24,32,.04);
   --schaduw-hoog:0 12px 40px rgba(16,24,32,.18);
   --font:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
@@ -375,7 +387,7 @@ kbd{font:600 11px var(--romp,inherit);font-family:inherit;padding:1px 6px;border
   --bg:#111417; --vlak:#181c20; --vlak2:#1e2328; --vlak3:#262c32; --tekst:#e8ebee; --zacht:#9aa3ad; --lijn:#2a3037;
   --accent:#8db6ea; --accent-zacht:#1c2a3b; --accent-sterk:#b4cff2;
   --ok:#6fc28e; --ok-zacht:#18291f; --hoog:#ff8a80; --let:#f2b35c; --let-zacht:#2c2415;
-  --onderwijs:#7aa7f0; --onderzoek:#dd8fd5; --istte:#4cc7ae; --overig:#9aa1ab;
+  --onderwijs:#7aa7f0; --overleg:#b6a2f2; --onderzoek:#dd8fd5; --istte:#4cc7ae; --overig:#9aa1ab;
   --schaduw:0 1px 2px rgba(0,0,0,.35); --schaduw-hoog:0 12px 40px rgba(0,0,0,.5); color-scheme:dark;
 }}
 body{font-family:var(--font);font-size:14px;font-feature-settings:"cv11","ss01";letter-spacing:-.003em}
@@ -595,6 +607,7 @@ const IKONEN = {
   sparkle:'<path d="M12 3l1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2z"/>',
   ster:'<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
   pin:'<path d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+  les:'<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5"/><path d="M22 9v6"/>',
   mensen:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3 3 0 0 1 0 6M18 14.3c1.8.8 3 2.7 3 5.7"/>',
   wacht:'<path d="M6 3h12M6 21h12M7 3c0 5 10 5 10 9s-10 4-10 9M17 3c0 5-10 5-10 9s10 4 10 9"/>',
   alert:'<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
@@ -1148,6 +1161,8 @@ function openAfspraak(i, anker){
   el.innerHTML = `
     <div class="pop-kop"><b>${esc(t ? t.omschrijving : a.titel)}</b><button class="ikoon" data-popdicht="1" title="Sluiten (Esc)">${ik("x")}</button></div>
     <div class="pop-r">${ik("clock")}<span>${esc(dagTekst)} · ${tijd}${a.vrij ? " · telt als vrij" : ""}${isFocus(a) ? " · beschermd" : ""}</span></div>
+    ${!t && a.soort === "les" ? `<div class="pop-r">${ik("les")}<span>Les</span></div>` : ""}
+    ${!t && a.soort === "overleg" ? `<div class="pop-r">${ik("mensen")}<span>Vergadering met anderen; verzetten doe je in Outlook</span></div>` : ""}
     ${a.locatie ? `<div class="pop-r">${ik("pin")}<span>${linkjes(a.locatie)}</span></div>` : ""}
     ${a.kalender ? `<div class="pop-r">${ik("calendar")}<span>${esc(a.kalender)}</span></div>` : ""}
     ${a.organisator && (a.organisator.naam || a.organisator.adres) ? `<div class="pop-r">${ik("mail")}<span>Georganiseerd door ${esc(a.organisator.naam || a.organisator.adres)}</span></div>` : ""}
@@ -1590,8 +1605,13 @@ function afsprakenHTML(lijst, d0, van, tot, schaal, kalenderInTitel, klikbaar){
   });
   bezet.forEach(a => {
     const hoog = Math.max(14, (a.e-a.b)*schaal - 2), n = a.n, sleep = klikbaar && sleepbaar(a);
-    h += `<div class="afs${isFocus(a) ? " focus" : ""}${hoog < 30 ? " smal" : ""}${klikbaar ? " klik" : ""}${sleep ? " sleepbaar" : ""}"${klikbaar ? ` data-afs="${a.i}" tabindex="0"` : ""} style="top:${y(a.b)}px;height:${hoog}px;left:${a.kol*100/n}%;width:calc(${100/n}% - 3px)${hoog < 30 ? `;line-height:${hoog - 2}px` : ""}"
-      title="${esc(a.titel)}${kalenderInTitel && a.kalender ? " · " + esc(a.kalender) : ""}${sleep ? " · sleep om te verzetten" : ""}">${esc(kortTitel(a.titel))}${isFocus(a) ? " · beschermd" : ""}${sleep ? `<div class="rek" title="Sleep om langer of korter te maken"></div>` : ""}</div>`;
+    const taak = klikbaar ? appTaakBij(a) : null, soort = taak ? "taak" : isFocus(a) ? "" : (a.soort || "");
+    const anderen = (a.deelnemers || []).filter(d => !d.ik).length;
+    const voor = soort === "overleg" ? `<span class="afs-ik" title="Vergadering met ${anderen} ${anderen === 1 ? "ander" : "anderen"}">${ik("mensen")}${anderen}</span>`
+      : soort === "les" ? `<span class="afs-ik" title="Les">${ik("les")}</span>`
+      : soort === "taak" ? `<span class="afs-ik" title="Taak uit de app">${ik("check")}<span class="stip" style="background:${kleur(taak.project)}"></span></span>` : "";
+    h += `<div class="afs${isFocus(a) ? " focus" : ""}${soort ? " soort-" + soort : ""}${hoog < 30 ? " smal" : ""}${klikbaar ? " klik" : ""}${sleep ? " sleepbaar" : ""}"${klikbaar ? ` data-afs="${a.i}" tabindex="0"` : ""} style="top:${y(a.b)}px;height:${hoog}px;left:${a.kol*100/n}%;width:calc(${100/n}% - 3px)${hoog < 30 ? `;line-height:${hoog - 2}px` : ""}"
+      title="${esc(a.titel)}${kalenderInTitel && a.kalender ? " · " + esc(a.kalender) : ""}${sleep ? " · sleep om te verzetten" : ""}">${voor}${esc(kortTitel(a.titel))}${isFocus(a) ? " · beschermd" : ""}${sleep ? `<div class="rek" title="Sleep om langer of korter te maken"></div>` : ""}</div>`;
   });
   return h;
 }
@@ -2256,7 +2276,10 @@ function plTijdlijnHTML(){
             <b>${esc(t ? t.omschrijving : "Taak")}</b><span id="pl-tijd">${blokTijdVan(plaatsing.start, plaatsing.minuten)}</span><div class="rek"></div></div>`;
   }
   const heledag = lijst.map((a, i) => ({...a, i})).filter(a => a.heledag);
-  return (heledag.length ? `<div class="heledag">${heledag.map(a => `<span class="klik" data-afs="${a.i}" tabindex="0">${esc(a.titel)}</span>`).join("")}</div>` : "") +
+  const soorten = new Set(lijst.filter(a => !a.heledag).map(a => appTaakBij(a) ? "taak" : isFocus(a) ? "focus" : a.vrij ? "" : (a.soort || "eigen")));
+  const legenda = [["overleg", "mensen", "Met anderen"], ["les", "les", "Les"], ["taak", "check", "Taak uit de app"], ["focus", "clock", "Beschermd"], ["eigen", "calendar", "Eigen afspraak"]]
+    .filter(([k]) => soorten.has(k)).map(([k, i, l]) => `<span class="lg lg-${k}">${ik(i)}${l}</span>`).join("");
+  return (legenda && soorten.size > 1 ? `<div class="legenda">${legenda}</div>` : "") + (heledag.length ? `<div class="heledag">${heledag.map(a => `<span class="klik" data-afs="${a.i}" tabindex="0">${esc(a.titel)}</span>`).join("")}</div>` : "") +
     `<div class="tijdlijn" id="pl-tijdlijn"><div class="tl-binnen" id="pl-binnen" data-van="${van}" style="height:${(tot-van)*PLPX}px">${h}</div></div>`;
 }
 
