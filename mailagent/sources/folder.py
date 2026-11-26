@@ -18,6 +18,8 @@ class MapBron:
         self.pad = Path(pad)
         self.uit = Path(data_dir) / "concepten"
         self.vlaggen: dict[str, int] = {}   # bron_id -> kleur; alleen voor tests
+        self.gelezen: set[str] = set()      # mail waarop je antwoordde; alleen voor tests
+        self.beantwoorde: set[str] = set()  # mail die 'Mail' als beantwoord markeerde; alleen voor tests
 
     def haal_op(self, sinds, maximum: int, overslaan=None) -> list[Email]:
         mails = []
@@ -48,6 +50,9 @@ class MapBron:
     def maak_concept(self, bron_id: str, tekst: str, onderwerp: str, aan: str, message_id: str | None = None,
                      verzenden: bool = False) -> str:
         self.uit.mkdir(parents=True, exist_ok=True)
+        self.gelezen.add(bron_id)
+        if verzenden:
+            self.beantwoorde.add(bron_id)
         msg = email.message.EmailMessage()
         msg["To"] = aan
         msg["Subject"] = onderwerp if onderwerp.lower().startswith("re:") else f"Re: {onderwerp}"
@@ -94,6 +99,10 @@ class MapBron:
             else:
                 resultaat[i] = "file not found"
         return resultaat
+
+    def beantwoord(self, mails: list[tuple[str, str | None]]) -> dict[str, tuple[str, str | None]]:
+        return {bid: ("weg" if not (self.pad / bid).exists() else "ja" if bid in self.beantwoorde else "nee", bid)
+                for bid, _ in mails}
 
     def markeer(self, bron_id: str, message_id: str | None, aan: bool, kleur: int = 4) -> None:
         if aan:

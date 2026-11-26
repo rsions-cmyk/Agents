@@ -1462,7 +1462,8 @@ const AFG = {gedaan:["check","Done"], goedgekeurd:["mail","Reply in Mail"], verz
              opgeborgen:["folder","Filed"], verwijderd:["trash","In Bin"], ter_info:["eye","FYI"],
              genegeerd:["ban","Skipped"], wacht:["inbox","In To do"], fout:["alert","In To do"], handmatig:["inbox","In To do"]};
 const afgLabel = it => { const [i, l] = AFG[it.status] || ["mail", it.status];
-  return [i, it.status === "opgeborgen" && it.opmerking ? `In ${String(it.opmerking).split("/").pop()}` : l]; };
+  return [i, it.status === "opgeborgen" && it.opmerking ? `In ${String(it.opmerking).split("/").pop()}`
+            : it.opgeruimd ? `${l} · archived` : l]; };
 const IN_TE_DOEN = ["wacht", "fout", "handmatig"];
 
 function dagKop(iso){

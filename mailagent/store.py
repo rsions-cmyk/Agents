@@ -165,7 +165,8 @@ class Store:
         if "vorige_status" not in itemkolommen:
             self.db.execute("ALTER TABLE items ADD COLUMN vorige_status TEXT")
         for kolom in ("lijkt_beantwoord", "bewijs", "deadline_in_agenda", "context",   # context: gebruikte achtergrond
-                      "afspraak"):                                                     # afspraak: verzoek uit de mail (JSON)
+                      "afspraak",                                                      # afspraak: verzoek uit de mail (JSON)
+                      "opgeruimd"):     # na je antwoord gearchiveerd (tijdstip), of 'weg' als hij al niet meer in de inbox stond
             if kolom not in itemkolommen:
                 self.db.execute(f"ALTER TABLE items ADD COLUMN {kolom} TEXT")
         wachtkolommen = {r["name"] for r in self.db.execute("PRAGMA table_info(wacht_op)")}
@@ -313,6 +314,19 @@ class Store:
 
     def zet_lijkt_beantwoord(self, item_id: int, reden: str | None, bewijs: str) -> None:
         self.db.execute("UPDATE items SET lijkt_beantwoord=?, bewijs=? WHERE id=?", (reden, bewijs, item_id))
+        self.db.commit()
+
+    def op_te_ruimen(self, dagen: int = 14) -> list[sqlite3.Row]:
+        """Mail die je via de app beantwoordde (Reply in Mail of Send) en die nog in je inbox staat."""
+        from datetime import timedelta
+        sinds = (datetime.now().astimezone() - timedelta(days=dagen)).isoformat(timespec="seconds")
+        return self.db.execute(
+            "SELECT i.id, i.status, i.afgehandeld, m.bron, m.bron_id, m.thread_id FROM items i JOIN mails m USING(sleutel) "
+            "WHERE i.status IN ('goedgekeurd','verzonden') AND i.opgeruimd IS NULL AND i.eigen_antwoord IS NOT NULL "
+            "AND i.afgehandeld >= ? ORDER BY i.afgehandeld", (sinds,)).fetchall()
+
+    def zet_opgeruimd(self, item_id: int, waarde: str | None) -> None:
+        self.db.execute("UPDATE items SET opgeruimd=? WHERE id=?", (waarde, item_id))
         self.db.commit()
 
     def wis_lijkt_beantwoord(self, item_id: int) -> None:

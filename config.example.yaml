@@ -148,6 +148,11 @@ opvolgen:
   aan: true
   werkdagen: 3
 
+# Email you answer through the app (Reply in Mail or Send) is marked as read and moved to your archive once the
+# reply has gone: straight after Send, and after Reply in Mail as soon as you send the reply in Mail.
+# A draft you throw away leaves the email in your inbox. false: leave answered email where it is.
+archiveren_na_antwoord: true
+
 # Notifications on your Mac for email from important senders (only between 07:00 and 22:00).
 meldingen:
   aan: true

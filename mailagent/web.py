@@ -30,7 +30,7 @@ from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
 from .opmaak import externe_afbeeldingen, html_uit_bron, veilig
-from .pipeline import RondeBezig, terug_naar_te_doen, agenda_check, lijkt_afspraak, achtergrond_voor_item, afspraak_momenten, bevestig_voorlopig, geef_voorlopig_vrij, haal_uit_agenda, houd_vast, verzet_taak, afzender_adres, deadline_in_agenda, ochtend, voorstellen_voor, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
+from .pipeline import RondeBezig, ruim_beantwoord_op, terug_naar_te_doen, agenda_check, lijkt_afspraak, achtergrond_voor_item, afspraak_momenten, bevestig_voorlopig, geef_voorlopig_vrij, haal_uit_agenda, houd_vast, verzet_taak, afzender_adres, deadline_in_agenda, ochtend, voorstellen_voor, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
 from .melding import meld
 from .store import Store
 
@@ -51,6 +51,7 @@ BESTANDEN = {
 def item_dict(rij, volledig: bool = False) -> dict:
     d = {k: rij[k] for k in ("id", "project", "actie", "prioriteit", "deadline", "samenvatting",
                              "status", "van", "onderwerp", "datum", "lijkt_beantwoord", "deadline_in_agenda")}
+    d["opgeruimd"] = bool(rij["opgeruimd"]) and rij["opgeruimd"] != "weg" if "opgeruimd" in rij.keys() else False
     if volledig:
         d.update({
             "reden": rij["reden"], "concept": rij["concept"] or "", "agenda": rij["agenda"],
@@ -310,6 +311,27 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
             threading.Thread(target=ophalen_op_achtergrond, daemon=True).start()
         return gevonden
 
+    def start_opruimen() -> None:
+        """Mail die je via de app beantwoordde naar het archief zodra het antwoord verstuurd is. Een antwoord van
+        het afgelopen halfuur bekijkt hij elke minuut, oudere elke tien minuten."""
+        def lus():
+            tik = 0
+            while True:
+                try:
+                    st = Store(db_pad)
+                    rijen = st.op_te_ruimen(cfg.terugkijken_dagen)
+                    grens = (datetime.now().astimezone() - timedelta(minutes=30)).isoformat(timespec="seconds")
+                    ids = [r["id"] for r in rijen if tik % 10 == 0 or (r["afgehandeld"] or "") >= grens]
+                    if ids:
+                        n = ruim_beantwoord_op(cfg, st, bronnen, item_ids=ids, slot=mail_slot)
+                        if n:
+                            logging.getLogger("mailagent").info("%d beantwoorde mail(s) gearchiveerd", n)
+                except Exception as e:
+                    logging.getLogger("mailagent").warning("opruimen: %s", e)
+                tik += 1
+                time.sleep(60)
+        threading.Thread(target=lus, daemon=True).start()
+
     def start_bewaking() -> None:
         def lus():
             while True:
@@ -402,6 +424,10 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                                             verzenden=bool(v.get("verzenden")))
                     if v.get("verzenden") and store.item(int(v["id"]))["status"] != "verzonden":
                         return self._json({"ok": False, "melding": melding})
+                    if v.get("verzenden") and cfg.opruimen_na_antwoord:   # verstuurd: meteen naar het archief
+                        threading.Thread(target=lambda i=int(v["id"]): ruim_beantwoord_op(
+                            cfg, Store(db_pad), bronnen, item_ids=[i], slot=mail_slot), daemon=True).start()
+                        melding += "; the email goes to your archive"
                 elif actie == "gedaan":
                     melding = markeer_gedaan(store, int(v["id"]))
                 elif actie == "niet-gedaan":
@@ -861,6 +887,7 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
     Handler.deel_in = staticmethod(deel_in_op_achtergrond)
     Handler.indelen = indelen
     Handler.start_bewaking = staticmethod(start_bewaking)
+    Handler.start_opruimen = staticmethod(start_opruimen)
     return Handler
 
 
@@ -869,6 +896,8 @@ def serveer(cfg: Config, store: Store, bronnen: dict, llm_factory) -> None:
     server = ThreadingHTTPServer((cfg.web_host, cfg.web_poort), handler)
     if cfg.meldingen_aan:
         handler.start_bewaking()
+    if cfg.opruimen_na_antwoord:
+        handler.start_opruimen()
     print(f"attaché: http://{cfg.web_host}:{cfg.web_poort}  (stop with Ctrl+C)")
     try:
         server.serve_forever()

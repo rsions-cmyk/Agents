@@ -510,6 +510,12 @@ def run(cfg: Config, store: Store, bronnen: dict, llm: LLM, dagen: int | None = 
                      "%(wacht_nieuw)d nieuw, %(wacht_opgelost)d beantwoord", telling)
         except Exception as e:  # de controle mag de ronde niet laten mislukken
             log.warning("controle na de ronde mislukt: %s", e)
+        try:
+            n = ruim_beantwoord_op(cfg, store, bronnen)
+            if n:
+                log.info("%d beantwoorde mail(s) gearchiveerd", n)
+        except Exception as e:
+            log.warning("opruimen na de ronde mislukt: %s", e)
         return resultaat
 
 
@@ -559,6 +565,61 @@ def keur_goed(store: Store, bronnen: dict, item_id: int, concept: str | None,
         store.zet_eigen_antwoord(item_id, concept)
     store.log(item_id, "VERZONDEN na bevestigde klik" if verzonden else "concept in Mail gezet")
     return melding
+
+
+def ruim_beantwoord_op(cfg: Config, store: Store, bronnen: dict, item_ids: list[int] | None = None,
+                       slot=None) -> int:
+    """Mail die je via de app beantwoordde naar het archief, zodra je antwoord echt verstuurd is: na Send meteen,
+    na Reply in Mail zodra Mail het origineel als beantwoord markeert (dat doet Mail zelf bij versturen).
+    Een concept dat je weggooit, laat de mail dus in je inbox. Archiveren zet hem ook op gelezen.
+    Mail die al niet meer in je inbox staat, omdat je hem zelf verplaatste, laat de app met rust."""
+    from collections import defaultdict
+    from contextlib import nullcontext
+
+    if not cfg.opruimen_na_antwoord:
+        return 0
+    rijen = store.op_te_ruimen(cfg.terugkijken_dagen)
+    if item_ids is not None:
+        rijen = [r for r in rijen if r["id"] in set(item_ids)]
+    per_bron = defaultdict(list)
+    for r in rijen:
+        per_bron[r["bron"]].append(r)
+    slot = slot or nullcontext()
+    gelukt = 0
+    for bron_naam, items in per_bron.items():
+        bron = bronnen.get(bron_naam)
+        if bron is None or not hasattr(bron, "verplaats") or not hasattr(bron, "beantwoord"):
+            continue
+        try:
+            with slot:
+                stand = bron.beantwoord([(it["bron_id"], it["thread_id"]) for it in items])
+        except Exception as e:
+            log.warning("%s: niet na te gaan welke mail beantwoord is: %s", bron_naam, e)
+            continue
+        klaar = []
+        for it in items:
+            wat, huidig = stand.get(it["bron_id"], ("nee", None))
+            if wat == "weg":
+                store.zet_opgeruimd(it["id"], "weg")
+            elif it["status"] == "verzonden" or wat == "ja":
+                klaar.append((it, huidig or it["bron_id"]))
+        if not klaar:
+            continue
+        try:
+            with slot:
+                res = bron.verplaats([bid for _, bid in klaar], "archief")
+        except Exception as e:
+            log.warning("%s: archiveren na je antwoord mislukt: %s", bron_naam, e)
+            continue
+        for it, bid in klaar:
+            fout = res.get(bid, "no result")
+            if fout is None:
+                store.zet_opgeruimd(it["id"], datetime.now().astimezone().isoformat(timespec="seconds"))
+                store.log(it["id"], "na je antwoord gearchiveerd en op gelezen gezet")
+                gelukt += 1
+            else:
+                log.warning("%s: archiveren na je antwoord mislukt voor item %s: %s", bron_naam, it["id"], fout)
+    return gelukt
 
 
 VOORVOEGSEL = re.compile(r"^\s*((re|aw|antw|fw|fwd|wg|doorst)\s*:\s*)+", re.IGNORECASE)
@@ -1267,6 +1328,16 @@ def terug_naar_te_doen(store: Store, bronnen: dict, item_id: int) -> str:
         return "Back in your inbox and in To do"
     if it["status"] in ("wacht", "fout", "handmatig"):
         return "Already in To do"
+    if it["opgeruimd"] and it["opgeruimd"] != "weg":   # na je antwoord gearchiveerd: eerst terug naar de inbox
+        bron = bronnen.get(it["bron"])
+        if bron is None or not hasattr(bron, "terugzetten") or not it["thread_id"]:
+            raise ValueError("couldn't bring the email back from the archive")
+        nieuw = bron.terugzetten([it["thread_id"]], "archief").get(it["thread_id"], "FOUT:no response")
+        if nieuw.startswith("FOUT"):
+            raise ValueError(f"couldn't bring the email back from the archive ({nieuw[5:]})")
+        if nieuw != it["bron_id"]:
+            store.nieuw_bron_id(it["sleutel"], it["bron"], nieuw)
+        store.zet_opgeruimd(item_id, None)
     terug = it["vorige_status"] if it["vorige_status"] in ("wacht", "fout", "handmatig") else "wacht"
     store.zet_status(item_id, terug)
     store.wis_lijkt_beantwoord(item_id)

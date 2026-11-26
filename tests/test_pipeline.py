@@ -1530,3 +1530,69 @@ def test_alleen_werkagenda_naar_claude():
     assert mag_agenda_naar_claude(cfg2, {"kalender": "Werk", "account": "iCloud"})
     assert not mag_agenda_naar_claude(cfg2, {"kalender": "Gezin", "account": "iCloud"})
     assert not mag_agenda_naar_claude({}, werk)                                      # geen agenda ingesteld
+
+
+def test_beantwoorde_mail_gelezen_en_gearchiveerd(omgeving):
+    """Reply in Mail en Send zetten het origineel op gelezen. Na Send gaat het meteen naar het archief, na Reply
+    in Mail pas als Mail het als beantwoord markeert. Een weggegooid concept laat de mail in je inbox."""
+    from mailagent.pipeline import ruim_beantwoord_op, terug_naar_te_doen
+    cfg, store, bronnen = omgeving
+    bron = bronnen["test"]
+    run(cfg, store, bronnen, NepLLM())
+    a, b, c = [r["id"] for r in store.items(status="wacht")][:3]
+    ba, bb, bc = (store.item(i)["bron_id"] for i in (a, b, c))
+    inbox, archief = cfg.data_dir.parent / "mail", cfg.data_dir.parent / "mail" / "_archief"
+
+    keur_goed(store, bronnen, a, "Dank, akkoord.", verzenden=True)      # Send
+    keur_goed(store, bronnen, b, "Beste Jan,\n\nPrima.")                 # Reply in Mail, nog niet verstuurd
+    keur_goed(store, bronnen, c, "Beste Piet,\n\nKomt goed.")            # Reply in Mail, concept weggegooid
+    assert {ba, bb, bc} <= bron.gelezen                                   # alle drie op gelezen
+
+    assert ruim_beantwoord_op(cfg, store, bronnen) == 1                   # alleen de verstuurde
+    assert (archief / ba).exists() and not (inbox / ba).exists()
+    assert (inbox / bb).exists() and (inbox / bc).exists()
+    assert store.item(a)["opgeruimd"] and store.item(b)["opgeruimd"] is None
+
+    bron.beantwoorde.add(bb)                                              # je verstuurt het antwoord in Mail
+    assert ruim_beantwoord_op(cfg, store, bronnen) == 1
+    assert (archief / bb).exists() and (inbox / bc).exists()
+    assert ruim_beantwoord_op(cfg, store, bronnen) == 0                   # niets dubbel
+
+    # in Handled staat erbij dat hij gearchiveerd is
+    from mailagent.web import item_dict
+    afgehandeld = {r["id"]: item_dict(r) for r in store.afgehandeld_uit_te_doen()}
+    assert afgehandeld[a]["opgeruimd"] and not afgehandeld[c]["opgeruimd"]
+
+    # terug naar Te doen: de mail komt eerst terug uit het archief
+    assert "To do" in terug_naar_te_doen(store, bronnen, a)
+    assert (inbox / ba).exists() and store.item(a)["opgeruimd"] is None
+    assert store.item(a)["status"] == "wacht"
+
+
+def test_zelf_verplaatste_mail_blijft_staan(omgeving):
+    from mailagent.pipeline import ruim_beantwoord_op
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    a = store.items(status="wacht")[0]["id"]
+    ba = store.item(a)["bron_id"]
+    keur_goed(store, bronnen, a, "Beste Jan,\n\nPrima.")
+    inbox = cfg.data_dir.parent / "mail"
+    (inbox / "_eigen map").mkdir()
+    (inbox / ba).rename(inbox / "_eigen map" / ba)                          # je zette hem zelf ergens anders neer
+    bronnen["test"].beantwoorde.add(ba)
+    assert ruim_beantwoord_op(cfg, store, bronnen) == 0
+    assert store.item(a)["opgeruimd"] == "weg"                               # niet meer elke minuut nakijken
+    assert (inbox / "_eigen map" / ba).exists()
+
+
+def test_archiveren_na_antwoord_uit(omgeving):
+    from mailagent.pipeline import ruim_beantwoord_op
+    cfg, store, bronnen = omgeving
+    pad = cfg.data_dir.parent / "config.yaml"
+    pad.write_text(pad.read_text().replace("archiveren_na_antwoord: true", "archiveren_na_antwoord: false"))
+    cfg = config_mod.laad(pad)
+    run(cfg, store, bronnen, NepLLM())
+    a = store.items(status="wacht")[0]["id"]
+    keur_goed(store, bronnen, a, "Dank, akkoord.", verzenden=True)
+    assert ruim_beantwoord_op(cfg, store, bronnen) == 0
+    assert (cfg.data_dir.parent / "mail" / store.item(a)["bron_id"]).exists()

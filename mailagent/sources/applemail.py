@@ -191,6 +191,10 @@ on run argv
         end try
     end if
     if m is missing value then error "email no longer found in " & mailboxNaam & " or " & archiefNaam
+    -- je handelt deze mail nu af, dus in Mail op gelezen
+    try
+        tell application "Mail" to set read status of m to true
+    end try
     set allen to (count of argv) > 6 and (item 7 of argv) is "1"
     set verzend to (count of argv) > 7 and (item 8 of argv) is "1"
     -- 1. Een echt antwoordvenster: Mail zet de oorspronkelijke mail er zelf in, met alle opmaak,
@@ -526,6 +530,42 @@ end run
 '''
 
 
+SCRIPT_BEANTWOORD = HULP + r'''
+on run argv
+    set accountNaam to item 1 of argv
+    set mailboxNaam to item 2 of argv
+    set uitvoer to ""
+    tell application "Mail" to set mb to mailbox mailboxNaam of account accountNaam
+    repeat with i from 3 to count of argv
+        -- per mail "id<tab>message-id"; het id verandert soms, het Message-ID niet
+        set delen to my splits(item i of argv, tab)
+        set berichtId to item 1 of delen
+        set berichtMid to ""
+        if (count of delen) > 1 then set berichtMid to item 2 of delen
+        set m to missing value
+        tell application "Mail"
+            try
+                set m to first message of mb whose id is (berichtId as integer)
+            end try
+            if m is missing value and berichtMid is not "" then
+                try
+                    set m to first message of mb whose message id is berichtMid
+                end try
+            end if
+            if m is missing value then
+                set uitvoer to uitvoer & berichtId & tab & "weg" & linefeed
+            else if was replied to of m then
+                set uitvoer to uitvoer & berichtId & tab & "ja" & tab & (id of m) & linefeed
+            else
+                set uitvoer to uitvoer & berichtId & tab & "nee" & tab & (id of m) & linefeed
+            end if
+        end tell
+    end repeat
+    return uitvoer
+end run
+'''
+
+
 def _osascript(script: str, *args: str) -> str:
     try:
         r = subprocess.run(["osascript", "-", *args], input=script, capture_output=True, text=True, timeout=600)
@@ -666,6 +706,18 @@ class AppleMailBron:
                     "System Settings > Privacy & Security > Accessibility, then restart it")
         return ("Reply opened, but the window didn't come to the front in time, so I didn't paste. Your text is on "
                 "the clipboard, so click in the reply and press ⌘V")
+
+    def beantwoord(self, mails: list[tuple[str, str | None]]) -> dict[str, tuple[str, str | None]]:
+        """Per mail in de inbox: heeft Mail hem als beantwoord gemarkeerd? Mail doet dat zelf zodra je antwoord
+        verstuurd is. Geeft per bron_id ('ja' | 'nee' | 'weg', huidig id); 'weg' is niet meer in de inbox."""
+        uit = _osascript(SCRIPT_BEANTWOORD, self.account, self.mailbox,
+                         *[f"{bid}\t{mid or ''}" for bid, mid in mails])
+        res: dict[str, tuple[str, str | None]] = {}
+        for regel in uit.splitlines():
+            delen = regel.split("\t")
+            if len(delen) >= 2:
+                res[delen[0].strip()] = (delen[1].strip(), delen[2].strip() if len(delen) > 2 else None)
+        return res
 
     def markeer(self, bron_id: str, message_id: str | None, aan: bool, kleur: int = 4) -> None:
         """Vlag zetten (aan) of weghalen. Kleur: 0 rood, 1 oranje, 2 geel, 3 groen, 4 blauw, 5 paars, 6 grijs."""
