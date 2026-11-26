@@ -107,6 +107,14 @@ CREATE TABLE IF NOT EXISTS les_regels (
     aangemaakt TEXT NOT NULL,
     UNIQUE (soort, waarde)
 );
+CREATE TABLE IF NOT EXISTS afspraak_soorten (
+    sleutel TEXT PRIMARY KEY,    -- EventKit-id (één per reeks) of titel en organisator
+    soort TEXT NOT NULL,         -- les | afdeling | overleg | eigen
+    reden TEXT,
+    door TEXT NOT NULL,          -- claude | jij
+    titel TEXT,
+    aangemaakt TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS gemeld (
     sleutel TEXT PRIMARY KEY,
     tijd TEXT NOT NULL
@@ -388,6 +396,23 @@ class Store:
 
     def zet_context(self, item_id: int, context: list[dict]) -> None:
         self.db.execute("UPDATE items SET context=? WHERE id=?", (json.dumps(context, ensure_ascii=False), item_id))
+        self.db.commit()
+
+    def afspraak_soorten(self) -> dict[str, dict]:
+        return {r["sleutel"]: dict(r) for r in self.db.execute("SELECT * FROM afspraak_soorten")}
+
+    def zet_afspraak_soort(self, sleutel: str, soort: str, reden: str | None, door: str, titel: str | None = None) -> None:
+        if door == "claude":   # nooit over jouw eigen keuze heen
+            self.db.execute("INSERT INTO afspraak_soorten(sleutel, soort, reden, door, titel, aangemaakt) VALUES (?,?,?,?,?,?) "
+                            "ON CONFLICT(sleutel) DO UPDATE SET soort=excluded.soort, reden=excluded.reden "
+                            "WHERE afspraak_soorten.door='claude'", (sleutel, soort, reden, door, titel, nu()))
+        else:
+            self.db.execute("INSERT OR REPLACE INTO afspraak_soorten(sleutel, soort, reden, door, titel, aangemaakt) "
+                            "VALUES (?,?,?,?,?,?)", (sleutel, soort, reden, door, titel, nu()))
+        self.db.commit()
+
+    def wis_afspraak_soort(self, sleutel: str) -> None:
+        self.db.execute("DELETE FROM afspraak_soorten WHERE sleutel=?", (sleutel,))
         self.db.commit()
 
     def les_regels(self) -> list[sqlite3.Row]:

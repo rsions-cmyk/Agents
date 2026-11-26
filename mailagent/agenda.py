@@ -87,6 +87,20 @@ LES_WOORDEN = ["college", "hoorcollege", "werkcollege", "responsiecollege", "lec
                "les", "lessen", "lesson", "class", "seminar", "colloquium", "tentamen", "exam"]
 
 
+AFDELING_WOORDEN = ["staff meeting", "staffmeeting", "staffm", "teamoverleg", "teammeeting", "team meeting",
+                    "afdelingsoverleg", "afdelingsvergadering", "algemene vergadering", "general meeting", "all hands",
+                    "lunchmeeting", "kick-off", "kickoff", "update from", "opleidingsoverleg", "heidag", "studiedag"]
+SOORTEN = ("les", "afdeling", "overleg", "eigen")
+
+
+def afspraak_sleutel(a: dict) -> str:
+    """Eén sleutel per afspraak of reeks (herhaalde afspraken delen hun EventKit-id)."""
+    if a.get("id"):
+        return f"id:{a['id']}"
+    org = (a.get("organisator") or {}).get("adres", "")
+    return f"tt:{str(a.get('titel', '')).strip().lower()}|{org}"
+
+
 def les_regel_bij(a: dict, regels) -> Optional[dict]:
     """De regel die je zelf in de app maakte en die bij deze afspraak past: titel gaat voor organisator, die
     voor agenda."""
@@ -100,6 +114,23 @@ def les_regel_bij(a: dict, regels) -> Optional[dict]:
             if r["soort"] == soort and past(r["waarde"]):
                 return dict(r)
     return None
+
+
+def soort_bepalen(a: dict, lessen: dict | None, regels, geleerd: Optional[dict]) -> tuple[str, str]:
+    """(soort, waarom). Volgorde: jouw keuze voor deze afspraak of reeks, jouw regels (titel, organisator,
+    agenda), Claude, en dan de eenvoudige herkenning op woorden en deelnemers."""
+    if geleerd and geleerd.get("door") == "jij":
+        return geleerd["soort"], "jouw keuze"
+    regel = les_regel_bij(a, regels)
+    if regel is not None:
+        if regel["les"]:
+            return "les", f"jouw regel ({regel['soort']})"
+    elif geleerd and geleerd.get("soort") in SOORTEN:
+        return geleerd["soort"], geleerd.get("reden") or "Claude"
+    soort = soort_afspraak(a, lessen, regels)
+    if soort == "les" and regel is not None and not regel["les"]:
+        soort = ""
+    return soort, ""
 
 
 def soort_afspraak(a: dict, lessen: dict | None = None, regels=None) -> str:
@@ -122,7 +153,10 @@ def soort_afspraak(a: dict, lessen: dict | None = None, regels=None) -> str:
             or (organisatoren and any(o in f"{org.get('naam', '')} {org.get('adres', '')}".lower() for o in organisatoren)) \
             or any(re.search(rf"\b{re.escape(w)}\b", tekst) for w in woorden):
         return "les"
-    if any(not d.get("ik") for d in a.get("deelnemers") or []):
+    anderen = [d for d in a.get("deelnemers") or [] if not d.get("ik")]
+    if any(re.search(rf"\b{re.escape(w)}\b", tekst) for w in AFDELING_WOORDEN) or len(anderen) >= 12:
+        return "afdeling"
+    if anderen:
         return "overleg"
     return ""
 
@@ -216,6 +250,7 @@ class AppleAgenda:
                 a["url"] = str(ev.URL().absoluteString()) if ev.URL() else ""
                 a["organisator"] = self._deelnemer(ev.organizer()) if ev.organizer() else None
                 a["deelnemers"] = [self._deelnemer(d) for d in (ev.attendees() or [])][:40]
+                a["herhaalt"] = bool(ev.hasRecurrenceRules())
                 # zelf verschuiven mag alleen bij je eigen afspraken zonder andere deelnemers
                 a["wijzigbaar"] = bool(ev.calendar().allowsContentModifications()) and not bool(ev.hasAttendees())
             except Exception:

@@ -25,7 +25,7 @@ from urllib.parse import parse_qs, urlparse
 from .config import Config
 from datetime import date, datetime, timedelta
 
-from .agenda import les_regel_bij, lees_werktijd, maak_agenda, soort_afspraak, vrije_momenten
+from .agenda import SOORTEN, afspraak_sleutel, les_regel_bij, lees_werktijd, maak_agenda, soort_bepalen, vrije_momenten
 from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
@@ -221,6 +221,56 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
             ophalen["laatste"] = f"ophalen mislukt: {ex}"
         finally:
             ophalen["bezig"] = False
+
+    indelen = {"bezig": False}
+    indelen_slot = threading.Lock()
+
+    def deel_in_op_achtergrond(afspraken: list[dict]) -> bool:
+        """Afspraken die de app nog niet kent laten indelen door Claude, op de achtergrond, één keer per reeks.
+        Niets van organisatoren of titels op de lijst 'nooit naar Claude'; notities kort en zonder links."""
+        import re as _re
+        if not indelen_slot.acquire(blocking=False):
+            return True   # loopt al
+        indelen["bezig"] = True
+
+        def werk():
+            st = Store(db_pad)
+            try:
+                gezien, stukken = set(), []
+                for a in afspraken:
+                    sleutel = afspraak_sleutel(a)
+                    org = a.get("organisator") or {}
+                    proef = Email(bron="", bron_id="", van=org.get("adres") or org.get("naam") or "", aan="",
+                                  onderwerp=a.get("titel") or "", datum=datetime.now().astimezone(), tekst="")
+                    if sleutel in gezien or not mag_naar_claude(cfg, proef):
+                        continue
+                    gezien.add(sleutel)
+                    dl = [d for d in a.get("deelnemers") or [] if not d.get("ik")]
+                    notities = _re.sub(r"https?://\S+", "", a.get("notities") or "")[:300].strip()
+                    stukken.append((sleutel, a.get("titel"), {
+                        "titel": anonimiseer(cfg, a.get("titel") or ""), "locatie": a.get("locatie"),
+                        "organisator": org.get("naam") or org.get("adres"),
+                        "deelnemers": f"{len(dl)} anderen" + (f", bijvoorbeeld {', '.join(d.get('naam') or d.get('adres', '') for d in dl[:6])}" if dl else ""),
+                        "herhaalt": "ja" if a.get("herhaalt") else "nee", "agenda": a.get("kalender"),
+                        "duur": f"{int((a['eind'] - a['start']).total_seconds() // 60)} minuten",
+                        "notities": anonimiseer(cfg, notities)}))
+                llm = llm_factory()
+                if not hasattr(llm, "deel_afspraken_in"):
+                    return
+                for begin in range(0, len(stukken), 20):
+                    groep = stukken[begin:begin + 20]
+                    uit = llm.deel_afspraken_in([{"nr": i, **velden} for i, (_, _, velden) in enumerate(groep)])
+                    for r in uit:
+                        if 0 <= int(r.get("nr", -1)) < len(groep) and r.get("soort") in SOORTEN:
+                            sleutel, titel, _ = groep[int(r["nr"])]
+                            st.zet_afspraak_soort(sleutel, r["soort"], (r.get("reden") or "")[:120], "claude", titel)
+            except Exception as e:
+                logging.getLogger("mailagent").warning("afspraken indelen: %s", e)
+            finally:
+                indelen["bezig"] = False
+                indelen_slot.release()
+        threading.Thread(target=werk, daemon=True).start()
+        return True
 
     def bewaak_belangrijk() -> int:
         """Eén keer kijken: nieuwe mail van een belangrijke afzender? Dan een melding op je Mac, en meteen
@@ -504,11 +554,31 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                         lijst = [{"titel": "Bezet", "start": b, "eind": e, "heledag": False, "vrij": False, "kalender": ""}
                                  for b, e in ag.bezet(van, tot)]
                     lessen = (cfg.agenda or {}).get("lessen") or {}
-                    regels = store.les_regels()
-                    return self._json({"ok": True, "afspraken": [
-                        {**a, "start": a["start"].isoformat(timespec="minutes"), "eind": a["eind"].isoformat(timespec="minutes"),
-                         "soort": soort_afspraak(a, lessen, regels), "les_regel": les_regel_bij(a, regels)}
-                        for a in lijst]})
+                    regels, geleerd = store.les_regels(), store.afspraak_soorten()
+                    uit, onbekend = [], []
+                    for a in lijst:
+                        sleutel = afspraak_sleutel(a)
+                        g = geleerd.get(sleutel)
+                        soort, waarom = soort_bepalen(a, lessen, regels, g)
+                        if g is None and not a.get("heledag") and not a.get("vrij"):
+                            onbekend.append(a)
+                        uit.append({**a, "start": a["start"].isoformat(timespec="minutes"),
+                                    "eind": a["eind"].isoformat(timespec="minutes"), "sleutel": sleutel,
+                                    "soort": soort, "soort_waarom": waarom, "soort_door": (g or {}).get("door", ""),
+                                    "les_regel": les_regel_bij(a, regels)})
+                    bezig = deel_in_op_achtergrond(onbekend) if onbekend else indelen["bezig"]
+                    return self._json({"ok": True, "afspraken": uit, "bezig": bool(bezig)})
+                elif actie == "afspraak-soort":
+                    sleutel = v.get("sleutel") or ""
+                    if not sleutel:
+                        return self._json({"ok": False, "melding": "Onbekende afspraak"})
+                    if v.get("soort") in SOORTEN:
+                        store.zet_afspraak_soort(sleutel, v["soort"], None, "jij", v.get("titel"))
+                        melding = {"les": "Les", "afdeling": "Afdelingsoverleg", "overleg": "Overleg met anderen",
+                                   "eigen": "Eigen afspraak"}[v["soort"]] + (", ook de volgende keren" if v.get("herhaalt") else "")
+                    else:
+                        store.wis_afspraak_soort(sleutel)
+                        melding = "De app deelt deze afspraak weer zelf in"
                 elif actie == "les-regel":
                     soort = v.get("soort")
                     waarde = (v.get("waarde") or "").strip()
@@ -689,6 +759,8 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
             self._json({"ok": True, "melding": melding})
 
     Handler.bewaak_belangrijk = staticmethod(bewaak_belangrijk)
+    Handler.deel_in = staticmethod(deel_in_op_achtergrond)
+    Handler.indelen = indelen
     Handler.start_bewaking = staticmethod(start_bewaking)
     return Handler
 

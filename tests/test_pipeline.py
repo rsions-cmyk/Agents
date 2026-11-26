@@ -50,6 +50,15 @@ class NepLLM:
         return TakenOordeel(taken=[TaakOordeel(taak_id=i, klaar=any(w in antwoord.lower() for w in t.lower().split()[:1]),
                                                reden="test") for i, t in taken])
 
+    def deel_afspraken_in(self, afspraken):
+        self.gezien.extend(a.get("titel", "") for a in afspraken)
+        uit = []
+        for a in afspraken:
+            t = a.get("titel", "").lower()
+            soort = "les" if "y1" in t or "y2" in t else "afdeling" if "staff" in t else "overleg" if a.get("deelnemers", "").startswith(("1 ", "2 ")) else "eigen"
+            uit.append({"nr": a["nr"], "soort": soort, "reden": "test"})
+        return uit
+
     def herinnering(self, aan, onderwerp, tekst, werkdagen):
         self.gezien.append(tekst)
         return f"Hoi, even een herinnering over: {onderwerp}"
@@ -1273,3 +1282,40 @@ def test_zelf_geleerde_lesregels(omgeving):
     store.zet_les_regel("titel", "Werkcollege intervisie", False)             # 'geen les' gaat voor de woorden
     assert soort_afspraak({"titel": "Werkcollege intervisie"}, {}, store.les_regels()) == ""
     assert soort_afspraak({"titel": "Werkcollege TMO"}, {}, store.les_regels()) == "les"
+
+
+def test_afspraken_indelen_door_claude_en_jouw_keuze(omgeving):
+    import time
+    from datetime import datetime, timedelta
+    from mailagent.agenda import afspraak_sleutel, soort_bepalen
+    from mailagent.web import maak_handler
+
+    cfg, store, bronnen = omgeving
+    nu = datetime.now().astimezone()
+    mij = {"naam": "Rob", "ik": True}
+    vrijdag = {"id": "EV-VR", "titel": "TMO Y2 A Strategy", "locatie": "C2.07", "start": nu, "eind": nu + timedelta(hours=2),
+               "organisator": {"naam": "Roosterbureau", "adres": "rooster@buas.nl"}, "herhaalt": True,
+               "deelnemers": [mij, {"naam": "Groep TMO Y2 A", "ik": False}], "kalender": "Calendar", "notities": ""}
+    staff = {"id": "EV-ST", "titel": "Staffm. Lunchmeeting", "start": nu, "eind": nu + timedelta(hours=1),
+             "deelnemers": [mij] + [{"naam": f"collega {i}", "ik": False} for i in range(30)], "kalender": "Calendar"}
+    bank = {"id": "EV-B", "titel": "Afspraak", "start": nu, "eind": nu + timedelta(hours=1),
+            "organisator": {"adres": "service@mijnbank.example"}, "kalender": "Calendar"}
+    handler = maak_handler(cfg, store, bronnen, NepLLM)
+    handler.deel_in([vrijdag, staff, bank])
+    for _ in range(50):
+        if not handler.indelen["bezig"]:
+            break
+        time.sleep(0.05)
+    geleerd = store.afspraak_soorten()
+    assert geleerd[afspraak_sleutel(vrijdag)]["soort"] == "les"            # vrijdag nu wel een les
+    assert geleerd[afspraak_sleutel(staff)]["soort"] == "afdeling"
+    assert afspraak_sleutel(bank) not in geleerd                           # nooit naar Claude
+    assert soort_bepalen(vrijdag, {}, [], geleerd[afspraak_sleutel(vrijdag)])[0] == "les"
+
+    # jouw keuze gaat voor, en Claude overschrijft die niet
+    store.zet_afspraak_soort(afspraak_sleutel(staff), "eigen", None, "jij")
+    store.zet_afspraak_soort(afspraak_sleutel(staff), "afdeling", "opnieuw", "claude")
+    g = store.afspraak_soorten()[afspraak_sleutel(staff)]
+    assert soort_bepalen(staff, {}, [], g) == ("eigen", "jouw keuze")
+    # zonder Claude herkent de app een groot overleg ook zelf als afdeling
+    assert soort_bepalen({**staff, "id": "X"}, {}, [], None)[0] == "afdeling"
