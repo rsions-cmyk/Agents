@@ -172,6 +172,8 @@ class AppleAgenda:
                 a["url"] = str(ev.URL().absoluteString()) if ev.URL() else ""
                 a["organisator"] = self._deelnemer(ev.organizer()) if ev.organizer() else None
                 a["deelnemers"] = [self._deelnemer(d) for d in (ev.attendees() or [])][:40]
+                # zelf verschuiven mag alleen bij je eigen afspraken zonder andere deelnemers
+                a["wijzigbaar"] = bool(ev.calendar().allowsContentModifications()) and not bool(ev.hasAttendees())
             except Exception:
                 pass
             uit.append(a)
@@ -192,6 +194,32 @@ class AppleAgenda:
             if str(ev.title() or "").startswith(titel[:40]):
                 return str(ev.eventIdentifier())
         return None
+
+    def _exemplaar(self, afspraak_id: str, oud_start: Optional[datetime]):
+        """De afspraak zelf; bij een herhaalde afspraak het exemplaar op `oud_start`."""
+        if oud_start is not None:
+            pred = self.store.predicateForEventsWithStartDate_endDate_calendars_(
+                self._nsdate(oud_start - timedelta(minutes=1)), self._nsdate(oud_start + timedelta(minutes=1)), None)
+            for ev in self.store.eventsMatchingPredicate_(pred) or []:
+                if str(ev.eventIdentifier() or "") == afspraak_id:
+                    return ev
+        return self.store.eventWithIdentifier_(afspraak_id)
+
+    def verplaats_afspraak(self, afspraak_id: str, oud_start: Optional[datetime], start: datetime, eind: datetime) -> str:
+        """Afspraak naar een ander moment (alleen dit exemplaar). Niet bij vergaderingen met anderen."""
+        ev = self._exemplaar(afspraak_id, oud_start)
+        if ev is None:
+            raise RuntimeError("afspraak niet gevonden in je agenda")
+        if ev.hasAttendees():
+            raise RuntimeError("dit is een vergadering met anderen; verzet die in Outlook, dan krijgen zij de wijziging ook")
+        if not ev.calendar().allowsContentModifications():
+            raise RuntimeError(f"de agenda '{ev.calendar().title()}' kun je niet wijzigen")
+        ev.setStartDate_(self._nsdate(start))
+        ev.setEndDate_(self._nsdate(eind))
+        ok, fout = self.store.saveEvent_span_error_(ev, self.EK.EKSpanThisEvent, None)
+        if not ok:
+            raise RuntimeError(f"Afspraak niet verzet: {fout}")
+        return f"verzet naar {nl_moment(start)}–{eind:%H:%M}"
 
     def verwijder_afspraak(self, afspraak_id: str) -> bool:
         ev = self.store.eventWithIdentifier_(afspraak_id)

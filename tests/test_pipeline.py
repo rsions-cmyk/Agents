@@ -1215,3 +1215,32 @@ def test_taak_uit_agenda_en_onthouden_afspraak(omgeving):
     assert ag.weg == ["EV-1"] and store.taak(t["id"])["gepland"] is None
     with pytest.raises(ValueError):
         haal_uit_agenda(store, ag, t["id"])                                   # staat al niet meer in de agenda
+
+
+def test_taak_verzetten_door_slepen(omgeving):
+    from datetime import datetime, timedelta
+    from mailagent.pipeline import plan_bestaande_taak, verzet_taak, zet_taken_klaar
+
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    it = store.items(status="wacht")[0]
+    zet_taken_klaar(store, bronnen, it["id"], "c", [{"omschrijving": "Bekijk ICRE-oproepen", "minuten": 30}])
+    t = store.open_taken()[0]
+
+    class Ag(NepAgenda2):
+        def __init__(self):
+            super().__init__(); self.verzet = []
+        def maak_afspraak(self, titel, start, eind, notities):
+            self.laatste_id = "EV-9"
+            return super().maak_afspraak(titel, start, eind, notities)
+        def verplaats_afspraak(self, afspraak_id, oud, start, eind):
+            self.verzet.append((afspraak_id, oud, start, eind)); return f"verzet naar {start:%H:%M}"
+    ag = Ag()
+    start = (datetime.now().astimezone() + timedelta(days=1)).replace(hour=10, minute=0, second=0, microsecond=0)
+    plan_bestaande_taak(store, ag, t["id"], start, 30)
+    nieuw = start.replace(hour=14, minute=15)
+    assert "14:15" in verzet_taak(store, ag, t["id"], nieuw, 45)              # ook langer maken
+    afspraak, oud, b, e = ag.verzet[0]
+    assert afspraak == "EV-9" and oud == start and b == nieuw and e - b == timedelta(minutes=45)
+    rij = store.taak(t["id"])
+    assert datetime.fromisoformat(rij["gepland"]) == nieuw and rij["minuten"] == 45

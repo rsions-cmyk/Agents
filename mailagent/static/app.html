@@ -171,6 +171,11 @@ details.origineel pre{white-space:pre-wrap;font:13px/1.5 -apple-system,sans-seri
 .afs-vrij span{position:absolute;right:6px;top:2px;font-size:10.5px;color:var(--zacht);opacity:.8;max-width:60%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .afs{z-index:1}
 .afs.klik{cursor:pointer}
+.afs.sleepbaar{cursor:grab;touch-action:none}
+.afs.sleepbaar .rek{position:absolute;left:0;right:0;bottom:0;height:7px;cursor:ns-resize}
+.afs.sleept{cursor:grabbing;z-index:5;box-shadow:0 6px 18px rgba(0,0,0,.18);border-color:var(--accent);color:var(--tekst);opacity:.95}
+.sleep-tijd{position:absolute;right:6px;top:2px;font-size:11px;font-weight:600;color:var(--accent);background:var(--vlak);padding:0 4px;border-radius:4px}
+body.blok-slepen{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .afs.klik:hover,.afs.klik:focus-visible{border-color:var(--accent);color:var(--tekst);outline:none}
 .heledag .klik{cursor:pointer}
 .afs-pop{position:fixed;z-index:60;width:340px;max-height:min(560px,calc(100vh - 16px));overflow:auto;background:var(--vlak);
@@ -650,12 +655,15 @@ const filter = (lijst, taken) => lijst.filter(i => !(taken ? takenVerborgen : ve
   && (staat.project === "alles" || i.project === staat.project));
 
 let peilTimer = null;   // één timer, hoe vaak laad() ook wordt aangeroepen
+let afsSleep = null, negeerKlik = false;   // een blok in Planning wordt versleept
 async function laad(){
   clearTimeout(peilTimer);
   try {
     const r = await fetch("/api/data", {cache:"no-store", headers:{"X-Token":TOKEN}});
     if (!r.ok) throw new Error("status " + r.status);
-    D = await r.json();
+    const nieuw = await r.json();
+    if (afsSleep){ D = nieuw; peilTimer = setTimeout(laad, 1500); return; }   // niet hertekenen midden in het slepen
+    D = nieuw;
   } catch(e){
     document.getElementById("status").textContent = "Geen verbinding met de app; opnieuw over 10 seconden";
     peilTimer = setTimeout(laad, 10000);
@@ -1059,6 +1067,63 @@ async function planTaakIn(id, start){
   return j.ok;
 }
 
+// Slepen in Planning: taken van de app, en je eigen afspraken zonder andere deelnemers (vergaderingen met
+// anderen verzet je in Outlook, dan krijgen zij de wijziging ook). Overlappen mag.
+function sleepbaar(a){
+  if (a.heledag || (a.vrij && !isFocus(a))) return false;
+  if (appTaakBij(a)) return true;
+  return !!a.id && a.wijzigbaar !== false && !(a.deelnemers && a.deelnemers.length);
+}
+async function verzetAfspraak(a, start, minuten, stil_){
+  const t = appTaakBij(a), oudStart = a.start, oudMin = Math.round((Date.parse(a.eind) - Date.parse(a.start)) / 60000);
+  const data = t ? {taak: t.id, start: lokaalIso(start), minuten} : {id: a.id, oud_start: a.start, start: lokaalIso(start), minuten};
+  a.start = lokaalIso(start); a.eind = lokaalIso(start + minuten * 60000);       // meteen tonen
+  if (t){ t.gepland = a.start; t.minuten = minuten; }
+  teken();
+  const j = await stil("afspraak-verplaats", data);
+  if (!j.ok){ a.start = oudStart; a.eind = lokaalIso(Date.parse(oudStart) + oudMin * 60000); if (t) t.gepland = oudStart; toast(j.melding, true); return teken(); }
+  if (!stil_) toast(j.melding, false, {label: "Ongedaan maken", doe: () => verzetAfspraak(a, Date.parse(oudStart), oudMin, true)});
+  legeDagen(); laad();
+}
+document.addEventListener("pointerdown", ev => {
+  const el = ev.target.closest("#pl-tijdlijn .afs.sleepbaar[data-afs]");
+  if (!el || staat.tab !== "planning" || plaatsing || gekozenKaart || ev.button > 0) return;
+  const a = (dagen[staat.planDag] || [])[Number(el.dataset.afs)];
+  if (!a) return;
+  afsSleep = {el, a, y0: ev.clientY, modus: ev.target.closest(".rek") ? "rek" : "schuif", bewogen: false,
+              start0: Date.parse(a.start), duur0: Math.round((Date.parse(a.eind) - Date.parse(a.start)) / 60000),
+              top0: parseFloat(el.style.top), hoog0: parseFloat(el.style.height)};
+  afsSleep.start = afsSleep.start0; afsSleep.duur = afsSleep.duur0;
+  el.setPointerCapture(ev.pointerId);
+}, true);
+document.addEventListener("pointermove", ev => {
+  if (!afsSleep) return;
+  const s_ = afsSleep, dy = ev.clientY - s_.y0;
+  if (!s_.bewogen && Math.abs(dy) < 5) return;
+  if (!s_.bewogen){ s_.bewogen = true; sluitPop(); s_.el.classList.add("sleept"); document.body.classList.add("blok-slepen"); }
+  const stap = Math.round(dy / PLPX / 15) * 15, d0 = dagBegin(staat.planDag);
+  if (s_.modus === "schuif"){
+    const m = Math.max(0, Math.min(24 * 60 - s_.duur0, (s_.start0 - d0) / 60000 + stap));
+    s_.start = d0 + m * 60000;
+    s_.el.style.top = (s_.top0 + ((s_.start - s_.start0) / 60000) * PLPX) + "px";
+  } else {
+    s_.duur = Math.max(15, s_.duur0 + stap);
+    s_.el.style.height = Math.max(14, s_.duur * PLPX - 2) + "px";
+  }
+  let lbl = s_.el.querySelector(".sleep-tijd");
+  if (!lbl){ lbl = document.createElement("span"); lbl.className = "sleep-tijd"; s_.el.append(lbl); }
+  lbl.textContent = `${tijdVan(s_.start)}–${tijdVan(s_.start + s_.duur * 60000)}`;
+});
+document.addEventListener("pointerup", () => {
+  if (!afsSleep) return;
+  const s_ = afsSleep; afsSleep = null;
+  document.body.classList.remove("blok-slepen");
+  if (!s_.bewogen) return;                       // gewone klik: het venstertje opent
+  negeerKlik = true; setTimeout(() => { negeerKlik = false; }, 400);
+  if (s_.start === s_.start0 && s_.duur === s_.duur0) return teken();
+  verzetAfspraak(s_.a, s_.start, s_.duur);
+}, true);
+
 // Venstertje met details van een afspraak in Planning; bij een taak van de app ook de taak en wat je ermee kunt
 function appTaakBij(a){
   return (D.taken || []).find(t => t.gepland && ((t.afspraak_id && t.afspraak_id === a.id) ||
@@ -1111,6 +1176,7 @@ function openAfspraak(i, anker){
 }
 document.addEventListener("click", async ev => {
   const afs = ev.target.closest("#pl-tijdlijn .afs[data-afs], .heledag [data-afs]");
+  if (afs && negeerKlik){ ev.stopPropagation(); return; }
   if (afs && staat.tab === "planning" && !plaatsing && !gekozenKaart){ ev.stopPropagation(); return openAfspraak(Number(afs.dataset.afs), afs); }
   const pop = document.getElementById("afs-pop");
   if (!pop) return;
@@ -1523,9 +1589,9 @@ function afsprakenHTML(lijst, d0, van, tot, schaal, kalenderInTitel, klikbaar){
     g.forEach(a => { a.n = Math.max(1, kolEind.length); });
   });
   bezet.forEach(a => {
-    const hoog = Math.max(14, (a.e-a.b)*schaal - 2), n = a.n;
-    h += `<div class="afs${isFocus(a) ? " focus" : ""}${hoog < 30 ? " smal" : ""}${klikbaar ? " klik" : ""}"${klikbaar ? ` data-afs="${a.i}" tabindex="0"` : ""} style="top:${y(a.b)}px;height:${hoog}px;left:${a.kol*100/n}%;width:calc(${100/n}% - 3px)${hoog < 30 ? `;line-height:${hoog - 2}px` : ""}"
-      title="${esc(a.titel)}${kalenderInTitel && a.kalender ? " · " + esc(a.kalender) : ""}">${esc(kortTitel(a.titel))}${isFocus(a) ? " · beschermd" : ""}</div>`;
+    const hoog = Math.max(14, (a.e-a.b)*schaal - 2), n = a.n, sleep = klikbaar && sleepbaar(a);
+    h += `<div class="afs${isFocus(a) ? " focus" : ""}${hoog < 30 ? " smal" : ""}${klikbaar ? " klik" : ""}${sleep ? " sleepbaar" : ""}"${klikbaar ? ` data-afs="${a.i}" tabindex="0"` : ""} style="top:${y(a.b)}px;height:${hoog}px;left:${a.kol*100/n}%;width:calc(${100/n}% - 3px)${hoog < 30 ? `;line-height:${hoog - 2}px` : ""}"
+      title="${esc(a.titel)}${kalenderInTitel && a.kalender ? " · " + esc(a.kalender) : ""}${sleep ? " · sleep om te verzetten" : ""}">${esc(kortTitel(a.titel))}${isFocus(a) ? " · beschermd" : ""}${sleep ? `<div class="rek" title="Sleep om langer of korter te maken"></div>` : ""}</div>`;
   });
   return h;
 }
@@ -1702,7 +1768,7 @@ function rekVelden(root = document){
 new MutationObserver(() => rekVelden(document.getElementById("paneel"))).observe(document.getElementById("paneel"), {childList: true});
 window.addEventListener("resize", () => { rekVelden(); if (staat.tab === "planning" && !plaatsing) teken(); });
 setInterval(() => {   // nu-lijn bijwerken, alleen als je niet aan het slepen of plaatsen bent
-  if (D && staat.tab === "planning" && !plaatsing && !gekozenKaart && document.querySelector(".nu-lijn, #pl-binnen")) teken();
+  if (D && staat.tab === "planning" && !plaatsing && !gekozenKaart && !afsSleep && document.querySelector(".nu-lijn, #pl-binnen")) teken();
 }, 60000);
 document.addEventListener("keydown", ev => {
   // Enter in een taakveld maakt geen nieuwe regel; Shift+Enter wel

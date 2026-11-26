@@ -30,7 +30,7 @@ from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
 from .opmaak import externe_afbeeldingen, html_uit_bron, veilig
-from .pipeline import RondeBezig, achtergrond_voor_item, haal_uit_agenda, afzender_adres, deadline_in_agenda, ochtend, voorstellen_voor, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
+from .pipeline import RondeBezig, achtergrond_voor_item, haal_uit_agenda, verzet_taak, afzender_adres, deadline_in_agenda, ochtend, voorstellen_voor, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
 from .melding import meld
 from .store import Store
 
@@ -610,6 +610,21 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                         morgen = datetime.combine(date.today() + timedelta(days=1), datetime.min.time()).astimezone()
                         voorstellen = voorstellen_voor(ag, cfg, open_, morgen)
                     return self._json({"ok": True, "voorstellen": voorstellen, "agenda_fout": fout})
+                elif actie == "afspraak-verplaats":
+                    ag, fout = agenda()
+                    if ag is None:
+                        return self._json({"ok": False, "melding": fout or "geen agenda gekoppeld"})
+                    start = datetime.fromisoformat(v["start"]).astimezone()
+                    minuten = max(5, min(24 * 60, int(v.get("minuten") or 30)))
+                    with mail_slot:
+                        if v.get("taak"):
+                            melding = verzet_taak(store, ag, int(v["taak"]), start, minuten)
+                        else:
+                            if not hasattr(ag, "verplaats_afspraak"):
+                                return self._json({"ok": False, "melding": "Verzetten kan niet in deze agenda"})
+                            oud = datetime.fromisoformat(v["oud_start"]).astimezone() if v.get("oud_start") else None
+                            melding = ag.verplaats_afspraak(v["id"], oud, start, start + timedelta(minutes=minuten))
+                    melding = melding[:1].upper() + melding[1:]
                 elif actie == "afspraak-weg":
                     ag, fout = agenda()
                     if ag is None:

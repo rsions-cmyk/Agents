@@ -246,6 +246,29 @@ def plan_bestaande_taak(store: Store, agenda, taak_id: int, start: datetime, min
     return melding
 
 
+def verzet_taak(store: Store, agenda, taak_id: int, start: datetime, minuten: int) -> str:
+    """Ingeplande taak naar een ander moment of een andere duur (slepen in Planning). Overlappen mag."""
+    if agenda is None:
+        raise ValueError("geen agenda gekoppeld")
+    t = store.taak(taak_id)
+    if t is None or not t["gepland"]:
+        raise ValueError("deze taak staat niet in je agenda")
+    oud = datetime.fromisoformat(t["gepland"])
+    stappen = json.loads(t["stappen"] or "[]")
+    afspraak = t["afspraak_id"]
+    if not afspraak and hasattr(agenda, "zoek_afspraak"):
+        afspraak = agenda.zoek_afspraak(oud, afspraak_titel(t["omschrijving"], stappen))
+    eind = start + timedelta(minutes=minuten)
+    if afspraak and hasattr(agenda, "verplaats_afspraak"):
+        melding = agenda.verplaats_afspraak(afspraak, oud, start, eind)
+    else:   # de afspraak is weg uit de agenda: een nieuwe maken
+        melding = agenda.maak_afspraak(afspraak_titel(t["omschrijving"], stappen), start, eind, "\n".join(f"- {s}" for s in stappen))
+        afspraak = getattr(agenda, "laatste_id", None)
+    store.plan_taak(taak_id, start.isoformat(timespec="minutes"), minuten)
+    store.zet_afspraak_id(taak_id, afspraak)
+    return melding
+
+
 def haal_uit_agenda(store: Store, agenda, taak_id: int) -> str:
     """Ingeplande taak weer uit je agenda: de afspraak weg, de taak terug bij 'Nog in te plannen'. Na een klik."""
     if agenda is None:
