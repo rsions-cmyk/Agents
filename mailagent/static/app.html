@@ -2539,6 +2539,25 @@ const vindItem = id => [...D.zelf, ...D.wacht, ...D.info, ...D.overgeslagen].fin
 let taak = null;   // {id, item, voorstel, minuten, inplannen, start(ms), dag, archiveren}
 const dagen = {};  // datum -> lijst afspraken | "laden" | {fout}
 const legeDagen = () => Object.keys(dagen).forEach(k => delete dagen[k]);   // agenda opnieuw ophalen
+// De agenda op de achtergrond opnieuw ophalen voor de dagen die je al bekeek, zonder 'Loading calendar…':
+// na iets wat de app in je agenda zette, elke vijf minuten, en als je terugkomt in het venster (een afspraak die
+// je intussen in Outlook maakte). Dagen ver weg worden vergeten en bij het bekijken opnieuw opgehaald.
+let verversBezig = false;
+async function verversDagen(){
+  if (verversBezig || !D || !D.agenda_aan) return;
+  verversBezig = true;
+  const vandaag = isoDag(new Date()), grens = isoDag(new Date(Date.now() + 21 * 864e5));
+  for (const dag of Object.keys(dagen)){
+    if (dag < vandaag || dag > grens){ delete dagen[dag]; continue; }
+    if (!Array.isArray(dagen[dag])) continue;
+    try { const j = await (await post("dag", {datum: dag})).json(); if (j.ok) dagen[dag] = j.afspraken; } catch(e){}
+  }
+  verversBezig = false;
+  if (afsSleep || sleep || plaatsing) return;   // niet hertekenen midden in het slepen
+  if (taak) tekenTaak(); else teken();
+}
+setInterval(verversDagen, 5 * 60 * 1000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) verversDagen(); });
 const indeelPogingen = {};
 const PX = 0.8;    // pixels per minuut in het dagoverzicht bij Taak maken
 let PLPX = 0.8;    // in Planning: zo dat de werkdag het paneel vult (zie plTijdlijnHTML)
@@ -2742,7 +2761,9 @@ async function bevestigTaak(){
   const ok = await actie("taak-maak", data);
   weg.forEach(i => verborgen.delete(i));
   if (!ok){ taak = v; tekenTaak(); }
+  if (ok && start) delete dagen[start.slice(0, 10)];   // de nieuwe afspraak meteen zien, ook bij de volgende taak
   laad();
+  if (ok && start) verversDagen();
 }
 
 // taken uit een mail: bewerkbare kopie per mail, blijft bewaard als de lijst ververst
@@ -2872,7 +2893,9 @@ document.addEventListener("click", async ev => {
   if (d.deadlineagenda){
     t.disabled = true;
     const j = await stil("deadline-agenda", {id: Number(d.deadlineagenda), soort: d.soort});
-    toast(j.melding, !j.ok); return laad();
+    toast(j.melding, !j.ok);
+    if (j.ok) verversDagen();
+    return laad();
   }
   if (d.gedaanmelding) return document.getElementById("gedaan")?.click();
   if (d.nietbeantwoord){ const j = await stil("niet-beantwoord", {id: Number(d.nietbeantwoord)}); toast(j.melding, !j.ok); return laad(); }
