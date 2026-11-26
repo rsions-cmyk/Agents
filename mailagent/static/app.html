@@ -131,6 +131,7 @@ textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:
 .takenlijst{display:flex;flex-direction:column;gap:6px}
 .takenlijst div{display:flex;gap:8px;align-items:center;padding:8px 12px;border-radius:9px;background:var(--vlak2)}
 .takenlijst svg{color:var(--ok);width:16px;height:16px}
+details.origineel{scroll-margin-top:12px}
 details.origineel summary{cursor:pointer;color:var(--zacht);font-size:13px;list-style:none;display:flex;align-items:center;gap:6px}
 details.origineel pre{white-space:pre-wrap;font:13px/1.5 -apple-system,sans-serif;background:var(--vlak2);padding:12px 14px;border-radius:11px;max-height:340px;overflow:auto;margin:8px 0 0}
 .p-voet{padding:14px 20px;border-top:1px solid var(--lijn);display:flex;gap:10px;align-items:center}
@@ -3141,11 +3142,23 @@ document.addEventListener("click", ev => {
   const blok = b.closest(".mailweergave");
   if (blok) ververs(Number(blok.id.slice(3)));
 });
+// Original email: pas bij openen de mail invoegen, en als je hem zelf opent meteen naar de mail springen
+document.addEventListener("click", ev => {
+  const d = ev.target.closest && ev.target.closest("details.origineel > summary")?.parentElement;
+  if (d && !d.open) d.dataset.springen = "1";
+}, true);
 document.addEventListener("toggle", ev => {
   const d = ev.target;
-  if (!(d instanceof HTMLDetailsElement) || !d.dataset.orig || !d.open || d.querySelector(".mailweergave")) return;
-  const id = Number(d.dataset.orig), it = [...D.zelf, ...D.wacht].find(i => i.id === id);
-  d.insertAdjacentHTML("beforeend", mailWeergave(id, it ? it.tekst : ""));
+  if (!(d instanceof HTMLDetailsElement) || !d.classList.contains("origineel") || !d.open) return;
+  if (d.dataset.orig && !d.querySelector(".mailweergave")){
+    const id = Number(d.dataset.orig), it = [...D.zelf, ...D.wacht].find(i => i.id === id);
+    d.insertAdjacentHTML("beforeend", mailWeergave(id, it ? it.tekst : ""));
+  }
+  if (d.dataset.springen){
+    delete d.dataset.springen;
+    const rustig = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    requestAnimationFrame(() => d.scrollIntoView({block:"start", behavior: rustig ? "auto" : "smooth"}));
+  }
 }, true);
 // ---------------- kolombreedtes en inklappen (onthouden per browser) ----------------
 const STANDAARD = {zij: 220, lijst: 400};
