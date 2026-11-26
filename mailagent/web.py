@@ -30,7 +30,7 @@ from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
 from .opmaak import externe_afbeeldingen, html_uit_bron, veilig
-from .pipeline import RondeBezig, ruim_beantwoord_op, schone_open_punten, terug_naar_te_doen, agenda_check, lijkt_afspraak, achtergrond_voor_item, afspraak_momenten, bevestig_voorlopig, geef_voorlopig_vrij, haal_uit_agenda, houd_vast, verzet_taak, afzender_adres, deadline_in_agenda, ochtend, voorstellen_voor, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
+from .pipeline import RondeBezig, zet_afwijzen_terug, ruim_beantwoord_op, schone_open_punten, terug_naar_te_doen, agenda_check, lijkt_afspraak, achtergrond_voor_item, afspraak_momenten, bevestig_voorlopig, geef_voorlopig_vrij, haal_uit_agenda, houd_vast, verzet_taak, afzender_adres, deadline_in_agenda, ochtend, voorstellen_voor, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
 from .melding import meld
 from .store import Store
 
@@ -438,7 +438,9 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                     melding = zet_gedaan_terug(store, int(v["id"]))
                 elif actie == "afwijzen":
                     wijs_af(store, int(v["id"]))
-                    melding = "Afgewezen"
+                    melding = "Dismissed"
+                elif actie == "niet-afgewezen":
+                    melding = zet_afwijzen_terug(store, int(v["id"]))
                 elif actie in ("taak-klaar", "taak-heropen"):
                     klaar = actie == "taak-klaar"
                     (store.taak_klaar if klaar else store.taak_heropen)(int(v["id"]))

@@ -1818,3 +1818,15 @@ def test_omkeerbaar_anonimiseren_in_alle_velden(omgeving):
     cli = ClaudeCodeLLM(cfg, uitvoerder=uitvoerder)
     u2 = cli.werk_uit(mail, mail.tekst, s)
     assert "123456" not in gezien[0] and "studentnummer 123456 staat" in u2.concept_antwoord
+
+
+def test_dismiss_ongedaan_maken(omgeving):
+    from mailagent.pipeline import zet_afwijzen_terug
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    a = store.items(status="wacht")[0]["id"]
+    wijs_af(store, a)
+    assert store.item(a)["status"] == "afgewezen" and store.item(a)["vorige_status"] == "wacht"
+    assert zet_afwijzen_terug(store, a) == "Back in To do" and store.item(a)["status"] == "wacht"
+    with pytest.raises(ValueError):
+        zet_afwijzen_terug(store, a)                                   # niet afgewezen: niets terug te zetten

@@ -1454,7 +1454,20 @@ def terug_naar_te_doen(store: Store, bronnen: dict, item_id: int) -> str:
 
 
 def wijs_af(store: Store, item_id: int, reden: str | None = None) -> None:
+    """Dismiss: het voorstel van Claude klopt niet. De mail blijft in je inbox; Undo zet het item terug."""
+    item = store.item(item_id)
+    if item is None:
+        raise ValueError("email not found")
+    store.bewaar_vorige_status(item_id, item["status"])
     store.zet_status(item_id, "afgewezen", opmerking=reden or None)
+
+
+def zet_afwijzen_terug(store: Store, item_id: int) -> str:
+    item = store.item(item_id)
+    if item is None or item["status"] != "afgewezen":
+        raise ValueError("not dismissed")
+    store.zet_status(item_id, item["vorige_status"] if item["vorige_status"] in OPEN_STATUSSEN else "wacht")
+    return "Back in To do"
 
 
 def overzicht(cfg: Config, store: Store, uren: int = 24) -> str:

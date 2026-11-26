@@ -3025,7 +3025,21 @@ document.addEventListener("click", async ev => {
     if (!ok){ bewaarTekst(id, concept); staat.open = id; teken(); }   // niet verstuurd: jouw tekst blijft staan
     return;
   }
-  if (t.id === "goedkeuren" || t.id === "afwijzen"){
+  if (t.id === "afwijzen"){   // Dismiss, met Undo
+    const id = Number(document.getElementById("paneel").dataset.id);
+    const volgende = drieKolommen() ? volgendeNa(id) : null;
+    sluitPaneel();
+    if (volgende !== null) staat.open = volgende;
+    await animeerWeg([id]); verborgen.add(id); teken();
+    const j = await stil("afwijzen", {id});
+    verborgen.delete(id);
+    if (!j.ok){ toast(j.melding, true); staat.open = id; teken(); return; }
+    toast("Dismissed: Claude's suggestion was wrong. The email stays in your inbox.", false, {label: "Undo", doe: async () => {
+      const r = await stil("niet-afgewezen", {id}); toast(r.melding, !r.ok); staat.open = id; laad(); }});
+    laad();
+    return;
+  }
+  if (t.id === "goedkeuren"){
     const id = Number(document.getElementById("paneel").dataset.id);
     const goed = t.id === "goedkeuren";
     const data = goed ? {id, concept: document.getElementById("concept").value,
