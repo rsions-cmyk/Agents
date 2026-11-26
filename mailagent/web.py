@@ -35,7 +35,7 @@ from .melding import meld
 from .store import Store
 
 APP_HTML = Path(__file__).with_name("static") / "app.html"
-# vaste bestanden naast de app: logo, Dock-icoon (Safari > Archief > Zet in Dock) en manifest
+# vaste bestanden naast de app: logo, Dock-icoon (Safari > File > Add to Dock) en manifest
 BESTANDEN = {
     "/favicon.svg": ("favicon.svg", "image/svg+xml"),
     "/favicon.ico": ("icon-192.png", "image/png"),

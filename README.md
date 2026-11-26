@@ -59,7 +59,7 @@ Na elke run staat er een overzicht per project in `data/overzicht.md`.
 
 **Zoeken.** ⌘K (of `/`) zet de cursor in het zoekveld bovenin. De app zoekt in alle mail die hij verwerkte (afzender, onderwerp, tekst, samenvatting en je eigen antwoord), in je taken en in Wacht op antwoord. Alle woorden moeten voorkomen. Met de pijltjes en Enter open je een treffer op de plek waar hij hoort: Te doen, Opruimen, Planning, of het detailpaneel als hij al is afgehandeld. Mail die de app nooit ophaalde (ouder dan `terugkijken_dagen` bij de eerste ronde) zoek je in Mail zelf.
 
-**Icoon in je Dock.** De app heeft een eigen icoon (de bel). Een icoon dat je eerder met Safari > Archief > Zet in Dock maakte, houdt het oude plaatje: verwijder het uit het Dock en zet de pagina opnieuw in het Dock. De naam staat dan al op Concierge.
+**Icoon in je Dock.** De app heeft een eigen icoon (de bel). Een Dock-app die je eerder met Safari > File > Add to Dock maakte, houdt het oude plaatje. Gooi die weg (hij staat in de map Programma's in je thuismap) en zet de pagina opnieuw in het Dock; de naam staat dan al op Concierge.
 
 **Opbergen in een map.** Naast archiveren kun je een mail in een eigen map zetten, bijvoorbeeld ENTER÷IFITT: met de mapknop of toets `V`. De kiezer zet bovenaan waar je mail van deze afzender eerder opborg, mappen die je vaak voor dit project gebruikt, en mappen waarvan de naam in het onderwerp staat. Typ om te zoeken, `↵` om op te bergen. De mappenlijst wordt eenmaal per sessie uit Apple Mail gehaald; "Vernieuwen" haalt hem opnieuw op.
 
