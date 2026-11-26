@@ -166,6 +166,12 @@ details.origineel pre{white-space:pre-wrap;font:13px/1.5 -apple-system,sans-seri
 .buiten{position:absolute;left:-52px;right:-8px;background:var(--vlak2);opacity:.7}
 .afs{position:absolute;background:var(--vlak2);border:1px solid var(--lijn);border-left:3px solid var(--zacht);border-radius:6px;padding:2px 6px;font-size:12px;line-height:1.3;overflow:hidden;color:var(--zacht)}
 .afs.vrij{border-left-style:dashed;opacity:.7}
+.afs.smal{padding:0 6px;font-size:11px;white-space:nowrap;text-overflow:ellipsis}
+.afs-vrij{position:absolute;left:0;right:0;border-left:2px dashed var(--lijn);background:repeating-linear-gradient(180deg,transparent 0 10px,color-mix(in srgb,var(--lijn) 25%,transparent) 10px 11px);z-index:0;pointer-events:none}
+.afs-vrij span{position:absolute;right:6px;top:2px;font-size:10.5px;color:var(--zacht);opacity:.8;max-width:60%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.afs{z-index:1}
+.nu-lijn{position:absolute;left:-8px;right:0;height:0;border-top:2px solid var(--hoog);z-index:4;pointer-events:none}
+.nu-lijn::before{content:"";position:absolute;left:-4px;top:-5px;width:8px;height:8px;border-radius:50%;background:var(--hoog)}
 .tb{position:absolute;left:28%;right:0;background:var(--accent);color:var(--vlak);border-radius:8px;padding:3px 8px;font-size:12px;line-height:1.3;cursor:grab;box-shadow:0 2px 10px rgba(0,0,0,.18);touch-action:none;z-index:2;overflow:hidden}
 .tb:active{cursor:grabbing}
 .tb.botst{background:var(--hoog)}
@@ -305,7 +311,7 @@ kbd{font:600 11px var(--romp,inherit);font-family:inherit;padding:1px 6px;border
 .dagkop b{min-width:170px;text-align:center;font-size:15px}
 .plaatsbalk{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;margin-bottom:8px;border-radius:10px;background:var(--accent-zacht)}
 .plaatsbalk span{flex:1;min-width:0}
-#pl-tijdlijn{max-height:calc(100vh - 190px)}
+#pl-tijdlijn{max-height:none}
 .tb.concept{background:transparent;color:var(--accent);border:2px dashed var(--accent);box-shadow:none}
 .tb.concept.botst{color:var(--hoog);border-color:var(--hoog)}
 
@@ -1382,7 +1388,41 @@ function momentTekst(iso, minuten){
 const vindItem = id => [...D.zelf, ...D.wacht, ...D.info, ...D.overgeslagen].find(i => i.id === id);
 let taak = null;   // {id, item, voorstel, minuten, inplannen, start(ms), dag, archiveren}
 const dagen = {};  // datum -> lijst afspraken | "laden" | {fout}
-const PX = 0.8;    // pixels per minuut in het dagoverzicht
+const PX = 0.8;    // pixels per minuut in het dagoverzicht bij Taak maken
+let PLPX = 0.8;    // in Planning: zo dat de werkdag het paneel vult (zie plTijdlijnHTML)
+const kortTitel = t => String(t || "").split(" · begin met:")[0];
+// rode lijn op het huidige moment, als de getoonde dag vandaag is
+function nuLijn(dag, van, tot, schaal){
+  if (dag !== isoDag(new Date())) return "";
+  const nu = new Date(), m = nu.getHours() * 60 + nu.getMinutes();
+  if (m < van || m > tot) return "";
+  return `<div class="nu-lijn" style="top:${(m - van) * schaal}px" title="Nu, ${tijdVan(nu.getTime())}"></div>`;
+}
+// afspraken: vrije als achtergrond, bezette naast elkaar als ze overlappen
+function afsprakenHTML(lijst, d0, van, tot, schaal, kalenderInTitel){
+  const y = m => (m - van) * schaal;
+  const alle = lijst.filter(a => !a.heledag).map(a => ({...a, b: Math.max(van, (Date.parse(a.start)-d0)/60000), e: Math.min(tot, (Date.parse(a.eind)-d0)/60000)}))
+                    .filter(a => a.e > a.b).sort((p, q) => p.b - q.b);
+  let h = "";
+  alle.filter(a => a.vrij && !isFocus(a)).forEach(a => {
+    h += `<div class="afs-vrij" style="top:${y(a.b)}px;height:${Math.max(16, (a.e-a.b)*schaal - 2)}px" title="${esc(a.titel)} (telt als vrij)"><span>${esc(a.titel)}</span></div>`;
+  });
+  // alleen afspraken die elkaar echt overlappen delen de breedte; de rest krijgt de hele breedte
+  const bezet = alle.filter(a => !a.vrij || isFocus(a)), groepen = [];
+  let groep = null, groepEind = -1;
+  bezet.forEach(a => { if (!groep || a.b >= groepEind){ groep = []; groepen.push(groep); groepEind = a.e; } else groepEind = Math.max(groepEind, a.e); groep.push(a); });
+  groepen.forEach(g => {
+    const kolEind = [];
+    g.forEach(a => { let k = kolEind.findIndex(e => e <= a.b); if (k < 0){ k = kolEind.length; kolEind.push(0); } kolEind[k] = a.e; a.kol = k; });
+    g.forEach(a => { a.n = Math.max(1, kolEind.length); });
+  });
+  bezet.forEach(a => {
+    const hoog = Math.max(14, (a.e-a.b)*schaal - 2), n = a.n;
+    h += `<div class="afs${isFocus(a) ? " focus" : ""}${hoog < 30 ? " smal" : ""}" style="top:${y(a.b)}px;height:${hoog}px;left:${a.kol*100/n}%;width:calc(${100/n}% - 3px)${hoog < 30 ? `;line-height:${hoog - 2}px` : ""}"
+      title="${esc(a.titel)}${kalenderInTitel && a.kalender ? " · " + esc(a.kalender) : ""}">${esc(kortTitel(a.titel))}${isFocus(a) ? " · beschermd" : ""}</div>`;
+  });
+  return h;
+}
 const tweeCijfers = n => String(n).padStart(2, "0");
 const isoDag = d => `${d.getFullYear()}-${tweeCijfers(d.getMonth()+1)}-${tweeCijfers(d.getDate())}`;
 const lokaalIso = ms => { const d = new Date(ms); return `${isoDag(d)}T${tweeCijfers(d.getHours())}:${tweeCijfers(d.getMinutes())}`; };
@@ -1435,15 +1475,7 @@ function tijdlijnHTML(){
   if (uurMin(w.eind) < tot) h += `<div class="buiten" style="top:${y(uurMin(w.eind))}px;height:${y(tot)-y(uurMin(w.eind))}px"></div>`;
   for (let m = van; m < tot; m += 30)
     h += `<div class="uur${m % 60 ? " half" : ""}" style="top:${y(m)}px">${m % 60 ? "" : `<span>${tweeCijfers(m/60)}:00</span>`}</div>`;
-  // afspraken naast elkaar als ze overlappen
-  const blokken = lijst.filter(a => !a.heledag).map(a => ({...a, b: Math.max(van, (Date.parse(a.start)-d0)/60000), e: Math.min(tot, (Date.parse(a.eind)-d0)/60000)}))
-                       .filter(a => a.e > a.b).sort((p, q) => p.b - q.b);
-  const kolEind = [];
-  blokken.forEach(a => { let k = kolEind.findIndex(e => e <= a.b); if (k < 0){ k = kolEind.length; kolEind.push(0); } kolEind[k] = a.e; a.kol = k; });
-  const n = Math.max(1, kolEind.length);
-  blokken.forEach(a => {
-    h += `<div class="afs${a.vrij ? " vrij" : ""}${isFocus(a) ? " focus" : ""}" style="top:${y(a.b)}px;height:${Math.max(16, (a.e-a.b)*PX - 2)}px;left:${a.kol*100/n}%;width:calc(${100/n}% - 3px)" title="${esc(a.titel)} · ${esc(a.kalender)}">${esc(a.titel)}${isFocus(a) ? " · beschermd" : ""}</div>`;
-  });
+  h += afsprakenHTML(lijst, d0, van, tot, PX, true) + nuLijn(taak.dag, van, tot, PX);
   // de nieuwe taak
   const sMin = (taak.start - d0)/60000, bots = botsingen();
   h += `<div class="tb${bots.length ? " botst" : ""}" id="tb" style="top:${y(sMin)}px;height:${taak.minuten*PX - 2}px">
@@ -1562,7 +1594,10 @@ function rekVelden(root = document){
   root.querySelectorAll("textarea.groei").forEach(t => { t.style.height = "auto"; t.style.height = t.scrollHeight + 2 + "px"; });
 }
 new MutationObserver(() => rekVelden(document.getElementById("paneel"))).observe(document.getElementById("paneel"), {childList: true});
-window.addEventListener("resize", () => rekVelden());
+window.addEventListener("resize", () => { rekVelden(); if (staat.tab === "planning" && !plaatsing) teken(); });
+setInterval(() => {   // nu-lijn bijwerken, alleen als je niet aan het slepen of plaatsen bent
+  if (D && staat.tab === "planning" && !plaatsing && !gekozenKaart && document.querySelector(".nu-lijn, #pl-binnen")) teken();
+}, 60000);
 document.addEventListener("keydown", ev => {
   // Enter in een taakveld maakt geen nieuwe regel; Shift+Enter wel
   if (ev.key === "Enter" && !ev.shiftKey && !ev.metaKey && !ev.ctrlKey && ev.target.matches && ev.target.matches("textarea.groei")){ ev.preventDefault(); ev.target.blur(); }
@@ -2034,25 +2069,23 @@ function plTijdlijnHTML(){
     const sm = (plaatsing.start - d0)/60000;
     van = Math.min(van, Math.floor(sm/60)*60); tot = Math.max(tot, Math.ceil((sm + plaatsing.minuten)/60)*60);
   }
-  const y = m => (m - van) * PX;
+  // de werkdag vult de hoogte van het venster; nooit kleiner dan vroeger, nooit absurd groot
+  const heledagN = lijst.filter(a => a.heledag).length;
+  PLPX = Math.max(0.8, Math.min(2.6, (window.innerHeight - 250 - (heledagN ? 34 : 0)) / (tot - van)));
+  const y = m => (m - van) * PLPX;
   let h = "";
   if (uurMin(w.begin) > van) h += `<div class="buiten" style="top:0;height:${y(uurMin(w.begin))}px"></div>`;
   if (uurMin(w.eind) < tot) h += `<div class="buiten" style="top:${y(uurMin(w.eind))}px;height:${y(tot)-y(uurMin(w.eind))}px"></div>`;
   for (let m = van; m < tot; m += 30) h += `<div class="uur${m % 60 ? " half" : ""}" style="top:${y(m)}px">${m % 60 ? "" : `<span>${tweeCijfers(m/60)}:00</span>`}</div>`;
-  const blokken = lijst.filter(a => !a.heledag).map(a => ({...a, b: Math.max(van, (Date.parse(a.start)-d0)/60000), e: Math.min(tot, (Date.parse(a.eind)-d0)/60000)}))
-                       .filter(a => a.e > a.b).sort((p, q) => p.b - q.b);
-  const kolEind = [];
-  blokken.forEach(a => { let k = kolEind.findIndex(e => e <= a.b); if (k < 0){ k = kolEind.length; kolEind.push(0); } kolEind[k] = a.e; a.kol = k; });
-  const n = Math.max(1, kolEind.length);
-  blokken.forEach(a => { h += `<div class="afs${a.vrij ? " vrij" : ""}${isFocus(a) ? " focus" : ""}" style="top:${y(a.b)}px;height:${Math.max(16, (a.e-a.b)*PX - 2)}px;left:${a.kol*100/n}%;width:calc(${100/n}% - 3px)" title="${esc(a.titel)}">${esc(a.titel)}${isFocus(a) ? " · beschermd" : ""}</div>`; });
+  h += afsprakenHTML(lijst, d0, van, tot, PLPX, false) + nuLijn(staat.planDag, van, tot, PLPX);
   if (plaatsing && isoDag(new Date(plaatsing.start)) === staat.planDag){
     const t = D.taken.find(x => x.id === plaatsing.id);
-    h += `<div class="tb concept${plBotsingen().length ? " botst" : ""}" id="pl-blok" style="top:${y((plaatsing.start-d0)/60000)}px;height:${plaatsing.minuten*PX - 2}px">
+    h += `<div class="tb concept${plBotsingen().length ? " botst" : ""}" id="pl-blok" style="top:${y((plaatsing.start-d0)/60000)}px;height:${plaatsing.minuten*PLPX - 2}px">
             <b>${esc(t ? t.omschrijving : "Taak")}</b><span id="pl-tijd">${blokTijdVan(plaatsing.start, plaatsing.minuten)}</span><div class="rek"></div></div>`;
   }
   const heledag = lijst.filter(a => a.heledag);
   return (heledag.length ? `<div class="heledag">${heledag.map(a => `<span>${esc(a.titel)}</span>`).join("")}</div>` : "") +
-    `<div class="tijdlijn" id="pl-tijdlijn"><div class="tl-binnen" id="pl-binnen" data-van="${van}" style="height:${(tot-van)*PX}px">${h}</div></div>`;
+    `<div class="tijdlijn" id="pl-tijdlijn"><div class="tl-binnen" id="pl-binnen" data-van="${van}" style="height:${(tot-van)*PLPX}px">${h}</div></div>`;
 }
 
 function minuutOp(clientY){
@@ -2060,7 +2093,7 @@ function minuutOp(clientY){
   if (!binnen) return null;
   const r = binnen.getBoundingClientRect();
   if (clientY < r.top || clientY > r.bottom) return null;
-  return Math.round(((clientY - r.top) / PX + Number(binnen.dataset.van)) / 15) * 15;
+  return Math.round(((clientY - r.top) / PLPX + Number(binnen.dataset.van)) / 15) * 15;
 }
 function plaats(id, clientY){
   const t = D.taken.find(x => x.id === id), m = minuutOp(clientY);
@@ -2096,12 +2129,12 @@ document.addEventListener("pointermove", ev => {
     return;
   }
   if (!plSleep || !plaatsing) return;
-  const stap = Math.round((ev.clientY - plSleep.y0) / PX / 15) * 15, d0 = dagBegin(staat.planDag);
+  const stap = Math.round((ev.clientY - plSleep.y0) / PLPX / 15) * 15, d0 = dagBegin(staat.planDag);
   if (plSleep.modus === "schuif") plaatsing.start = d0 + Math.min(24*60 - plaatsing.minuten, Math.max(0, (plSleep.start0 - d0)/60000 + stap)) * 60000;
   else plaatsing.minuten = Math.max(15, Math.min(24*60 - (plaatsing.start - d0)/60000, plSleep.duur0 + stap));
   const blok = document.getElementById("pl-blok"), van = Number(document.getElementById("pl-binnen").dataset.van);
-  blok.style.top = ((plaatsing.start - d0)/60000 - van) * PX + "px";
-  blok.style.height = plaatsing.minuten * PX - 2 + "px";
+  blok.style.top = ((plaatsing.start - d0)/60000 - van) * PLPX + "px";
+  blok.style.height = plaatsing.minuten * PLPX - 2 + "px";
   blok.classList.toggle("botst", plBotsingen().length > 0);
   document.getElementById("pl-tijd").textContent = blokTijdVan(plaatsing.start, plaatsing.minuten);
 });
