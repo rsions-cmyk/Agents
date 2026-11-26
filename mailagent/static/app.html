@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>attaché</title>
+<script>(function(){var m="auto";try{m=localStorage.getItem("attache-thema")||"auto"}catch(e){}
+var d=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches;
+document.documentElement.dataset.theme=m==="auto"?(d?"dark":"paper"):m;document.documentElement.dataset.themaKeuze=m})();</script>
 <meta name="application-name" content="attaché">
 <meta name="apple-mobile-web-app-title" content="attaché">
 <meta name="description" content="attaché. Minding the details. Your email, tasks and calendar, prepared by Claude; you do the sending yourself.">
@@ -649,6 +652,132 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
 .zoek-flits{animation:zoekflits 1.6s ease}
 @keyframes zoekflits{0%,60%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}
 @media (max-width:760px){.zoek{order:5;width:100%;margin-left:0}.zoek kbd{display:none}}
+/* ================= attaché: drie thema's =================
+   Paper (overdag, standaard), Light en Dark. Automatisch volgt het uiterlijk van macOS: licht = Paper, donker = Dark.
+   Messing alleen voor wat nu gebeurt, wat aandacht vraagt en de ene hoofdknop. Selectie is neutraal. */
+:root[data-theme]{--font:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--r1:8px;--r2:10px}
+:root[data-theme=paper]{--canvas:#F6F2E9;--s1:#FDFBF6;--s2:#F1EBDD;--hover:#F7F3EA;--input:#FFFFFF;--line:#E6DECD;--line2:#D3C8B2;
+  --t1:#0E131C;--t2:#525967;--t3:#7D7768;--brass:#9C7030;--brass-t:#7A5520;--fill:#C9A052;--fill-b:#9C7030;--on:#0E131C;
+  --hatch:rgba(14,19,28,.045);--papier:#FFFFFF;--pop:0 8px 24px rgba(0,0,0,.06);color-scheme:light;
+  --onderwijs:#4F6488;--onderzoek:#6B5880;--istte:#4E7466;--overig:#7D7768}
+:root[data-theme=light]{--canvas:#F2EAD9;--s1:#E8DEC8;--s2:#D9CCB0;--hover:#E1D6BE;--input:#F8F3E8;--line:#D6C9AE;--line2:#C4B494;
+  --t1:#0E131C;--t2:#4D5461;--t3:#7D7768;--brass:#9C7030;--brass-t:#7A5520;--fill:#C9A052;--fill-b:#9C7030;--on:#0E131C;
+  --hatch:rgba(14,19,28,.05);--papier:#FBF8F1;--pop:0 8px 24px rgba(0,0,0,.08);color-scheme:light;
+  --onderwijs:#4F6488;--onderzoek:#6B5880;--istte:#4E7466;--overig:#7D7768}
+:root[data-theme=dark]{--canvas:#0E131C;--s1:#1C2534;--s2:#243044;--hover:#202A3C;--input:#151C28;--line:#283142;--line2:#374154;
+  --t1:#F2EAD9;--t2:#9BA3B0;--t3:#6B7482;--brass:#D4A853;--brass-t:#E2BE76;--fill:linear-gradient(#E6C27A,#B98A3E);--fill-b:#B98A3E;--on:#0E131C;
+  --hatch:rgba(242,234,217,.06);--papier:#F7F2E7;--pop:0 8px 24px rgba(0,0,0,.12);color-scheme:dark;
+  --onderwijs:#8094B5;--onderzoek:#9C8AAE;--istte:#7FA394;--overig:#6B7482}
+:root[data-theme]{--bg:var(--s1);--vlak:var(--s1);--vlak2:var(--hover);--vlak3:var(--canvas);--tekst:var(--t1);--zacht:var(--t2);--lijn:var(--line);
+  --accent:var(--t1);--accent-zacht:var(--s2);--accent-sterk:var(--t1);--ok:var(--t2);--ok-zacht:var(--s2);--hoog:var(--brass);
+  --let:var(--t2);--let-zacht:transparent;--overleg:var(--t2);--afdeling:var(--t2);--schaduw:none;--schaduw-hoog:var(--pop)}
+:root[data-theme] body{background:var(--s1);color:var(--t1)}
+:root[data-theme] :focus-visible{outline:2px solid var(--t1);outline-offset:2px}
+:root[data-theme] .kop h1,:root[data-theme] .p-kop h2,:root[data-theme] .groep-kop h2,:root[data-theme] .label,:root[data-theme] .zr-kop{font-weight:600}
+/* zijbalk */
+:root[data-theme] .zij{background:var(--canvas);border-right-color:var(--line)}
+:root[data-theme] .nav:hover{background:var(--hover)}
+:root[data-theme] .nav.actief{background:var(--s2);color:var(--t1);box-shadow:none}
+:root[data-theme] .nav.actief svg{color:var(--t1)}
+:root[data-theme] .nav .tel,:root[data-theme] .nav.actief .tel{background:transparent;color:var(--t2);font-weight:500;padding:0 4px}
+:root[data-theme] .nav{position:relative}
+.nav-dot{width:6px;height:6px;border-radius:50%;background:var(--brass);flex:none;margin-left:-2px}
+.app.ingeklapt .nav-dot{position:absolute;top:6px;right:6px}
+:root[data-theme] .knop-ophalen{background:transparent;border:1px solid var(--line2);box-shadow:none}
+:root[data-theme] .woordmerk-e{color:var(--brass-t)}
+:root[data-theme=dark] .logo .blok.merk{box-shadow:0 0 0 1px rgba(255,255,255,.1)}
+:root[data-theme=paper] .logo .blok.merk,:root[data-theme=light] .logo .blok.merk{box-shadow:none}
+/* lijsten: rijen op het vlak, haarlijnen, selectie neutraal */
+:root[data-theme] .app.drie main{background:var(--s1)}
+:root[data-theme] .lijst{box-shadow:none;border-color:var(--line);background:var(--s1)}
+:root[data-theme] .rij:hover{background:var(--hover)}
+:root[data-theme] .rij.gekozen,:root[data-theme] .rij.leest{background:var(--s2);box-shadow:none}
+@media (min-width:1100px){
+  :root[data-theme] .app.drie .lijst .rij{border-radius:0;margin-bottom:0;border-bottom:1px solid var(--line)}
+  :root[data-theme] .app.drie .lijst .rij:hover{background:var(--hover)}
+  :root[data-theme] .app.drie .lijst .rij.gekozen,:root[data-theme] .app.drie .lijst .rij.leest{background:var(--s2);box-shadow:none}
+}
+:root[data-theme] .rij.urg::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:2px;border-radius:2px;background:var(--brass)}
+:root[data-theme] .avatar{background:var(--s2)!important;color:var(--t2)}
+:root[data-theme] .avatar .pl{background:var(--s1);color:var(--t2);box-shadow:0 0 0 1.5px var(--s1)}
+:root[data-theme] .zr-rij .avatar svg{color:var(--t2)}
+/* labels in plaats van gekleurde chips */
+:root[data-theme] .chip,:root[data-theme] .chip.let,:root[data-theme] .chip.ok,:root[data-theme] .chip.hoog{background:transparent;border:0;padding:0;color:var(--t2);font-weight:400}
+:root[data-theme] .chip.project{background:transparent!important;color:var(--t1);border:1px solid var(--line2);padding:1px 8px}
+:root[data-theme] .projectkies{background-color:transparent!important;color:var(--t1)!important;box-shadow:inset 0 0 0 1px var(--line2);
+  background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%)!important}
+:root[data-theme] .projectkies option{color:#0E131C}
+:root[data-theme] .prio{background:var(--brass)}
+/* knoppen: één messing hoofdknop */
+:root[data-theme] .knop{background:transparent;border-color:var(--line2);color:var(--t1)}
+:root[data-theme] .knop:hover{border-color:var(--t3)}
+:root[data-theme] .knop.primair{background:transparent;border-color:var(--line2);color:var(--t1)}
+:root[data-theme] .knop.goed,:root[data-theme] #goedkeuren{background:var(--fill);border-color:var(--fill-b);color:var(--on)}
+:root[data-theme] .knop.klein.goed:not(#pl-bevestig):not(#afsluit-start){background:transparent;border-color:var(--line2);color:var(--t1)}
+:root[data-theme] #verzenden:not(.bevestig){background:transparent;border-color:var(--line2);color:var(--t1)}
+:root[data-theme] .knop.bevestig{background:var(--fill)!important;border-color:var(--fill-b)!important;color:var(--on)!important;animation:none}
+:root[data-theme] .p-voet:has(#verzenden.bevestig) #goedkeuren{background:transparent;border-color:var(--line2);color:var(--t1)}
+:root[data-theme] .knop kbd{background:color-mix(in srgb,currentColor 12%,transparent)}
+:root[data-theme] .ikoon.rood:hover,:root[data-theme] .ikoon.voorkeur,:root[data-theme] .ikoon.voorkeur.rood{color:var(--t1);background:var(--s2)}
+:root[data-theme] .p-voet{background:var(--s1);border-top-color:var(--line)}
+:root[data-theme] .segment{background:var(--canvas);border:1px solid var(--line)}
+:root[data-theme] .segment button.aan{background:var(--s2);color:var(--t1);box-shadow:none}
+/* meldingen en blokken: neutraal, met een haarlijn links */
+:root[data-theme] .melding,:root[data-theme] .melding.info{background:transparent;border-radius:0;padding:2px 0 2px 14px;border-left:2px solid var(--line2)}
+:root[data-theme] .melding.info{border-left:0;padding-left:0}
+:root[data-theme] .melding svg,:root[data-theme] .melding.info svg{color:var(--t2)}
+:root[data-theme] .melding.fout{background:transparent;border-left-color:var(--brass)}
+:root[data-theme] .melding.fout svg{color:var(--brass)}
+:root[data-theme] .vandaag,:root[data-theme] .afsluiten,:root[data-theme] .afspr{background:var(--s1);border-color:var(--line);box-shadow:none}
+:root[data-theme] .voorstel{background:var(--s2)}
+:root[data-theme] .voortgang-balk{height:2px}
+:root[data-theme] .voortgang-balk i,:root[data-theme] .voortgang.klaar .voortgang-balk i{background:var(--t2)}
+:root[data-theme] .leeg .rond,:root[data-theme] .leegpaneel .rond{background:var(--s2);color:var(--t2)}
+:root[data-theme] .jouw-antwoord{border-left:2px solid var(--line2);background:transparent}
+/* schrijf- en leesvlak per thema; opgemaakte mail blijft op papier */
+:root[data-theme] textarea,:root[data-theme] textarea.groei,:root[data-theme] .tk-rij input{background:var(--input);color:var(--t1);border-color:var(--line2)}
+:root[data-theme] textarea#concept,:root[data-theme] #a-tekst{background:var(--input);color:var(--t1);border-color:var(--line2);color-scheme:inherit}
+:root[data-theme] textarea#concept::placeholder,:root[data-theme] #a-tekst::placeholder{color:var(--t3)}
+:root[data-theme] textarea:focus{outline:2px solid var(--t1);outline-offset:-1px}
+:root[data-theme] .leesvlak{background:var(--input);color:var(--t1);border-color:var(--line);color-scheme:inherit}
+:root[data-theme] .mailframe{background:var(--papier);border-color:var(--line)}
+/* zoeken, popovers, toasts */
+:root[data-theme] .zoek{background:var(--input);border-color:var(--line2)}
+:root[data-theme] .zoek:focus-within{border-color:var(--t2);box-shadow:none}
+:root[data-theme] .zoek-res,:root[data-theme] .afs-pop,:root[data-theme] .kiezer,:root[data-theme] .overlay .vel{background:var(--s1);border-color:var(--line2);box-shadow:var(--pop)}
+:root[data-theme] .zr-rij.aan,:root[data-theme] .zr-rij:hover{background:var(--s2)}
+:root[data-theme] .toast svg{color:inherit}
+:root[data-theme] .toast.fout{background:var(--fill);color:var(--on)}
+:root[data-theme] .toast.fout svg{color:var(--on)}
+:root[data-theme] .greep:hover::after,:root[data-theme] .greep.actief::after{background:var(--line2)}
+:root[data-theme] .tb{background:var(--s2);color:var(--t1);border:1px dashed var(--brass);box-shadow:none}
+:root[data-theme] .spook{background:var(--s2);color:var(--t1);border:1px solid var(--line2)}
+/* agenda: soort via toon en pictogram, geen kleur; messing voor nu */
+:root[data-theme] .afs{background:var(--s1);border:1px solid var(--line);border-left:1px solid var(--line);color:var(--t1)}
+:root[data-theme] .afs .afs-ik{color:var(--t2)}
+:root[data-theme] .afs.soort-les,:root[data-theme] .afs.soort-afdeling{background:var(--s2);border-color:transparent;color:var(--t1)}
+:root[data-theme] .afs.soort-overleg{background:var(--s1);border-color:var(--line2);color:var(--t1)}
+:root[data-theme] .afs.soort-voorlopig{background:transparent;border:1px dashed var(--t3);color:var(--t2)}
+:root[data-theme] .afs.soort-taak{background:var(--s1);border:1px dashed var(--line2);color:var(--t1)}
+:root[data-theme] .afs.focus{background:var(--s1) repeating-linear-gradient(135deg,var(--hatch) 0 6px,transparent 6px 12px);border:1px solid var(--line);color:var(--t1);font-weight:500}
+:root[data-theme] .afs.nu{box-shadow:inset 2px 0 0 var(--brass)}
+:root[data-theme] .afs.sleept{border-color:var(--t2);box-shadow:var(--pop)}
+:root[data-theme] .nu-lijn{border-top:1.5px solid var(--brass)}
+:root[data-theme] .nu-lijn::before{background:var(--brass);width:7px;height:7px;top:-4.5px}
+.nu-tijd{position:absolute;right:calc(100% + 6px);top:-8px;font-size:11px;font-weight:600;color:var(--brass-t);background:var(--s1);padding:0 3px;font-variant-numeric:tabular-nums}
+:root[data-theme] .pop-soort .knop.aan{border-color:var(--t1);color:var(--t1)}
+:root[data-theme] .pop-r a,:root[data-theme] .pop-notities a{color:var(--t1)}
+/* thema kiezen */
+.thema{position:relative}
+.thema-knop{display:flex;align-items:center;gap:8px;width:100%;padding:6px 10px;border-radius:var(--r1);color:var(--t2);font-size:12.5px}
+.thema-knop:hover{background:var(--hover);color:var(--t1)}
+.thema-menu{position:absolute;bottom:calc(100% + 6px);left:0;width:232px;background:var(--s1);border:1px solid var(--line2);border-radius:10px;box-shadow:var(--pop);padding:4px;z-index:70}
+.thema-menu button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:7px 10px;border-radius:7px;font-size:13px;color:var(--t1)}
+.thema-menu button:hover{background:var(--hover)}
+.thema-menu button .meta{margin-left:auto;font-size:11.5px;color:var(--t2);white-space:nowrap}
+.thema-menu button svg{width:14px;height:14px;visibility:hidden}
+.thema-menu button.aan svg{visibility:visible}
+.app.ingeklapt .thema-knop{justify-content:center;width:44px;padding:8px 0}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -665,6 +794,7 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
     <div class="onder">
       <button class="knop-ophalen" id="ophalen" title="Get mail"><span data-ikoon="refresh"></span><span class="navtekst">Get mail</span></button>
       <div class="status" id="status"></div>
+      <div class="thema" id="thema"><button class="thema-knop" id="thema-knop" title="Theme" aria-haspopup="menu"><span data-ikoon="thema"></span><span class="navtekst" id="thema-naam">Automatic</span></button></div>
     </div>
   </aside>
   <main>
@@ -693,6 +823,7 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
 <script>
 const TOKEN = "__TOKEN__";
 const IKONEN = {
+  thema:'<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor" stroke="none"/>',
   inbox:'<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/>',
   refresh:'<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>',
   check:'<path d="M20 6 9 17l-5-5"/>', x:'<path d="M18 6 6 18M6 6l12 12"/>',
@@ -761,6 +892,9 @@ if (!["te_doen","planning","opruimen"].includes(staat.tab)) staat.tab = "te_doen
 const breed = () => window.matchMedia("(min-width:1100px)").matches;
 const drieKolommen = () => breed() && staat.tab !== "planning";
 const teDoen = () => filter([...D.zelf, ...D.wacht]);
+// dringend: hoge prioriteit, belangrijke afzender, deadline voorbij, of een fout. 'Your decision' alleen telt niet.
+const isUrgent = it => it.prioriteit === "hoog" || !!it.belangrijk || it.status === "fout" || (!!it.deadline && it.deadline < isoDag(new Date()));
+const heeftUrgent = () => teDoen().some(isUrgent) || (D.wacht_op || []).some(w => w.herinner_op <= isoDag(new Date()));
 const opruimLijst = () => [...filter(D.info), ...filter(D.overgeslagen)];
 const bewaar = () => { try { localStorage.setItem("mailagent-ui", JSON.stringify({project:staat.project, tab:staat.tab})); } catch(e){} };
 // Items waarvoor een actie onderweg is: meteen van het scherm, terug als de actie mislukt.
@@ -1040,7 +1174,7 @@ function teken(){
   const opruimN = filter(D.info).length + filter(D.overgeslagen).length;
   const weergaven = [["te_doen","inbox","To do",teDoen().length],["planning","calendar","Planning",inPlan],["opruimen","sparkle","Tidy up",opruimN]];
   document.getElementById("nav").innerHTML =
-    weergaven.map(([k,i,l,n]) => `<button class="nav${staat.tab===k?" actief":""}" data-tab="${k}" title="${l}">${ik(i)}<span class="navtekst">${l}</span>${n ? `<span class="tel">${n}</span>` : ""}</button>`).join("")
+    weergaven.map(([k,i,l,n]) => `<button class="nav${staat.tab===k?" actief":""}" data-tab="${k}" title="${l}">${ik(i)}<span class="navtekst">${l}</span>${n ? `<span class="tel">${n}</span>` : ""}${k === "te_doen" && heeftUrgent() ? `<span class="nav-dot" title="Something needs attention"></span>` : ""}</button>`).join("")
     + `<div class="nav-kop">Projects</div>`
     + [{naam:"alles"}, ...D.projecten].map(p => `
     <button class="nav${p.naam===staat.project?" actief":""}" data-project="${esc(p.naam)}" title="${esc(naamProject(p.naam))}">
@@ -1117,6 +1251,8 @@ function tekenVoortgang(){
 const htmlCache = {};          // id -> {html, geblokkeerd, extern, altijd, adres} | "laden" | {fout}
 let weergave = "opgemaakt";
 try { weergave = localStorage.getItem("mailagent-weergave") || "opgemaakt"; } catch(e){}
+let donkerOpgemaakt = false;   // in Dark toont de app mail als tekst, tot je zelf voor Formatted kiest
+const toonWeergave = () => document.documentElement.dataset.theme === "dark" && !donkerOpgemaakt ? "tekst" : weergave;
 const attr = s => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 
 function laadHtml(id, afbeeldingen){
@@ -1125,9 +1261,10 @@ function laadHtml(id, afbeeldingen){
 }
 function mailWeergave(id, tekst){
   const h = htmlCache[id];
-  if (weergave === "opgemaakt" && h === undefined) laadHtml(id, false);
-  const opgemaakt = weergave === "opgemaakt" && h && typeof h === "object" && h.html !== undefined;
-  const status = weergave !== "opgemaakt" ? "" : h === "laden" || h === undefined ? "loading formatting…" : h && h.fout ? esc(h.fout) : "";
+  const wg = toonWeergave();
+  if (wg === "opgemaakt" && h === undefined) laadHtml(id, false);
+  const opgemaakt = wg === "opgemaakt" && h && typeof h === "object" && h.html !== undefined;
+  const status = wg !== "opgemaakt" ? "" : h === "laden" || h === undefined ? "loading formatting…" : h && h.fout ? esc(h.fout) : "";
   const balk = !opgemaakt ? "" : h.geblokkeerd ? `<div class="afbeeldingbalk">${ik("eye")}<span>${h.geblokkeerd === 1 ? "1 image" : h.geblokkeerd + " images"} blocked. Loading them tells the sender you opened the email.</span>
       <button class="knop klein" data-afbladen="${id}">Load</button>
       ${h.adres ? `<button class="knop klein" data-afbaltijd="${id}" data-adres="${esc(h.adres)}" data-aan="1">Always for ${esc(h.adres)}</button>` : ""}</div>`
@@ -1135,8 +1272,8 @@ function mailWeergave(id, tekst){
       <button class="knop klein" data-afbaltijd="${id}" data-adres="${esc(h.adres)}" data-aan="0">Stop</button></div>` : "";
   return `<div class="mailweergave" id="mw-${id}">
     <div class="weergavekeuze"><div class="segment">
-      <button class="${weergave === "opgemaakt" ? "aan" : ""}" data-weergave="opgemaakt">Formatted</button>
-      <button class="${weergave === "tekst" ? "aan" : ""}" data-weergave="tekst">Plain text</button></div>
+      <button class="${wg === "opgemaakt" ? "aan" : ""}" data-weergave="opgemaakt">Formatted</button>
+      <button class="${wg === "tekst" ? "aan" : ""}" data-weergave="tekst">Plain text</button></div>
       <span class="meta">${status}</span>
       <button class="knop klein" data-mailopen="${id}" style="margin-left:auto" title="Open this email in Apple Mail">${ik("mail")}Open in Mail</button></div>
     ${balk}
@@ -1165,7 +1302,7 @@ function tekenLees(id){
     stil("mail", {id}).then(j => { if (j.ok){ leesCache[id] = j.mail; if (staat.lees === id) tekenLees(id); } });
   }
   const zelfde = p.dataset.lees === String(id);
-  const sleutel = `${id}|${m ? 1 : 0}|${weergave}|${basis.status}`;
+  const sleutel = `${id}|${m ? 1 : 0}|${toonWeergave()}|${basis.status}`;
   if (zelfde && p.dataset.sleutel === sleutel && p.classList.contains("open")) return;   // niets veranderd: iframe niet herladen
   p.dataset.id = ""; p.dataset.lees = id; p.dataset.sleutel = sleutel;
   p.innerHTML = `
@@ -1241,7 +1378,7 @@ function tekenDetail(id){
   const m = typeof detailCache[id] === "object" ? detailCache[id] : null;
   const basis = m || (D.afgehandeld || []).find(i => i.id === id) || zoekTreffers.find(i => i.id === id);
   if (!m) laadDetail(id);
-  const sleutel = `${id}|${m ? 1 : 0}|${weergave}|${m ? m.status : ""}`;
+  const sleutel = `${id}|${m ? 1 : 0}|${toonWeergave()}|${m ? m.status : ""}`;
   if (p.dataset.detail === String(id) && p.dataset.sleutel === sleutel && p.classList.contains("open")) return;
   p.dataset.id = ""; p.dataset.lees = ""; p.dataset.sig = ""; p.dataset.detail = id; p.dataset.sleutel = sleutel;
   if (!basis){
@@ -1690,7 +1827,7 @@ function tekenWachtOp(){
   const nu = lijst.filter(w => w.herinner_op <= vandaag), loopt = lijst.filter(w => w.herinner_op > vandaag);
   if (!lijst.length) return "";
   const naam = w => esc((w.aan || "").split(",")[0].trim() || "the recipient");
-  const rij = (w, open) => `<div class="rij wachtrij${staat.wacht === w.id ? " gekozen" : ""}" data-wacht="${w.id}" tabindex="0">
+  const rij = (w, open) => `<div class="rij wachtrij${staat.wacht === w.id ? " gekozen" : ""}${open ? " urg" : ""}" data-wacht="${w.id}" tabindex="0">
       <span class="ikoon" style="color:var(--let)">${ik("wacht")}</span>
       <div class="midden"><div class="regel1"><span class="van">${esc(w.onderwerp || "(no subject)")}</span><span class="datum">${kortDatum(w.verstuurd)}</span></div>
         <div class="samenvatting">To ${naam(w)}${w.wat ? ` · waiting for: ${esc(w.wat)}` : ""}${open ? "" : ` · back on ${kortDatum(w.herinner_op)}`}</div>
@@ -1795,7 +1932,7 @@ function tekenBeoordelen(items){
     if (it.status === "fout" || it.status === "handmatig") chips.push(`<span class="chip let">${ik("alert")}Check it yourself</span>`);
     else if (it.vragen) chips.push(`<span class="chip let">Decision${dl}</span>`);
     else chips.push(`<span class="chip">${ik(ai)}${al}${dl}</span>`);
-    return `<div class="rij${staat.open===it.id?" gekozen":""}" data-open="${it.id}" tabindex="0">
+    return `<div class="rij${staat.open===it.id?" gekozen":""}${isUrgent(it) ? " urg" : ""}" data-open="${it.id}" tabindex="0">
       ${avatar(it)}
       <div class="midden">
         <div class="regel1"><span class="van">${it.belangrijk ? `<span class="vip" title="Important sender">${ik("ster")}</span>` : ""}${esc(a.naam)}${it.prioriteit === "hoog" ? `<span class="prio" title="High priority"></span>` : ""}</span><span class="datum">${datum(it.datum)}</span></div>
@@ -2048,7 +2185,7 @@ function nuLijn(dag, van, tot, schaal){
   if (dag !== isoDag(new Date())) return "";
   const nu = new Date(), m = nu.getHours() * 60 + nu.getMinutes();
   if (m < van || m > tot) return "";
-  return `<div class="nu-lijn" style="top:${(m - van) * schaal}px" title="Now, ${tijdVan(nu.getTime())}"></div>`;
+  return `<div class="nu-lijn" style="top:${(m - van) * schaal}px" title="Now, ${tijdVan(nu.getTime())}"><span class="nu-tijd">${tijdVan(nu.getTime())}</span></div>`;
 }
 // afspraken: vrije als achtergrond, bezette naast elkaar als ze overlappen
 function afsprakenHTML(lijst, d0, van, tot, schaal, kalenderInTitel, klikbaar){
@@ -2068,6 +2205,7 @@ function afsprakenHTML(lijst, d0, van, tot, schaal, kalenderInTitel, klikbaar){
     g.forEach(a => { let k = kolEind.findIndex(e => e <= a.b); if (k < 0){ k = kolEind.length; kolEind.push(0); } kolEind[k] = a.e; a.kol = k; });
     g.forEach(a => { a.n = Math.max(1, kolEind.length); });
   });
+  const nuM = (Date.now() - d0) / 60000;
   bezet.forEach(a => {
     const hoog = Math.max(14, (a.e-a.b)*schaal - 2), n = a.n, sleep = klikbaar && sleepbaar(a);
     const taak = klikbaar ? appTaakBij(a) : null, soort = a.voorlopig ? "voorlopig" : taak ? "taak" : isFocus(a) ? "" : (a.soort || "");
@@ -2077,7 +2215,7 @@ function afsprakenHTML(lijst, d0, van, tot, schaal, kalenderInTitel, klikbaar){
       : soort === "les" ? `<span class="afs-ik" title="Class">${ik("les")}</span>`
       : soort === "afdeling" ? `<span class="afs-ik" title="Department or team meeting">${ik("afdeling")}${anderen || ""}</span>`
       : soort === "taak" ? `<span class="afs-ik" title="Task from the app">${ik("check")}<span class="stip" style="background:${kleur(taak.project)}"></span></span>` : "";
-    h += `<div class="afs${isFocus(a) ? " focus" : ""}${soort ? " soort-" + soort : ""}${hoog < 30 ? " smal" : ""}${klikbaar ? " klik" : ""}${sleep ? " sleepbaar" : ""}"${klikbaar ? ` data-afs="${a.i}" tabindex="0"` : ""} style="top:${y(a.b)}px;height:${hoog}px;left:${a.kol*100/n}%;width:calc(${100/n}% - 3px)${hoog < 30 ? `;line-height:${hoog - 2}px` : ""}"
+    h += `<div class="afs${isFocus(a) ? " focus" : ""}${soort ? " soort-" + soort : ""}${a.b <= nuM && nuM < a.e ? " nu" : ""}${hoog < 30 ? " smal" : ""}${klikbaar ? " klik" : ""}${sleep ? " sleepbaar" : ""}"${klikbaar ? ` data-afs="${a.i}" tabindex="0"` : ""} style="top:${y(a.b)}px;height:${hoog}px;left:${a.kol*100/n}%;width:calc(${100/n}% - 3px)${hoog < 30 ? `;line-height:${hoog - 2}px` : ""}"
       title="${esc(a.titel)}${kalenderInTitel && a.kalender ? " · " + esc(a.kalender) : ""}${sleep ? " · drag to reschedule" : ""}">${voor}${esc(kortTitel(a.titel))}${isFocus(a) ? " · protected" : ""}${sleep ? `<div class="rek" title="Drag to make longer or shorter"></div>` : ""}</div>`;
   });
   return h;
@@ -2971,6 +3109,7 @@ document.addEventListener("click", ev => {
   const b = ev.target.closest("[data-weergave]");
   if (!b) return;
   weergave = b.dataset.weergave;
+  if (document.documentElement.dataset.theme === "dark") donkerOpgemaakt = weergave === "opgemaakt";
   try { localStorage.setItem("mailagent-weergave", weergave); } catch(e){}
   const blok = b.closest(".mailweergave");
   if (blok) ververs(Number(blok.id.slice(3)));
@@ -3023,6 +3162,35 @@ document.addEventListener("pointerup", () => {
 });
 zetBreedtes();
 document.querySelectorAll("[data-ikoon]").forEach(el => el.innerHTML = ik(el.dataset.ikoon));
+
+// ---------------- thema: Automatic (Paper overdag, Dark 's avonds via macOS), Paper, Light, Dark ----------------
+const THEMAS = [["auto", "Automatic", "follows macOS"], ["paper", "Paper", ""], ["light", "Light", ""], ["dark", "Dark", ""]];
+const donkerSysteem = window.matchMedia ? matchMedia("(prefers-color-scheme: dark)") : null;
+function themaKeuze(){ try { return localStorage.getItem("attache-thema") || "auto"; } catch(e){ return "auto"; } }
+function pasThemaToe(){
+  const k = themaKeuze(), oud = document.documentElement.dataset.theme;
+  const nieuw = k === "auto" ? (donkerSysteem && donkerSysteem.matches ? "dark" : "paper") : k;
+  document.documentElement.dataset.theme = nieuw; document.documentElement.dataset.themaKeuze = k;
+  document.getElementById("thema-naam").textContent = (THEMAS.find(t => t[0] === k) || THEMAS[0])[1];
+  if (oud !== nieuw && D){ document.getElementById("paneel").dataset.sig = ""; document.getElementById("paneel").dataset.sleutel = ""; teken(); }
+}
+if (donkerSysteem) donkerSysteem.addEventListener("change", pasThemaToe);
+document.getElementById("thema-knop").addEventListener("click", ev => {
+  ev.stopPropagation();
+  const doos = document.getElementById("thema"), open = doos.querySelector(".thema-menu");
+  if (open) return open.remove();
+  const k = themaKeuze();
+  doos.insertAdjacentHTML("beforeend", `<div class="thema-menu" role="menu">${THEMAS.map(([w, naam, uitleg]) =>
+    `<button role="menuitemradio" aria-checked="${w === k}" class="${w === k ? "aan" : ""}" data-thema="${w}">${ik("check")}${naam}${uitleg ? `<span class="meta">${uitleg}</span>` : ""}</button>`).join("")}</div>`);
+});
+document.addEventListener("click", ev => {
+  const b = ev.target.closest("[data-thema]");
+  document.querySelector(".thema-menu")?.remove();
+  if (!b) return;
+  try { localStorage.setItem("attache-thema", b.dataset.thema); } catch(e){}
+  pasThemaToe();
+});
+pasThemaToe();
 laad();
 setInterval(() => { if (!document.hidden && staat.open === null) laad(); }, 60000);
 </script>
