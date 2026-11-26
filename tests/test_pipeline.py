@@ -312,6 +312,16 @@ def test_web_api(omgeving):
         assert store.item(data["wacht"][0]["id"])["status"] == "wacht"
         assert post("afwijzen", {"id": data["wacht"][0]["id"]}, token)["ok"] is True
         assert store.item(data["wacht"][0]["id"])["status"] == "afgewezen"
+        # afgehandeld: terug te vinden, op te zoeken, en terug te zetten
+        weg = data["wacht"][0]["id"]
+        data = json.loads(urllib.request.urlopen(urllib.request.Request(basis + "/api/data", headers={"X-Token": token})).read())
+        assert weg in [x["id"] for x in data["afgehandeld"]]
+        z = post("zoek", {"q": data["afgehandeld"][0]["onderwerp"].split()[0]}, token)
+        assert z["ok"] and weg in [x["id"] for x in z["mail"]]
+        assert post("item-detail", {"id": weg}, token)["mail"]["tekst"]
+        assert post("terug-naar-te-doen", {"id": weg}, token)["ok"] is True
+        assert store.item(weg)["status"] == "wacht"
+        assert post("zoek", {"q": "x"}, "verkeerd")["ok"] is False
     finally:
         server.shutdown()
 
@@ -1090,11 +1100,20 @@ def test_wacht_op_paneel_tekst_sindsdien_en_herinnering(omgeving):
     from mailagent.pipeline import controleer_uitgaand
     from mailagent.web import maak_handler
 
+    import re
+    from datetime import datetime, timedelta
+    from email.utils import format_datetime
+
     cfg, store, bronnen = omgeving
+    # data ten opzichte van vandaag: de app kijkt een week terug in Verzonden
+    nu_ = datetime.now().astimezone()
+    istte = cfg.pad.parent / "mail" / "03-istte.eml"
+    istte.write_text(re.sub(r"^Date: .*$", "Date: " + format_datetime(nu_ - timedelta(days=1)),
+                            istte.read_text(), count=1, flags=re.M))
     run(cfg, store, bronnen, NepLLM())
     _verstuur(cfg, "vraag.eml",
               "From: docent@buas.nl\nTo: chair@istte.org\nSubject: Begroting 2027\n"
-              "Date: Thu, 19 Nov 2026 11:00:00 +0100\nMessage-ID: <vraag9@buas.nl>\n\n"
+              f"Date: {format_datetime(nu_ - timedelta(days=2))}\nMessage-ID: <vraag9@buas.nl>\n\n"
               "Beste Csanad,\n\nKun je de begroting voor 2027 voor vrijdag sturen?\n\nOp 18 nov schreef iemand:\n> oud\n")
     controleer_uitgaand(cfg, store, bronnen, NepLLM())
     w = store.wacht_op_lijst("wacht")[0]
@@ -1373,3 +1392,33 @@ def test_afspraak_plannen_momenten_vasthouden_bevestigen(omgeving):
     assert "1 andere momenten vrijgegeven" in bevestig_voorlopig(store, ag, "V2")
     assert ag.bevestigd == [("V2", "Koffie over Erasmus+ (Peter Warner)")] and ag.weg == ["V1"]
     assert store.voorlopige(it["id"]) == []
+
+
+def test_afgehandeld_terugvinden_zoeken_en_terugzetten(omgeving):
+    from mailagent.pipeline import markeer_gedaan, terug_naar_te_doen, verplaats_items
+
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    te_doen = {r["onderwerp"]: r["id"] for r in store.items(status="wacht")}
+    istte = te_doen["Agenda board meeting December"]
+    markeer_gedaan(store, istte)
+    ander = next(i for o, i in te_doen.items() if i != istte)
+    assert verplaats_items(store, bronnen, [ander], "archief").startswith("1 mail")
+    ter_info = next(r["id"] for r in store.items(status="ter_info"))
+    verplaats_items(store, bronnen, [ter_info], "archief")          # stond niet in Te doen: hoort er niet bij
+
+    weg = [r["id"] for r in store.afgehandeld_uit_te_doen()]
+    assert istte in weg and ander in weg and ter_info not in weg
+
+    # zoeken: alle woorden, in afzender, onderwerp en tekst, ook in afgehandelde mail
+    res = store.zoek("board december")
+    assert istte in [r["id"] for r in res["mail"]]
+    assert store.zoek("chair@istte.org")["mail"] and not store.zoek("board xyzzy")["mail"]
+    assert store.zoek("   ") == {"mail": [], "taken": [], "wacht": []}
+
+    assert terug_naar_te_doen(store, bronnen, istte) == "Terug in Te doen"
+    assert store.item(istte)["status"] == "wacht"
+    assert terug_naar_te_doen(store, bronnen, istte) == "Staat al in Te doen"
+    assert terug_naar_te_doen(store, bronnen, ander).startswith("Terug in je inbox")
+    assert store.item(ander)["status"] == "wacht"
+    assert istte not in [r["id"] for r in store.afgehandeld_uit_te_doen()]

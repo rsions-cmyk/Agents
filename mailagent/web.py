@@ -30,7 +30,7 @@ from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
 from .opmaak import externe_afbeeldingen, html_uit_bron, veilig
-from .pipeline import RondeBezig, achtergrond_voor_item, afspraak_momenten, bevestig_voorlopig, geef_voorlopig_vrij, haal_uit_agenda, houd_vast, verzet_taak, afzender_adres, deadline_in_agenda, ochtend, voorstellen_voor, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
+from .pipeline import RondeBezig, terug_naar_te_doen, achtergrond_voor_item, afspraak_momenten, bevestig_voorlopig, geef_voorlopig_vrij, haal_uit_agenda, houd_vast, verzet_taak, afzender_adres, deadline_in_agenda, ochtend, voorstellen_voor, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
 from .melding import meld
 from .store import Store
 
@@ -148,6 +148,7 @@ def verzamel(cfg: Config, store: Store, ophalen: dict) -> dict:
         "volgende_ronde": volgende_ronde(cfg),
         "wacht_op": [wacht_dict(store, w) for w in store.wacht_op_lijst("wacht")],
         "ochtend": ochtend(cfg, store),
+        "afgehandeld": [{**item_dict(r), "afgehandeld": r["afgehandeld"]} for r in store.afgehandeld_uit_te_doen()],
         "belangrijk": [{"adres": a, "vast": True} for a in cfg.belangrijk]
                       + [{"adres": r["adres"], "naam": r["naam"], "vast": False} for r in store.belangrijke()],
     }
@@ -569,6 +570,24 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                                     "les_regel": les_regel_bij(a, regels)})
                     bezig = deel_in_op_achtergrond(onbekend) if onbekend else indelen["bezig"]
                     return self._json({"ok": True, "afspraken": uit, "bezig": bool(bezig)})
+                elif actie == "zoek":
+                    res = store.zoek(str(v.get("q") or "")[:200])
+                    return self._json({"ok": True,
+                                       "mail": [{**item_dict(r), "afgehandeld": r["afgehandeld"]} for r in res["mail"]],
+                                       "taken": [{"id": t["id"], "omschrijving": t["omschrijving"], "gepland": t["gepland"],
+                                                  "klaar": t["klaar"], "project": t["project"], "item_id": t["item_id"]} for t in res["taken"]],
+                                       "wacht": [{"id": w["id"], "onderwerp": w["onderwerp"], "aan": w["aan"], "verstuurd": w["verstuurd"]}
+                                                 for w in res["wacht"]]})
+                elif actie == "item-detail":
+                    it = store.item(int(v["id"]))
+                    if it is None:
+                        return self._json({"ok": False, "melding": "Mail niet gevonden"})
+                    taken = [dict(t) for t in store.db.execute("SELECT * FROM taken WHERE item_id=? ORDER BY id", (it["id"],))]
+                    return self._json({"ok": True, "mail": {**item_dict(it, True), "eigen_antwoord": it["eigen_antwoord"],
+                                                            "afgehandeld": it["afgehandeld"], "taken_db": taken}})
+                elif actie == "terug-naar-te-doen":
+                    with mail_slot:
+                        melding = terug_naar_te_doen(store, bronnen, int(v["id"]))
                 elif actie == "afspraak-voorstel":
                     it = store.item(int(v["id"]))
                     if it is None:

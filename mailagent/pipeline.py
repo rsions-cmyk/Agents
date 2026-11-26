@@ -1164,6 +1164,25 @@ def zet_gedaan_terug(store: Store, item_id: int) -> str:
     return "Terug in Te doen"
 
 
+def terug_naar_te_doen(store: Store, bronnen: dict, item_id: int) -> str:
+    """Een afgehandelde mail weer in Te doen zetten, om er toch nog iets mee te doen. Gearchiveerde,
+    opgeborgen of weggegooide mail gaat eerst terug naar de inbox. Al verstuurde antwoorden blijven verstuurd."""
+    it = store.item(item_id)
+    if it is None:
+        raise ValueError("mail niet gevonden")
+    if it["status"] in ("gearchiveerd", "opgeborgen", "verwijderd"):
+        melding = zet_terug(store, bronnen, [item_id])
+        if "niet gelukt" in melding:
+            raise ValueError(melding)
+        return "Terug in je inbox en in Te doen"
+    if it["status"] in ("wacht", "fout", "handmatig"):
+        return "Staat al in Te doen"
+    terug = it["vorige_status"] if it["vorige_status"] in ("wacht", "fout", "handmatig") else "wacht"
+    store.zet_status(item_id, terug)
+    store.wis_lijkt_beantwoord(item_id)
+    return ("Terug in Te doen; je antwoord was al verstuurd" if it["status"] == "verzonden" else "Terug in Te doen")
+
+
 def wijs_af(store: Store, item_id: int, reden: str | None = None) -> None:
     store.zet_status(item_id, "afgewezen", opmerking=reden or None)
 

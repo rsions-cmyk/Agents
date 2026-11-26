@@ -600,6 +600,39 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
 .overlay dl{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;margin:0}
 .overlay dt{text-align:right}
 .overlay dd{margin:0;color:var(--zacht)}
+/* afgehandeld */
+.td-schakel button{white-space:nowrap}
+.rij.afg .afg-chip{flex:none}
+.rij.afg .afg-chip svg{width:13px;height:13px}
+.afg-taken{display:flex;flex-direction:column;gap:6px}
+.afg-taken>div{display:flex;align-items:center;gap:8px;font-size:13.5px}
+.afg-taken>div svg{width:15px;height:15px;color:var(--zacht);flex:none}
+.afg-taken>div.klaar span:first-of-type{text-decoration:line-through;color:var(--zacht)}
+.afg-taken .meta{margin-left:auto}
+/* zoeken */
+.zoek{position:relative;margin-left:auto;display:flex;align-items:center;gap:6px;width:min(420px,100%);height:34px;padding:0 10px;border:1px solid var(--lijn);border-radius:9px;background:var(--vlak2)}
+.zoek:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-zacht)}
+.zoek>svg{width:16px;height:16px;color:var(--zacht);flex:none}
+.zoek input{flex:1;min-width:0;border:0;background:none;outline:none;font:inherit;font-size:13.5px;color:var(--tekst);padding:0}
+.zoek input::-webkit-search-cancel-button{display:none}
+.zoek kbd{flex:none}
+.zoek:focus-within kbd{display:none}
+.zoek-res{position:absolute;top:calc(100% + 6px);left:-1px;right:-1px;max-height:min(70vh,560px);overflow:auto;background:var(--vlak2);border:1px solid var(--lijn);border-radius:12px;box-shadow:var(--schaduw);padding:6px;z-index:60}
+.zr-kop{font-size:11.5px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--zacht);padding:8px 10px 4px}
+.zr-rij{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:8px 10px;border-radius:8px;color:var(--tekst)}
+.zr-rij.aan,.zr-rij:hover{background:var(--vlak3)}
+.zr-rij .avatar svg{width:14px;height:14px;color:#fff}
+.zr-midden{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.zr-r1{display:flex;gap:8px;align-items:baseline}
+.zr-r1 b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zr-r1 .meta{margin-left:auto;flex:none}
+.zr-r2{font-size:12.5px;color:var(--zacht);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zr-rij .chip{flex:none}
+.zr-rij .chip svg{width:12px;height:12px}
+.zr-leeg{padding:14px 12px;font-size:13.5px;color:var(--zacht)}
+.zoek-flits{animation:zoekflits 1.6s ease}
+@keyframes zoekflits{0%,60%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}
+@media (max-width:760px){.zoek{order:5;width:100%;margin-left:0}.zoek kbd{display:none}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -618,6 +651,13 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
     <div class="kop">
       <h1 id="titel">Te doen</h1>
       <span class="kop-tel" id="koptel"></span>
+      <span id="kopschakel"></span>
+      <div class="zoek" id="zoek" role="search">
+        <span data-ikoon="zoek"></span>
+        <input id="zoekveld" type="search" placeholder="Zoek in mail, taken en antwoorden" autocomplete="off" spellcheck="false" aria-label="Zoeken" aria-controls="zoekres">
+        <kbd>⌘K</kbd>
+        <div class="zoek-res" id="zoekres" hidden></div>
+      </div>
     </div>
     <div id="inhoud"></div>
   </main>
@@ -655,6 +695,8 @@ const IKONEN = {
   clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   chevron:'<path d="M9 18l6-6-6-6"/>',
+  zoek:'<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
+  terug:'<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
   paneel:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>',
   folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>', mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
 };
@@ -690,7 +732,8 @@ const pletter = p => (p in PLETTER) ? PLETTER[p] : (p || "?")[0].toUpperCase();
 const avatar = (it, klein) => { const a = afzender(it.van);
   return `<div class="avatar${klein?" klein":""}" style="background:${kleur(it.project)}" title="${esc(naamProject(it.project || "overig"))}">${esc(initialen(a.naam))}${pletter(it.project) ? `<span class="pl">${esc(pletter(it.project))}</span>` : ""}</div>`; };
 
-let D = null, staat = {project:"alles", tab:"te_doen", open:null, lees:null, anker:null, gekozen:new Set(), geenAuto:false, planDag:null};
+let D = null, staat = {project:"alles", tab:"te_doen", open:null, lees:null, anker:null, gekozen:new Set(), geenAuto:false, planDag:null,
+                       td:"open", detail:null};
 const leesCache = {};   // id -> volledige mail (met tekst) voor Opruimen
 try { const o = JSON.parse(localStorage.getItem("mailagent-ui")||"{}"); Object.assign(staat, {project:o.project||"alles", tab:o.tab||"te_doen"}); } catch(e){}
 if (!["te_doen","planning","opruimen"].includes(staat.tab)) staat.tab = "te_doen";
@@ -993,7 +1036,13 @@ function teken(){
     : (D.ophalen.laatste || (D.volgende_ronde ? `Volgende ronde ${D.volgende_ronde}` : ""));
 
   const inhoud = document.getElementById("inhoud");
-  if (staat.tab === "te_doen") inhoud.innerHTML = tekenVandaag() + tekenVoortgang() + tekenWachtOp() + tekenBeoordelen(teDoen()) + tekenBelangrijk();
+  const nAfg = filter(D.afgehandeld || []).length;
+  document.getElementById("kopschakel").innerHTML = staat.tab !== "te_doen" ? "" :
+    `<span class="segment td-schakel" role="tablist" aria-label="Te doen of afgehandeld">
+      <button class="${staat.td !== "afgehandeld" ? "aan" : ""}" data-td="open" role="tab" aria-selected="${staat.td !== "afgehandeld"}">Open${teDoen().length ? ` · ${teDoen().length}` : ""}</button>
+      <button class="${staat.td === "afgehandeld" ? "aan" : ""}" data-td="afgehandeld" role="tab" aria-selected="${staat.td === "afgehandeld"}" title="Wat je de afgelopen drie weken uit Te doen haalde">Afgehandeld${nAfg ? ` · ${nAfg}` : ""}</button></span>`;
+  if (staat.tab === "te_doen" && staat.td === "afgehandeld") inhoud.innerHTML = tekenAfgehandeld();
+  else if (staat.tab === "te_doen") inhoud.innerHTML = tekenVandaag() + tekenVoortgang() + tekenWachtOp() + tekenBeoordelen(teDoen()) + tekenBelangrijk();
   else if (staat.tab === "planning") inhoud.innerHTML = tekenPlanning();
   else inhoud.innerHTML = tekenOpruimen();
   tekenBalk();
@@ -1001,6 +1050,12 @@ function teken(){
 
   // derde kolom / paneel
   if (taak || antwoord) return;
+  if (staat.detail != null) return tekenDetail(staat.detail);
+  if (staat.tab === "te_doen" && staat.td === "afgehandeld"){
+    const lijst = filter(D.afgehandeld || []);
+    if (drieKolommen() && lijst.length && !staat.geenAuto){ staat.detail = lijst[0].id; return tekenDetail(staat.detail); }
+    return drieKolommen() ? tekenLeegPaneel() : sluitPaneel();
+  }
   if (staat.tab === "opruimen"){
     const lijst = opruimLijst();
     if (staat.lees !== null && !lijst.some(i => i.id === staat.lees)) staat.lees = null;
@@ -1071,12 +1126,12 @@ function ververs(id){
   // alleen het weergaveblok vervangen, zodat de rest van het paneel (en wat je typt) blijft staan
   const el = document.getElementById("mw-" + id);
   if (!el) return;
-  const tekst = (leesCache[id] && leesCache[id].tekst) ?? ([...D.zelf, ...D.wacht].find(i => i.id === id)?.tekst ?? null);
+  const tekst = (leesCache[id] && leesCache[id].tekst) ?? detailCache[id]?.tekst ?? ([...D.zelf, ...D.wacht].find(i => i.id === id)?.tekst ?? null);
   el.outerHTML = mailWeergave(id, tekst);
 }
 
 async function openLees(id){
-  staat.lees = id; staat.geenAuto = false; taak = null; antwoord = null; teken();
+  staat.lees = id; staat.detail = null; staat.geenAuto = false; taak = null; antwoord = null; teken();
   document.querySelector(`.rij[data-kies="${id}"]`)?.scrollIntoView({block:"nearest"});
 }
 
@@ -1114,6 +1169,202 @@ function tekenLees(id){
   if (!drieKolommen()) document.getElementById("dek").classList.add("open");
 }
 
+// ---------------- Afgehandeld: terugvinden wat je uit Te doen haalde ----------------
+const detailCache = {};     // id -> volledige mail met je antwoord en taken
+const AFG = {gedaan:["check","Gedaan"], goedgekeurd:["mail","In Mail gezet"], verzonden:["forward","Verstuurd"],
+             afgewezen:["x","Afgewezen"], taak:["task","Taak gemaakt"], gearchiveerd:["archive","Gearchiveerd"],
+             opgeborgen:["folder","Opgeborgen"], verwijderd:["trash","In prullenbak"], ter_info:["eye","Ter info"],
+             genegeerd:["ban","Overgeslagen"], wacht:["inbox","In Te doen"], fout:["alert","In Te doen"], handmatig:["inbox","In Te doen"]};
+const afgLabel = it => { const [i, l] = AFG[it.status] || ["mail", it.status];
+  return [i, it.status === "opgeborgen" && it.opmerking ? `In ${String(it.opmerking).split("/").pop()}` : l]; };
+const IN_TE_DOEN = ["wacht", "fout", "handmatig"];
+
+function dagKop(iso){
+  const d = new Date(iso), nu = new Date(), gister = new Date(nu); gister.setDate(nu.getDate() - 1);
+  if (d.toDateString() === nu.toDateString()) return "Vandaag";
+  if (d.toDateString() === gister.toDateString()) return "Gisteren";
+  const tekst = d.toLocaleDateString("nl-NL", {weekday:"long", day:"numeric", month:"long"});
+  return tekst[0].toUpperCase() + tekst.slice(1);
+}
+
+function tekenAfgehandeld(){
+  const lijst = filter(D.afgehandeld || []);
+  if (!lijst.length) return leeg("Nog niets afgehandeld", "Wat je uit Te doen haalt, vind je hier drie weken terug.");
+  const groepen = new Map();
+  lijst.forEach(it => { const k = dagKop(it.afgehandeld); if (!groepen.has(k)) groepen.set(k, []); groepen.get(k).push(it); });
+  return [...groepen].map(([kop, items]) => `<div class="groep"><div class="groep-kop"><h2>${esc(kop)} · ${items.length}</h2></div>
+    <div class="lijst">${items.map(it => { const a = afzender(it.van), [i, l] = afgLabel(it);
+      return `<div class="rij afg${staat.detail === it.id ? " leest" : ""}" data-detail="${it.id}" tabindex="0">
+        ${avatar(it, true)}
+        <div class="midden">
+          <div class="regel1"><span class="van">${esc(a.naam)}</span><span class="datum">${datum(it.datum)}</span></div>
+          <div class="samenvatting">${esc(it.samenvatting || it.onderwerp)}</div>
+        </div>
+        <span class="chip afg-chip">${ik(i)}${esc(l)}</span>
+        <div class="snel"><button class="ikoon" data-terugtd="${it.id}" title="Terug naar Te doen">${ik("terug")}</button></div>
+      </div>`; }).join("")}</div></div>`).join("");
+}
+
+function laadDetail(id){
+  if (detailCache[id] === "laden") return;
+  detailCache[id] = "laden";
+  stil("item-detail", {id}).then(j => {
+    if (!j.ok){ delete detailCache[id]; toast(j.melding, true); return; }
+    detailCache[id] = j.mail; if (staat.detail === id) tekenDetail(id);
+  });
+}
+
+function tekenDetail(id){
+  const p = document.getElementById("paneel");
+  const m = typeof detailCache[id] === "object" ? detailCache[id] : null;
+  const basis = m || (D.afgehandeld || []).find(i => i.id === id) || zoekTreffers.find(i => i.id === id);
+  if (!m) laadDetail(id);
+  const sleutel = `${id}|${m ? 1 : 0}|${weergave}|${m ? m.status : ""}`;
+  if (p.dataset.detail === String(id) && p.dataset.sleutel === sleutel && p.classList.contains("open")) return;
+  p.dataset.id = ""; p.dataset.lees = ""; p.dataset.sig = ""; p.dataset.detail = id; p.dataset.sleutel = sleutel;
+  if (!basis){
+    p.innerHTML = `<div class="leegpaneel"><span class="meta">Mail laden…</span></div>`;
+  } else {
+    const a = afzender(basis.van), [i, l] = afgLabel(m || basis), status = (m || basis).status;
+    const wanneer = (m || basis).afgehandeld && !IN_TE_DOEN.includes(status) ? ` · ${datum((m || basis).afgehandeld)}` : "";
+    const antwoord = m && m.eigen_antwoord && m.eigen_antwoord.trim();
+    const taken = m ? m.taken_db || [] : [];
+    const knop = IN_TE_DOEN.includes(status)
+      ? `<button class="knop goed" data-openmail="${id}">${ik("inbox")}<span class="lbl">Open in Te doen</span></button>`
+      : `<button class="knop goed" data-terugtd="${id}" title="${["ter_info", "genegeerd"].includes(status) ? "Toch iets mee doen: in Te doen zetten" : "Weer in Te doen zetten om het te veranderen"}">${ik("terug")}<span class="lbl">${["ter_info", "genegeerd"].includes(status) ? "Zet in Te doen" : "Terug naar Te doen"}</span></button>`;
+    p.innerHTML = `
+      <div class="p-kop">${avatar(basis)}
+        <div style="min-width:0"><h2>${esc(basis.onderwerp)}</h2><div class="van">${esc(a.naam)} · ${esc(a.adres)} · ${datum(basis.datum)}</div>
+          <div class="chips"><span class="chip">${ik(i)}${esc(l)}${wanneer}</span><span class="chip">${esc(naamProject(basis.project || "overig"))}</span></div></div>
+        <button class="ikoon sluit-mail" id="sluit" title="Sluiten (Esc)">${ik("x")}</button></div>
+      <div class="p-inhoud">
+        ${basis.samenvatting && basis.samenvatting !== basis.onderwerp ? `<div class="melding info">${ik("sparkle")}<div>${esc(basis.samenvatting)}</div></div>` : ""}
+        ${status === "verzonden" ? `<div class="melding">${ik("forward")}<div>Je antwoord is verstuurd. Zet je de mail terug, dan blijft dat zo; je kunt dan een vervolg sturen.</div></div>` : ""}
+        ${antwoord ? `<div><div class="label">${ik("reply")}${status === "verzonden" ? "Wat je verstuurde" : "Je antwoord"}</div><div class="leesvlak">${esc(antwoord)}</div></div>` : ""}
+        ${taken.length ? `<div><div class="label">${ik("task")}Taken</div><div class="afg-taken">${taken.map(t => `<div class="${t.klaar ? "klaar" : ""}">${ik(t.klaar ? "check" : "calendar")}<span>${esc(t.omschrijving)}</span>
+          <span class="meta">${t.klaar ? "afgevinkt" : t.gepland ? kortDatum(t.gepland.slice(0, 10)) : "nog in te plannen"}</span></div>`).join("")}</div></div>` : ""}
+        <div><div class="label">${ik("mail")}De mail</div>${mailWeergave(id, m ? m.tekst : null)}</div>
+      </div>
+      <div class="p-voet"><span style="flex:1"></span>${knop}</div>`;
+  }
+  p.classList.add("open"); p.setAttribute("aria-hidden", "false");
+  if (!drieKolommen()) document.getElementById("dek").classList.add("open");
+}
+
+async function terugNaarTeDoen(id){
+  const j = await stil("terug-naar-te-doen", {id});
+  toast(j.melding, !j.ok);
+  if (!j.ok) return;
+  delete detailCache[id];
+  await laad();
+  // meteen openen in Te doen, zodat je verder kunt
+  staat.tab = "te_doen"; staat.td = "open"; staat.detail = null; bewaar();
+  if ([...D.zelf, ...D.wacht].some(i => i.id === id)) openPaneel(id); else teken();
+}
+
+// ---------------- Zoeken (⌘K of /) ----------------
+let zoekTreffers = [], zoekRes = null, zoekKeuze = 0, zoekTimer = null, zoekVraag = "";
+const zoekVeld = () => document.getElementById("zoekveld");
+
+function zoekResultaten(){
+  if (!zoekRes) return [];
+  return [...zoekRes.mail.map(x => ({soort:"mail", x})), ...zoekRes.wacht.map(x => ({soort:"wacht", x})), ...zoekRes.taken.map(x => ({soort:"taak", x}))];
+}
+function tekenZoek(){
+  const box = document.getElementById("zoekres"), alle = zoekResultaten();
+  if (!zoekVraag){ box.hidden = true; box.innerHTML = ""; return; }
+  box.hidden = false;
+  if (!zoekRes){ box.innerHTML = `<div class="zr-leeg meta">Zoeken…</div>`; return; }
+  if (!alle.length){ box.innerHTML = `<div class="zr-leeg">Niets gevonden voor <b>${esc(zoekVraag)}</b>. Zoeken gaat over mail die de app verwerkte, niet over je hele mailbox.</div>`; return; }
+  zoekKeuze = Math.min(zoekKeuze, alle.length - 1);
+  const kop = {mail:"Mail", wacht:"Wacht op antwoord", taak:"Taken"};
+  let vorige = "", html = "";
+  alle.forEach((r, n) => {
+    if (r.soort !== vorige){ html += `<div class="zr-kop">${kop[r.soort]}</div>`; vorige = r.soort; }
+    const x = r.x, aan = n === zoekKeuze ? " aan" : "";
+    if (r.soort === "mail"){
+      const a = afzender(x.van), [i, l] = afgLabel(x);
+      html += `<button class="zr-rij${aan}" data-zr="${n}" role="option">${avatar(x, true)}<span class="zr-midden"><span class="zr-r1"><b>${esc(a.naam)}</b><span class="meta">${datum(x.datum)}</span></span>
+        <span class="zr-r2">${esc(x.onderwerp || "(geen onderwerp)")}</span></span><span class="chip">${ik(i)}${esc(l)}</span></button>`;
+    } else if (r.soort === "wacht"){
+      html += `<button class="zr-rij${aan}" data-zr="${n}" role="option"><span class="avatar klein wacht-av">${ik("wacht")}</span><span class="zr-midden"><span class="zr-r1"><b>${esc(x.onderwerp || "(geen onderwerp)")}</b><span class="meta">${datum(x.verstuurd)}</span></span>
+        <span class="zr-r2">Aan ${esc((x.aan || "").split(",")[0])}</span></span></button>`;
+    } else {
+      html += `<button class="zr-rij${aan}" data-zr="${n}" role="option"><span class="avatar klein" style="background:${kleur(x.project || "overig")}">${ik(x.klaar ? "check" : "task")}</span><span class="zr-midden"><span class="zr-r1"><b>${esc(x.omschrijving)}</b></span>
+        <span class="zr-r2">${x.klaar ? "Afgevinkt" : x.gepland ? "Gepland " + kortDatum(x.gepland.slice(0, 10)) : "Nog in te plannen"}</span></span></button>`;
+    }
+  });
+  box.innerHTML = html;
+  box.querySelector(".zr-rij.aan")?.scrollIntoView({block:"nearest"});
+}
+async function zoek(q){
+  zoekVraag = q.trim(); zoekKeuze = 0;
+  if (!zoekVraag){ zoekRes = null; return tekenZoek(); }
+  zoekRes = null; tekenZoek();
+  const vraag = zoekVraag, j = await stil("zoek", {q: vraag});
+  if (vraag !== zoekVraag) return;          // er is intussen verder getypt
+  zoekRes = j.ok ? j : {mail:[], taken:[], wacht:[]};
+  zoekTreffers = zoekRes.mail;
+  tekenZoek();
+}
+function sluitZoek(leeg){
+  document.getElementById("zoekres").hidden = true;
+  if (leeg){ zoekVeld().value = ""; zoekVraag = ""; zoekRes = null; }
+}
+function openTreffer(r){
+  const x = r.x;
+  sluitZoek(false); zoekVeld().blur();
+  sluitPop(); taak = null; antwoord = null;
+  if (r.soort === "mail"){
+    if (IN_TE_DOEN.includes(x.status) && [...D.zelf, ...D.wacht].some(i => i.id === x.id)){
+      staat.tab = "te_doen"; staat.td = "open"; bewaar(); return openPaneel(x.id);
+    }
+    if (["ter_info", "genegeerd"].includes(x.status) && [...D.info, ...D.overgeslagen].some(i => i.id === x.id)){
+      staat.tab = "opruimen"; if (staat.project !== "alles" && staat.project !== x.project) staat.project = "alles";
+      bewaar(); return openLees(x.id);
+    }
+    staat.tab = "te_doen"; staat.td = (D.afgehandeld || []).some(i => i.id === x.id) ? "afgehandeld" : staat.td;
+    bewaar(); staat.open = null; staat.wacht = null; staat.detail = x.id; staat.geenAuto = false; return teken();
+  }
+  if (r.soort === "wacht"){
+    staat.tab = "te_doen"; staat.td = "open"; staat.open = null; staat.detail = null; staat.wacht = x.id; bewaar(); return teken();
+  }
+  // taak: afgevinkt met een mail erbij? Dan de mail. Anders naar Planning, op de dag van de taak.
+  if (x.klaar && x.item_id){ staat.tab = "te_doen"; staat.detail = x.item_id; staat.open = null; staat.wacht = null; bewaar(); return teken(); }
+  staat.tab = "planning"; if (x.gepland) staat.planDag = x.gepland.slice(0, 10);
+  bewaar(); sluitPaneel(); teken();
+  const el = document.querySelector(`[data-kaart="${x.id}"]`) || document.querySelector(`[data-klaar="${x.id}"]`)?.closest(".kaart");
+  if (el){ el.scrollIntoView({block:"center", behavior:"smooth"}); el.classList.add("zoek-flits"); setTimeout(() => el.classList.remove("zoek-flits"), 1800); }
+  else if (x.klaar) toast("Deze taak is al afgevinkt");
+}
+document.getElementById("zoekveld").addEventListener("input", ev => {
+  clearTimeout(zoekTimer); const q = ev.target.value;
+  zoekTimer = setTimeout(() => zoek(q), q.trim().length < 3 ? 350 : 180);
+});
+document.getElementById("zoekveld").addEventListener("focus", () => { if (zoekVraag) tekenZoek(); });
+document.getElementById("zoekveld").addEventListener("keydown", ev => {
+  const alle = zoekResultaten();
+  if (ev.key === "Escape"){ ev.preventDefault(); ev.stopPropagation(); if (zoekVeld().value) sluitZoek(true); else zoekVeld().blur(); return; }
+  if (ev.key === "ArrowDown" || ev.key === "ArrowUp"){ ev.preventDefault(); if (!alle.length) return;
+    zoekKeuze = (zoekKeuze + (ev.key === "ArrowDown" ? 1 : alle.length - 1)) % alle.length; return tekenZoek(); }
+  if (ev.key === "Enter"){ ev.preventDefault(); clearTimeout(zoekTimer);
+    if (zoekVeld().value.trim() !== zoekVraag) return zoek(zoekVeld().value);
+    if (alle[zoekKeuze]) openTreffer(alle[zoekKeuze]); }
+});
+document.getElementById("zoekres").addEventListener("mousedown", ev => ev.preventDefault());   // focus blijft in het veld
+document.getElementById("zoekres").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-zr]"); if (!b) return;
+  ev.stopPropagation(); openTreffer(zoekResultaten()[Number(b.dataset.zr)]);
+});
+document.getElementById("zoekveld").addEventListener("blur", () => setTimeout(() => {
+  if (document.activeElement !== zoekVeld()) document.getElementById("zoekres").hidden = true; }, 120));
+document.addEventListener("keydown", ev => {
+  const inVeld = ev.target.closest && ev.target.closest("input, textarea, select, [contenteditable]");
+  if (((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === "k") || (ev.key === "/" && !inVeld)){
+    ev.preventDefault(); ev.stopImmediatePropagation(); zoekVeld().focus(); zoekVeld().select();
+  }
+}, true);
+
 function tekenLeegPaneel(){
   const p = document.getElementById("paneel");
   p.dataset.id = ""; p.dataset.sleutel = ""; p.dataset.lees = ""; p.dataset.sig = "";
@@ -1121,6 +1372,7 @@ function tekenLeegPaneel(){
   p.innerHTML = `<div class="leegpaneel">
       ${klaar ? `<div class="rond">${ik("check")}</div><b style="color:var(--tekst)">Alles bijgewerkt</b>Er wacht niets op je.` :
         staat.tab === "opruimen" ? `${ik("sparkle")}<b style="color:var(--tekst)">Opruimen</b><p>Klik op een mail om hem te lezen. Vink mails aan om er meerdere tegelijk af te handelen.</p>` :
+        staat.tab === "te_doen" && staat.td === "afgehandeld" ? `${ik("check")}<b style="color:var(--tekst)">Afgehandeld</b><p>Mail die je de afgelopen drie weken uit Te doen haalde. Klik er een aan om te zien wat je ermee deed, of zet hem terug.</p>` :
         `${ik("mail")}<b style="color:var(--tekst)">Kies een mail</b>`}
       <div class="sneltoetsen"><span><kbd>J</kbd> <kbd>K</kbd> volgende, vorige</span><span><kbd>⌘</kbd><kbd>↵</kbd> in Mail</span><span><kbd>⇧⌘↵</kbd> verzenden</span><span><kbd>D</kbd> gedaan</span>
         <span><kbd>V</kbd> opbergen</span><span><kbd>E</kbd> archiveren</span><span><kbd>#</kbd> prullenbak</span><span><kbd>T</kbd> taak</span><span><kbd>X</kbd> afwijzen</span>
@@ -2003,10 +2255,10 @@ document.addEventListener("input", ev => {
   bewerkt[staat.open][Number(d.tk)][d.veld] = ev.target.value;
 });
 
-function openPaneel(id){ staat.open = id; staat.wacht = null; staat.geenAuto = false; taak = null; antwoord = null; teken();
+function openPaneel(id){ staat.open = id; staat.wacht = null; staat.detail = null; staat.geenAuto = false; taak = null; antwoord = null; teken();
   document.querySelector(`.rij[data-open="${id}"]`)?.scrollIntoView({block:"nearest"}); }
 function sluitPaneel(){
-  staat.open = null; staat.wacht = null; taak = null; antwoord = null;
+  staat.open = null; staat.wacht = null; staat.detail = null; taak = null; antwoord = null;
   if (staat.tab === "opruimen") staat.lees = null;
   document.querySelectorAll(".rij.gekozen[data-open]").forEach(r => r.classList.remove("gekozen"));
   document.getElementById("dek").classList.remove("open");
@@ -2078,7 +2330,7 @@ document.addEventListener("click", async ev => {
   if (t.id === "controleer") return controleerTaken();
   if (d.vandaagdicht){ try { localStorage.setItem("mailagent-vandaag-dicht", isoDag(new Date())); } catch(e){} return teken(); }
   if (d.vandaagopen){ try { localStorage.removeItem("mailagent-vandaag-dicht"); } catch(e){} return teken(); }
-  if (d.openmail){ staat.tab = "te_doen"; return openPaneel(Number(d.openmail)); }
+  if (d.openmail){ staat.tab = "te_doen"; staat.td = "open"; return openPaneel(Number(d.openmail)); }
   if (d.deadlinevoorstel){
     deadlineVoorstel = "laden"; teken();
     const j = await stil("deadline-voorstellen", {});
@@ -2139,7 +2391,11 @@ document.addEventListener("click", async ev => {
   if (taak && t.id === "t-archief"){ taak.archiveren = t.checked; return; }
   if (t.id === "sluit2") return sluitPaneel();
   if (d.project){ staat.project = d.project; staat.gekozen.clear(); staat.geenAuto = false; bewaar(); sluitPaneel(); return teken(); }
-  if (d.tab){ staat.tab = d.tab; staat.geenAuto = false; bewaar(); sluitPop(); sluitPaneel(); return teken(); }
+  if (d.tab){ staat.tab = d.tab; staat.geenAuto = false; if (d.tab === "te_doen") staat.td = "open"; bewaar(); sluitPop(); sluitPaneel(); return teken(); }
+  if (d.td){ staat.td = d.td; staat.geenAuto = false; sluitPaneel(); return teken(); }
+  if (d.detail){ staat.detail = Number(d.detail); staat.open = null; staat.wacht = null; staat.geenAuto = false; taak = null; antwoord = null;
+    teken(); document.querySelector(`.rij[data-detail="${d.detail}"]`)?.scrollIntoView({block:"nearest"}); return; }
+  if (d.terugtd){ return terugNaarTeDoen(Number(d.terugtd)); }
   if (d.open){ return openPaneel(Number(d.open)); }
   if (d.klaar){ return vinkAf(Number(d.klaar)); }
   if (d.terug){ return zetTerug(Number(d.terug)); }

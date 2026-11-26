@@ -443,6 +443,38 @@ class Store:
         self.db.execute("DELETE FROM voorlopig WHERE afspraak_id=?", (afspraak_id,))
         self.db.commit()
 
+    TE_DOEN = ("wacht", "fout", "handmatig")
+
+    def afgehandeld_uit_te_doen(self, dagen: int = 21, maximum: int = 150) -> list[sqlite3.Row]:
+        """Mail die in Te doen stond en die je afhandelde: gedaan, in Mail gezet, verstuurd, afgewezen, taak gemaakt,
+        of gearchiveerd, opgeborgen of weggegooid. Nieuwste eerst."""
+        from datetime import timedelta
+        sinds = (datetime.now().astimezone() - timedelta(days=dagen)).isoformat(timespec="seconds")
+        return self.db.execute(
+            "SELECT i.*, m.van, m.onderwerp, m.datum FROM items i JOIN mails m USING(sleutel) "
+            "WHERE i.afgehandeld >= ? AND (i.status IN ('gedaan','goedgekeurd','verzonden','afgewezen','taak') "
+            "OR (i.status IN ('gearchiveerd','opgeborgen','verwijderd') AND i.vorige_status IN ('wacht','fout','handmatig'))) "
+            "ORDER BY i.afgehandeld DESC LIMIT ?", (sinds, maximum)).fetchall()
+
+    def zoek(self, vraag: str, maximum: int = 40) -> dict:
+        """Zoeken in alle verwerkte mail (afzender, onderwerp, tekst, samenvatting, je antwoord), taken en
+        'wacht op antwoord'. Alle woorden moeten voorkomen."""
+        woorden = [w for w in vraag.lower().split() if w][:6]
+        if not woorden:
+            return {"mail": [], "taken": [], "wacht": []}
+        velden = "lower(coalesce(m.van,'') || ' ' || coalesce(m.onderwerp,'') || ' ' || coalesce(i.samenvatting,'') || ' ' || " \
+                 "coalesce(i.eigen_antwoord,'') || ' ' || coalesce(m.tekst,''))"
+        waar = " AND ".join([f"instr({velden}, ?) > 0"] * len(woorden))
+        mail = self.db.execute(f"SELECT i.*, m.van, m.onderwerp, m.datum FROM items i JOIN mails m USING(sleutel) WHERE {waar} "
+                               "ORDER BY m.datum DESC LIMIT ?", (*woorden, maximum)).fetchall()
+        tw = " AND ".join(["instr(lower(omschrijving || ' ' || coalesce(stappen,'')), ?) > 0"] * len(woorden))
+        taken = self.db.execute(f"SELECT * FROM taken WHERE {tw} ORDER BY klaar, coalesce(gepland, aangemaakt) DESC LIMIT 20",
+                                woorden).fetchall()
+        ww = " AND ".join(["instr(lower(coalesce(onderwerp,'') || ' ' || coalesce(aan,'') || ' ' || coalesce(tekst,'')), ?) > 0"] * len(woorden))
+        wacht = self.db.execute(f"SELECT * FROM wacht_op WHERE status='wacht' AND {ww} ORDER BY verstuurd DESC LIMIT 10",
+                                woorden).fetchall()
+        return {"mail": mail, "taken": taken, "wacht": wacht}
+
     def les_regels(self) -> list[sqlite3.Row]:
         return self.db.execute("SELECT * FROM les_regels ORDER BY id").fetchall()
 
