@@ -559,6 +559,11 @@ textarea#concept::placeholder,#a-tekst::placeholder{color:#8a929b}
 .toast .knop{background:transparent;color:inherit;border:1px solid color-mix(in srgb,currentColor 35%,transparent);margin-left:6px;padding:3px 10px}
 .toast .knop:hover{background:color-mix(in srgb,currentColor 12%,transparent)}
 .toast .knoppen{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
+.toast .knop{white-space:nowrap}
+.toast.veel{flex-wrap:wrap}   /* twee of meer knoppen: op een eigen rij onder de tekst */
+.toast.veel > div:first-of-type{flex:1 1 0;min-width:0}
+.toast.veel .knoppen{flex:1 0 100%;padding-left:24px}
+.toast.veel .knoppen .knop{margin-left:0}
 @keyframes omhoog{from{opacity:0;transform:translateY(8px)}}
 
 /* focusblokken in de tijdlijn: beschermd */
@@ -1459,7 +1464,7 @@ function toast(tekst, fout, knop){
   if(!tekst) return;
   const knoppen = !knop ? [] : Array.isArray(knop) ? knop : [knop];
   const t = document.createElement("div");
-  t.className = "toast" + (fout ? " fout" : "");
+  t.className = "toast" + (fout ? " fout" : "") + (knoppen.length > 1 ? " veel" : "");
   t.innerHTML = ik(fout ? "alert" : "check") + `<div>${esc(tekst)}</div>` +
     (knoppen.length ? `<div class="knoppen">${knoppen.map((k, i) => `<button class="knop" data-i="${i}"${k.label === "Undo" ? ' title="Undo (Z)"' : ""}>${esc(k.label)}</button>`).join("")}</div>` : "");
   t.querySelectorAll("button").forEach(b => b.addEventListener("click", () => { t.remove(); knoppen[Number(b.dataset.i)].doe(); }));
