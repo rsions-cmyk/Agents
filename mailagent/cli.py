@@ -28,12 +28,31 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("agenda-test", help="create a test event to check the reminder and lock in Outlook")
     tb = sub.add_parser("test-bronnen", help="show email from the last 24 hours, without Claude and without saving anything")
     tb.add_argument("--uren", type=int, default=24)
+    vb = sub.add_parser("vergeet-bron", help="remove everything attaché stored from an account that is no longer in config.yaml")
+    vb.add_argument("naam", help="the account's naam: from config.yaml, for example google")
+    vb.add_argument("--ja", action="store_true", help="don't ask for confirmation")
     args = ap.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     cfg = config_mod.laad(args.config)
     store = Store(cfg.db_pad)
 
+    if args.opdracht == "vergeet-bron":
+        if any(b.get("naam") == args.naam for b in cfg.bronnen):
+            print(f"'{args.naam}' is still in config.yaml under bronnen:. Remove it there first, then run this again.")
+            return 1
+        store = Store(cfg.db_pad)
+        n = store.db.execute("SELECT COUNT(*) FROM mails WHERE bron=?", (args.naam,)).fetchone()[0]
+        if not n:
+            print(f"attaché has no email stored from '{args.naam}'.")
+            return 0
+        if not args.ja and input(f"Remove {n} emails from '{args.naam}' from attaché? Apple Mail is not touched. [y/N] ").strip().lower() not in ("y", "yes", "j", "ja"):
+            print("Nothing removed.")
+            return 0
+        tel = store.vergeet_bron(args.naam)
+        print(f"Removed {tel['mails']} emails and {tel['items']} items from '{args.naam}'."
+              + (f" {tel['taken_losgekoppeld']} tasks stay, without the email." if tel.get("taken_losgekoppeld") else ""))
+        return 0
     if args.opdracht == "overzicht":
         from .pipeline import overzicht
         tekst = overzicht(cfg, store, args.uren)

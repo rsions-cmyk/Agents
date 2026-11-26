@@ -125,6 +125,10 @@ Reply in Mail and Reply open a real reply window: Mail includes the original ema
 
 Add the account to Apple Mail and add a source with `type: applemail` and the account name as Mail shows it. The first time, macOS asks whether Terminal may control Mail. Allow it under System Settings, Privacy & Security, Automation.
 
+### Removing an account
+
+Delete the account's block under `bronnen:` in `config.yaml`, then run `scripts/mailagent.sh vergeet-bron <naam>`. That removes everything attaché stored from that account (emails, items, Awaiting reply, sent email, folder choices). Tasks you made from those emails stay, without the email. Apple Mail and your calendar are not touched.
+
 ## Costs
 
 With `backend: claude-code` (the default) every call counts towards the usage limit of your Claude plan. There is no separate bill. With a lot of email you may reach the limit sooner; if so, lower `max_mails_per_run`.

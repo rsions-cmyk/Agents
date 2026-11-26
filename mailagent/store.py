@@ -589,6 +589,26 @@ class Store:
         return self.db.execute("SELECT * FROM taken WHERE klaar=1 ORDER BY afgerond IS NULL, afgerond DESC, id DESC LIMIT ?",
                                (limiet,)).fetchall()
 
+    def vergeet_bron(self, bron: str) -> dict:
+        """Alles wat de app van één account bewaarde weghalen: mail, items, wacht op antwoord, verzonden mail,
+        mapkeuzes en meldingen. Taken die je van zo'n mail maakte blijven bestaan, los van de mail.
+        Raakt Apple Mail en je agenda niet aan."""
+        ids = [r[0] for r in self.db.execute(
+            "SELECT i.id FROM items i JOIN mails m USING(sleutel) WHERE m.bron=?", (bron,))]
+        tel = {"mails": self.db.execute("SELECT COUNT(*) FROM mails WHERE bron=?", (bron,)).fetchone()[0], "items": len(ids)}
+        with self.db:
+            if ids:
+                vraag = ",".join("?" * len(ids))
+                tel["taken_losgekoppeld"] = self.db.execute(f"UPDATE taken SET item_id=NULL WHERE item_id IN ({vraag})", ids).rowcount
+                self.db.execute(f"DELETE FROM voorlopig WHERE item_id IN ({vraag})", ids)
+                self.db.execute(f"DELETE FROM log WHERE item_id IN ({vraag})", ids)
+                self.db.execute(f"DELETE FROM items WHERE id IN ({vraag})", ids)
+            self.db.execute("DELETE FROM mails WHERE bron=?", (bron,))
+            for tabel in ("wacht_op", "verstuurd", "map_keuzes", "bron_stand"):
+                self.db.execute(f"DELETE FROM {tabel} WHERE bron=?", (bron,))
+            self.db.execute("DELETE FROM gemeld WHERE sleutel LIKE ?", (bron + ":%",))
+        return tel
+
     def zet_eigen_antwoord(self, item_id: int, tekst: str) -> None:
         self.db.execute("UPDATE items SET eigen_antwoord=? WHERE id=?", (tekst, item_id))
         self.db.commit()

@@ -1496,3 +1496,19 @@ def test_map_verzonden_zelf_opzoeken(monkeypatch):
     assert bron.mappen["verzonden"] == "[Gmail]/Verzonden berichten"
     bron.verzonden_sinds(datetime.now().astimezone() - timedelta(days=1))   # tweede keer meteen de goede map
     assert aanroepen[-1] == ("Google", "[Gmail]/Verzonden berichten")
+
+
+def test_vergeet_bron(omgeving):
+    """Een account weghalen uit attaché: alle bewaarde mail van dat account weg, taken blijven los bestaan."""
+    from mailagent import cli
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    it = store.items(status="wacht")[0]
+    store.nieuwe_taak(it["id"], it["project"], "Iets doen", None, 30, [], None)
+    # zolang het account in config.yaml staat, weigert het commando
+    assert cli.main(["-c", str(cfg.pad), "vergeet-bron", "test", "--ja"]) == 1
+    tel = store.vergeet_bron("test")
+    assert tel["mails"] >= 5 and tel["items"] >= 5 and tel["taken_losgekoppeld"] == 1
+    assert store.db.execute("SELECT COUNT(*) FROM mails").fetchone()[0] == 0
+    assert store.db.execute("SELECT COUNT(*) FROM items").fetchone()[0] == 0
+    assert store.db.execute("SELECT item_id FROM taken WHERE omschrijving='Iets doen'").fetchone()[0] is None
