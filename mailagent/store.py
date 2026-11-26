@@ -176,7 +176,8 @@ class Store:
                       "afspraak",                                                      # afspraak: verzoek uit de mail (JSON)
                       "opgeruimd",      # na je antwoord gearchiveerd (tijdstip), of 'weg' als hij al niet meer in de inbox stond
                       "open_punten",    # wat je in het concept nog moet beslissen of aanvullen (JSON)
-                      "terug_in_inbox"):  # wanneer je deze mail zelf terugzette in je inbox
+                      "terug_in_inbox",   # wanneer je deze mail zelf terugzette in je inbox
+                      "niet_in_inbox"):   # sinds wanneer de mail niet meer in je inbox staat (fout 9)
             if kolom not in itemkolommen:
                 self.db.execute(f"ALTER TABLE items ADD COLUMN {kolom} TEXT")
         wachtkolommen = {r["name"] for r in self.db.execute("PRAGMA table_info(wacht_op)")}
@@ -239,6 +240,16 @@ class Store:
         if samengevoegd:
             self.db.commit()
         return samengevoegd
+
+    def open_items_van_bron(self, bron: str) -> list[sqlite3.Row]:
+        """Items in To do en Tidy up van deze bron, met waar en sinds wanneer de mail niet meer in de inbox staat."""
+        return self.db.execute(
+            "SELECT i.id, i.status, i.niet_in_inbox, m.bron_id, m.thread_id, m.datum FROM items i JOIN mails m USING(sleutel) "
+            f"WHERE m.bron=? AND i.status IN ({','.join('?' * len(OPEN_STATUSSEN))})", (bron, *OPEN_STATUSSEN)).fetchall()
+
+    def zet_niet_in_inbox(self, item_id: int, waarde: Optional[str]) -> None:
+        self.db.execute("UPDATE items SET niet_in_inbox=? WHERE id=?", (waarde, item_id))
+        self.db.commit()
 
     def zet_terug_in_inbox(self, item_id: int, status: str, wis_concept: bool) -> None:
         self.db.execute("UPDATE items SET status=?, opgeruimd=NULL, lijkt_beantwoord=NULL, terug_in_inbox=?, "
@@ -531,7 +542,7 @@ class Store:
         return self.db.execute(
             "SELECT i.*, m.van, m.onderwerp, m.datum FROM items i JOIN mails m USING(sleutel) "
             "WHERE i.afgehandeld >= ? AND (i.status IN ('gedaan','goedgekeurd','verzonden','afgewezen','taak') "
-            "OR (i.status IN ('gearchiveerd','opgeborgen','verwijderd') AND i.vorige_status IN ('wacht','fout','handmatig'))) "
+            "OR (i.status IN ('gearchiveerd','opgeborgen','verwijderd','verplaatst') AND i.vorige_status IN ('wacht','fout','handmatig'))) "
             "ORDER BY i.afgehandeld DESC LIMIT ?", (sinds, maximum)).fetchall()
 
     def zoek(self, vraag: str, maximum: int = 40) -> dict:

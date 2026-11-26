@@ -1830,3 +1830,56 @@ def test_dismiss_ongedaan_maken(omgeving):
     assert zet_afwijzen_terug(store, a) == "Back in To do" and store.item(a)["status"] == "wacht"
     with pytest.raises(ValueError):
         zet_afwijzen_terug(store, a)                                   # niet afgewezen: niets terug te zetten
+
+
+def test_zelf_verplaatste_mail_gaat_uit_te_doen(omgeving):
+    """Fout 9: mail die je buiten attaché uit je inbox haalt, gaat uit To do en Tidy up, maar pas als hij twee
+    rondes achter elkaar ontbreekt. Zet je hem terug, dan komt het item terug."""
+    from mailagent.pipeline import terug_naar_te_doen
+    cfg, store, bronnen = omgeving
+    llm = NepLLM()
+    run(cfg, store, bronnen, llm)
+    a, b = [r["id"] for r in store.items(status="wacht")][:2]
+    info = store.items(status="ter_info")[0]["id"]
+    inbox = cfg.data_dir.parent / "mail"
+    (inbox / "_elders").mkdir()
+    for i in (a, info):                                            # op je telefoon gearchiveerd
+        naam = store.item(i)["bron_id"]
+        (inbox / naam).rename(inbox / "_elders" / naam)
+    run(cfg, store, bronnen, llm)                                  # eerste keer weg: nog niets afsluiten
+    assert store.item(a)["status"] == "wacht" and store.item(a)["niet_in_inbox"]
+    store.db.execute("UPDATE items SET niet_in_inbox='2000-01-01T00:00:00+00:00' WHERE niet_in_inbox IS NOT NULL")
+    store.db.commit()
+    run(cfg, store, bronnen, llm)                                  # tweede keer, later: afsluiten
+    assert store.item(a)["status"] == "verplaatst" and store.item(info)["status"] == "verplaatst"
+    assert store.item(b)["status"] == "wacht"                      # wat er nog staat, blijft
+    assert a in [r["id"] for r in store.afgehandeld_uit_te_doen()]  # in Handled, met Back to To do
+
+    # even weg door een haperende synchronisatie: terug voor de tweede ronde, dan verandert er niets
+    naam_b = store.item(b)["bron_id"]
+    (inbox / naam_b).rename(inbox / "_elders" / naam_b)
+    run(cfg, store, bronnen, llm)
+    (inbox / "_elders" / naam_b).rename(inbox / naam_b)
+    run(cfg, store, bronnen, llm)
+    assert store.item(b)["status"] == "wacht" and store.item(b)["niet_in_inbox"] is None
+
+    # zelf teruggezet in de inbox: herkend en terug in To do, zonder Claude
+    naam_a = store.item(a)["bron_id"]
+    (inbox / "_elders" / naam_a).rename(inbox / f"terug-{naam_a}")
+    gezien = len(llm.gezien)
+    run(cfg, store, bronnen, llm)
+    assert store.item(a)["status"] == "wacht" and store.item(a)["terug_in_inbox"] and len(llm.gezien) == gezien
+    # Back to To do vanuit Handled werkt ook voor een verplaatste mail
+    assert "where you moved it" in terug_naar_te_doen(store, bronnen, info)
+    assert store.item(info)["status"] == "ter_info"
+
+
+def test_lege_inboxlijst_sluit_niets_af(omgeving):
+    from datetime import datetime, timedelta
+    from types import SimpleNamespace as NS
+    from mailagent.pipeline import sluit_verplaatste
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    sinds = datetime.now().astimezone() - timedelta(days=100000)
+    assert sluit_verplaatste(store, "test", NS(laatste_rijen=[]), sinds) == 0      # storing: niets weghalen
+    assert all(r["niet_in_inbox"] is None for r in store.open_items_van_bron("test"))

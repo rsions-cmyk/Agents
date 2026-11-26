@@ -14,7 +14,7 @@ from pathlib import Path
 from .config import Config, anonimiseer, mag_naar_claude, sorteer_met_regels
 from .llm import LLM, LLMFout
 from .models import UITWERK_ACTIES, Email, OpenPunt, Sortering
-from .store import OPEN_STATUSSEN, Store
+from .store import OPEN_STATUSSEN, Store, normaal_message_id
 
 log = logging.getLogger("mailagent")
 
@@ -502,7 +502,7 @@ class RondeBezig(RuntimeError):
     """Er loopt al een mailronde (gepland of vanuit de app)."""
 
 
-WEGGEZET = ("gearchiveerd", "opgeborgen", "verwijderd")
+WEGGEZET = ("gearchiveerd", "opgeborgen", "verwijderd", "verplaatst")   # verplaatst: door jou, buiten attaché om
 
 
 def herken_mail(store: Store, bron: str, bron_id: str, message_id: str | None) -> bool:
@@ -529,6 +529,43 @@ def herken_mail(store: Store, bron: str, bron_id: str, message_id: str | None) -
     else:
         store.log(it["id"], f"nieuw nummer in Mail ({bron_id}), zelfde mail")
     return True
+
+
+def sluit_verplaatste(store: Store, bron_naam: str, bron, sinds: datetime, nu_: datetime | None = None) -> int:
+    """Fout 9: mail die je buiten attaché uit je inbox haalde (in Mail, op je telefoon of in Outlook) gaat uit
+    To do en Tidy up. De app vergelijkt met de lijst van je inbox van deze ronde, op nummer en Message-ID. Hij
+    sluit pas af als een mail twee rondes achter elkaar ontbreekt, minstens tien minuten na elkaar, zodat een
+    haperende synchronisatie niets weghaalt. Een lege lijst (een storing) doet niets. Zet je de mail terug in
+    je inbox, dan herkent herken_mail hem en komt hij terug."""
+    rijen = getattr(bron, "laatste_rijen", None)
+    if not rijen:
+        return 0
+    nu_ = nu_ or datetime.now().astimezone()
+    ids = {r[0] for r in rijen}
+    mids = {normaal_message_id(r[2]) for r in rijen if len(r) > 2 and r[2]}
+    grens = sinds + timedelta(days=1)          # alleen mail ruim binnen de periode die de lijst beslaat
+    gesloten = 0
+    for it in store.open_items_van_bron(bron_naam):
+        try:
+            if datetime.fromisoformat(it["datum"]) <= grens:
+                continue
+        except (TypeError, ValueError):
+            continue
+        if it["bron_id"] in ids or (it["thread_id"] and normaal_message_id(it["thread_id"]) in mids):
+            if it["niet_in_inbox"]:
+                store.zet_niet_in_inbox(it["id"], None)        # was even weg, staat er weer
+            continue
+        if not it["niet_in_inbox"]:
+            store.zet_niet_in_inbox(it["id"], nu_.isoformat(timespec="seconds"))
+            continue
+        if nu_ - datetime.fromisoformat(it["niet_in_inbox"]) < timedelta(minutes=10):
+            continue
+        store.bewaar_vorige_status(it["id"], it["status"])
+        store.zet_status(it["id"], "verplaatst")
+        store.zet_niet_in_inbox(it["id"], None)
+        store.log(it["id"], "niet meer in je inbox: buiten attaché verplaatst of weggegooid")
+        gesloten += 1
+    return gesloten
 
 
 @contextmanager
@@ -604,6 +641,12 @@ def run(cfg: Config, store: Store, bronnen: dict, llm: LLM, dagen: int | None = 
                 item = store.item(item_id)
                 log.info("   -> %s, %s (%s)", item["project"], item["actie"], item["status"])
                 nieuw += 1
+            try:
+                weg = sluit_verplaatste(store, naam, bron, sinds)
+                if weg:
+                    log.info("%s: %d mail(s) uit To do en Tidy up gehaald; je verplaatste ze buiten attaché", naam, weg)
+            except Exception as e:
+                log.warning("%s: nakijken wat je zelf verplaatste mislukt: %s", naam, e)
             if mails:
                 store.zet_laatst_opgehaald(naam, max(m.datum for m in mails))
             rest = max(0, totaal - len(mails))
@@ -1437,6 +1480,11 @@ def terug_naar_te_doen(store: Store, bronnen: dict, item_id: int) -> str:
         return "Back in your inbox and in To do"
     if it["status"] in ("wacht", "fout", "handmatig"):
         return "Already in To do"
+    if it["status"] == "verplaatst":   # je verplaatste hem zelf in Mail: de mail blijft waar hij staat
+        terug = it["vorige_status"] if it["vorige_status"] in OPEN_STATUSSEN else "wacht"
+        store.zet_status(item_id, terug)
+        waar = "Tidy up" if terug in ("ter_info", "genegeerd") else "To do"
+        return f"Back in {waar}; the email itself is still where you moved it in Mail"
     if it["opgeruimd"] and it["opgeruimd"] != "weg":   # na je antwoord gearchiveerd: eerst terug naar de inbox
         bron = bronnen.get(it["bron"])
         if bron is None or not hasattr(bron, "terugzetten") or not it["thread_id"]:

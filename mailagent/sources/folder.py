@@ -23,6 +23,7 @@ class MapBron:
 
     def haal_op(self, sinds, maximum: int, overslaan=None) -> list[Email]:
         mails = []
+        self.laatste_rijen = []   # (id, datum, Message-ID) van alles in de 'inbox', zoals Apple Mail
         for f in sorted(self.pad.glob("*.eml")):
             msg = email.message_from_bytes(f.read_bytes(), policy=email.policy.default)
             try:
@@ -31,6 +32,7 @@ class MapBron:
                 datum = datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc)
             if sinds and datum <= sinds:
                 continue
+            self.laatste_rijen.append((f.name, datum, str(msg["Message-ID"] or "")))
             if overslaan and overslaan(f.name, str(msg["Message-ID"] or "")):
                 continue
             deel = msg.get_body(preferencelist=("plain", "html"))
