@@ -36,8 +36,10 @@ class NepLLM:
         return Sortering(project="overig", actie="ter_info", prioriteit="laag",
                          deadline=None, samenvatting=mail.onderwerp, reden="test")
 
-    def werk_uit(self, mail, tekst, sortering, voorbeelden=None, achtergrond=None, agenda_check=None):
+    def werk_uit(self, mail, tekst, sortering, voorbeelden=None, achtergrond=None, agenda_check=None,
+                 keuzes=None, huidig_concept=None):
         self.gezien.append(tekst)
+        self.keuzes, self.huidig_concept = keuzes, huidig_concept
         self.voorbeelden = voorbeelden
         self.achtergrond = achtergrond
         self.agenda_check = agenda_check
@@ -1596,3 +1598,68 @@ def test_archiveren_na_antwoord_uit(omgeving):
     keur_goed(store, bronnen, a, "Dank, akkoord.", verzenden=True)
     assert ruim_beantwoord_op(cfg, store, bronnen) == 0
     assert (cfg.data_dir.parent / "mail" / store.item(a)["bron_id"]).exists()
+
+
+def test_open_punten_nalopen():
+    """Elke knop moet iets in het concept kunnen invullen, en elke [FILL IN] krijgt een punt."""
+    from mailagent.models import OpenPunt, Optie
+    from mailagent.pipeline import schone_open_punten
+    concept = ("Beste Jan,\n\nIk kan [FILL IN: datum] langskomen. We verwachten [FILL IN: aantal studenten] studenten. "
+               "Het lokaal is [FILL IN: lokaal].\n\nGroet")
+    punten = [
+        OpenPunt(vraag="Which day suits you?", soort="keuze", plek="[FILL IN: datum]", suggestie=7,
+                 opties=[Optie(label="Tue 2 Dec", tekst="dinsdag 2 december"), Optie(label="Thu 4 Dec", tekst=None)]),
+        OpenPunt(vraag="How many students?", soort="invullen", plek="[FILL IN: aantal]"),   # net anders overgeschreven
+        OpenPunt(vraag="Accept?", soort="hele_mail", opties=[Optie(label="Yes")]),          # één optie: geen keuze
+    ]
+    uit = schone_open_punten(concept, punten)
+    assert [p.plek for p in uit] == ["[FILL IN: datum]", "[FILL IN: aantal studenten]", "[FILL IN: lokaal]"]
+    assert uit[0].suggestie is None and uit[0].opties[1].tekst == "Thu 4 Dec"
+    assert uit[1].vraag == "How many students?"
+    assert uit[2].soort == "invullen" and uit[2].vraag == "Fill in: lokaal"           # zelf aangemaakt
+
+    hele = schone_open_punten("Graag kom ik.", [OpenPunt(vraag="Accept the invitation?", soort="hele_mail", plek="x",
+                                                         suggestie=0, opties=[Optie(label="Yes", tekst="a"), Optie(label="No")])])
+    assert hele[0].plek is None and [o.tekst for o in hele[0].opties] == [None, None] and hele[0].suggestie == 0
+    assert schone_open_punten("Geen gaten hier.", []) == []
+
+
+def test_open_punten_bewaard_en_herschrijven_met_keuzes(omgeving):
+    import threading
+    import urllib.request
+    from http.server import HTTPServer
+    from mailagent.models import OpenPunt, Optie
+    from mailagent.web import maak_handler
+
+    class MetPunten(NepLLM):
+        def werk_uit(self, mail, tekst, sortering, *a, keuzes=None, huidig_concept=None, **k):
+            u = super().werk_uit(mail, tekst, sortering, *a, keuzes=keuzes, huidig_concept=huidig_concept, **k)
+            if keuzes:
+                u.concept_antwoord, u.open_punten = "Beste Jan,\n\nIk kom op dinsdag 2 december.", []
+                return u
+            u.concept_antwoord = "Beste Jan,\n\nIk kom [FILL IN: dag]."
+            u.open_punten = [OpenPunt(vraag="Which day?", soort="keuze", plek="[FILL IN: dag]",
+                                      opties=[Optie(label="Tue", tekst="op dinsdag 2 december")])]
+            return u
+
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, MetPunten())
+    a = store.items(status="wacht")[0]["id"]
+    assert json.loads(store.item(a)["open_punten"])[0]["plek"] == "[FILL IN: dag]"
+    server = HTTPServer(("127.0.0.1", 0), maak_handler(cfg, store, bronnen, MetPunten))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    basis = f"http://127.0.0.1:{server.server_port}"
+    try:
+        token = urllib.request.urlopen(basis + "/").read().decode().split('const TOKEN = "')[1].split('"')[0]
+        kop = {"Content-Type": "application/json", "X-Token": token}
+        data = json.loads(urllib.request.urlopen(urllib.request.Request(basis + "/api/data", headers=kop)).read())
+        it = next(i for i in data["wacht"] + data["zelf"] if i["id"] == a)
+        assert it["open_punten"][0]["opties"][0]["label"] == "Tue"                 # de app krijgt de punten mee
+        verzoek = {"id": a, "concept": "Beste Jan,\n\nIk kom op dinsdag 2 december. Student 1234567 doet mee.",
+                   "keuzes": [{"vraag": "Which day?", "antwoord": "Tue"}]}
+        req = urllib.request.Request(basis + "/api/antwoord-concept", data=json.dumps(verzoek).encode(), method="POST", headers=kop)
+        j = json.loads(urllib.request.urlopen(req).read())
+        assert j["ok"] and j["open_punten"] == [] and "dinsdag" in j["concept"]
+        assert store.item(a)["open_punten"] is None                                   # niets meer open
+    finally:
+        server.shutdown()

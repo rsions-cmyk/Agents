@@ -13,12 +13,69 @@ from pathlib import Path
 
 from .config import Config, anonimiseer, mag_naar_claude, sorteer_met_regels
 from .llm import LLM, LLMFout
-from .models import UITWERK_ACTIES, Email, Sortering
+from .models import UITWERK_ACTIES, Email, OpenPunt, Sortering
 from .store import Store
 
 log = logging.getLogger("mailagent")
 
 OPEN_PLEK = re.compile(r"\[\s*(FILL IN|AANVULLEN)", re.IGNORECASE)   # plek die Claude voor jou openliet
+HELE_PLEK = re.compile(r"\[\s*(?:FILL IN|AANVULLEN)\b[^\]\n]*\]", re.IGNORECASE)
+
+
+def schone_open_punten(concept: str | None, punten: list) -> list[OpenPunt]:
+    """De open punten van Claude nalopen, zodat elke knop iets in het concept kan invullen.
+    Een punt bij een plek die niet in het concept staat, vervalt (of krijgt de enige plek zonder punt). Een
+    [FILL IN] zonder punt krijgt alsnog een invulveld, zodat je nooit in de tekst hoeft te zoeken."""
+    concept = concept or ""
+    plekken = HELE_PLEK.findall(concept)
+    uit: list[OpenPunt] = []
+    los = []
+    for p in punten[:6]:
+        p = OpenPunt.model_validate(p) if not isinstance(p, OpenPunt) else p.model_copy(deep=True)
+        if not (p.vraag or "").strip():
+            continue
+        if p.soort not in ("keuze", "invullen", "hele_mail"):
+            p.soort = "keuze" if p.opties else "invullen"
+        p.opties = [o for o in p.opties if (o.label or "").strip()][:4]
+        if p.soort == "hele_mail":
+            p.plek = None
+            if len(p.opties) < 2:
+                continue
+            for o in p.opties:
+                o.tekst = None
+        else:
+            if p.soort == "keuze" and not p.opties:
+                p.soort = "invullen"
+            if p.soort == "invullen":
+                p.opties = []
+            for o in p.opties:
+                if o.tekst is None:
+                    o.tekst = o.label
+            if not p.plek or p.plek not in concept:
+                los.append(p)
+                continue
+        if p.suggestie is not None and not (0 <= p.suggestie < len(p.opties)):
+            p.suggestie = None
+        uit.append(p)
+    bezet = {p.plek for p in uit if p.plek}
+    vrij = [pl for pl in dict.fromkeys(plekken) if pl not in bezet]
+    # Claude schreef de plek net anders over: koppelen aan de vrije plek met de meeste woorden gemeen
+    woorden = lambda t: set(re.findall(r"\w{3,}", re.sub(r"(?i)fill in|aanvullen", "", t or "").lower()))
+    for p in los:
+        if not vrij:
+            break
+        scores = [(len(woorden(p.plek) & woorden(pl)), pl) for pl in vrij]
+        beste, pl = max(scores, key=lambda x: x[0])
+        if beste == 0 and not (len(los) == 1 and len(vrij) == 1):
+            continue
+        p.plek = pl
+        vrij.remove(pl)
+        uit.append(p)
+    for pl in vrij:
+        omschrijving = re.sub(r"^\[\s*(?:FILL IN|AANVULLEN)\s*:?\s*|\]$", "", pl, flags=re.IGNORECASE).strip()
+        uit.append(OpenPunt(vraag=f"Fill in: {omschrijving}" if omschrijving else "Fill in", soort="invullen", plek=pl))
+    volgorde = {pl: concept.find(pl) for pl in plekken}
+    return sorted(uit, key=lambda p: volgorde.get(p.plek, -1) if p.plek else -1)
 
 
 def stijlvoorbeelden(cfg: Config, store: Store, mail: Email, project: str, aantal: int = 3) -> list[dict]:
@@ -80,6 +137,7 @@ def verwerk_mail(cfg: Config, store: Store, llm: LLM, mail: Email, agenda=None) 
                 context.append({"soort": "agenda", **check["telling"]})
             uitwerking = llm.werk_uit(mail, tekst, sortering, stijlvoorbeelden(cfg, store, mail, sortering.project),
                                       achtergrond=extra or None, agenda_check=check["blok"] if check else None)
+            uitwerking.open_punten = schone_open_punten(uitwerking.concept_antwoord, uitwerking.open_punten)
     except Exception as e:  # ook een kapot antwoord of een onverwachte fout: de mail komt bij 'zelf doen'
         soort = "Claude-fout" if isinstance(e, LLMFout) else f"onverwachte fout ({type(e).__name__})"
         log.warning("%s bij %s: %s", soort, mail.sleutel, e)

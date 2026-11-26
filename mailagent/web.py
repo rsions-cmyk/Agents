@@ -30,7 +30,7 @@ from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
 from .opmaak import externe_afbeeldingen, html_uit_bron, veilig
-from .pipeline import RondeBezig, ruim_beantwoord_op, terug_naar_te_doen, agenda_check, lijkt_afspraak, achtergrond_voor_item, afspraak_momenten, bevestig_voorlopig, geef_voorlopig_vrij, haal_uit_agenda, houd_vast, verzet_taak, afzender_adres, deadline_in_agenda, ochtend, voorstellen_voor, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
+from .pipeline import RondeBezig, ruim_beantwoord_op, schone_open_punten, terug_naar_te_doen, agenda_check, lijkt_afspraak, achtergrond_voor_item, afspraak_momenten, bevestig_voorlopig, geef_voorlopig_vrij, haal_uit_agenda, houd_vast, verzet_taak, afzender_adres, deadline_in_agenda, ochtend, voorstellen_voor, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
 from .melding import meld
 from .store import Store
 
@@ -57,6 +57,7 @@ def item_dict(rij, volledig: bool = False) -> dict:
             "reden": rij["reden"], "concept": rij["concept"] or "", "agenda": rij["agenda"],
             "vragen": rij["vragen"], "opmerking": rij["opmerking"], "context": json.loads(rij["context"] or "[]"),
             "taken": json.loads(rij["taken"] or "[]"), "tekst": (rij["tekst"] or "")[:8000],
+            "open_punten": json.loads(rij["open_punten"] or "[]") if "open_punten" in rij.keys() else [],
         })
     return d
 
@@ -474,14 +475,21 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                                 context = context + [{"soort": "agenda", **check["telling"]}]
                             except Exception as ex:
                                 logging.getLogger("mailagent").warning("agenda nakijken: %s", ex)
+                    # 'Rewrite with these choices': wat je in de open punten koos, en je huidige concept
+                    keuzes = [{"vraag": str(k.get("vraag", ""))[:300], "antwoord": anonimiseer(cfg, str(k.get("antwoord", "")))[:500]}
+                              for k in (v.get("keuzes") or []) if str(k.get("antwoord", "")).strip()] or None
+                    huidig = anonimiseer(cfg, v["concept"]) if keuzes and (v.get("concept") or "").strip() else None
                     u = llm.werk_uit(mail, tekst_a, s, stijlvoorbeelden(cfg, store, mail, it["project"]),
-                                     achtergrond=extra or None, agenda_check=check["blok"] if check else None)
+                                     achtergrond=extra or None, agenda_check=check["blok"] if check else None,
+                                     keuzes=keuzes, huidig_concept=huidig)
                     if context:
                         store.zet_context(it["id"], context)
                     if not (u.concept_antwoord or "").strip():
                         return self._json({"ok": False, "melding": "Claude found no reply was needed and wrote no draft"})
-                    store.zet_concept(it["id"], u.concept_antwoord.strip(), vragen=u.vragen_aan_jou or "")
-                    return self._json({"ok": True, "concept": u.concept_antwoord.strip(), "vragen": u.vragen_aan_jou})
+                    concept = u.concept_antwoord.strip()
+                    punten = [p.model_dump() for p in schone_open_punten(concept, u.open_punten)]
+                    store.zet_concept(it["id"], concept, vragen=u.vragen_aan_jou or "", open_punten=punten)
+                    return self._json({"ok": True, "concept": concept, "vragen": u.vragen_aan_jou, "open_punten": punten})
                 elif actie == "taken-klaarzetten":
                     item_id = int(v["id"])
                     melding, ids = zet_taken_klaar(store, bronnen, item_id, v.get("concept"), v.get("taken") or [])

@@ -166,7 +166,8 @@ class Store:
             self.db.execute("ALTER TABLE items ADD COLUMN vorige_status TEXT")
         for kolom in ("lijkt_beantwoord", "bewijs", "deadline_in_agenda", "context",   # context: gebruikte achtergrond
                       "afspraak",                                                      # afspraak: verzoek uit de mail (JSON)
-                      "opgeruimd"):     # na je antwoord gearchiveerd (tijdstip), of 'weg' als hij al niet meer in de inbox stond
+                      "opgeruimd",      # na je antwoord gearchiveerd (tijdstip), of 'weg' als hij al niet meer in de inbox stond
+                      "open_punten"):   # wat je in het concept nog moet beslissen of aanvullen (JSON)
             if kolom not in itemkolommen:
                 self.db.execute(f"ALTER TABLE items ADD COLUMN {kolom} TEXT")
         wachtkolommen = {r["name"] for r in self.db.execute("PRAGMA table_info(wacht_op)")}
@@ -228,12 +229,14 @@ class Store:
                 self._bewaar_mail(mail)
                 cur = self.db.execute(
                     "INSERT INTO items(sleutel, project, actie, prioriteit, deadline, samenvatting, reden, "
-                    "concept, taken, agenda, vragen, status, opmerking, aangemaakt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    "concept, taken, agenda, vragen, open_punten, status, opmerking, aangemaakt) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (mail.sleutel, s.project, s.actie, s.prioriteit, s.deadline, s.samenvatting, s.reden,
                      u.concept_antwoord if u else None,
                      json.dumps([t.model_dump() for t in u.taken], ensure_ascii=False) if u else "[]",
                      u.agenda_voorstel if u else None,
                      u.vragen_aan_jou if u else None,
+                     json.dumps([p.model_dump() for p in u.open_punten], ensure_ascii=False) if u and u.open_punten else None,
                      status, opmerking, nu()),
                 )
         except sqlite3.IntegrityError:
@@ -655,10 +658,14 @@ class Store:
     def map_keuzes(self, bron: str) -> list[sqlite3.Row]:
         return self.db.execute("SELECT * FROM map_keuzes WHERE bron=?", (bron,)).fetchall()
 
-    def zet_concept(self, item_id: int, concept: str, vragen: Optional[str] = None) -> None:
+    def zet_concept(self, item_id: int, concept: str, vragen: Optional[str] = None,
+                    open_punten: Optional[list] = None) -> None:
         self.db.execute("UPDATE items SET concept=? WHERE id=?", (concept, item_id))
         if vragen is not None:
             self.db.execute("UPDATE items SET vragen=? WHERE id=?", (vragen or None, item_id))
+        if open_punten is not None:
+            self.db.execute("UPDATE items SET open_punten=? WHERE id=?",
+                            (json.dumps(open_punten, ensure_ascii=False) if open_punten else None, item_id))
         self.db.commit()
 
     # --- geleerde afzenderregels ---------------------------------------------

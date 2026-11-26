@@ -47,11 +47,27 @@ class Taak(BaseModel):
     minuten: Optional[int] = None   # geschat eigen werk; oudere items hebben dit niet
 
 
+class Optie(BaseModel):
+    label: str                     # op de knop, Brits Engels
+    tekst: Optional[str] = None    # wat op de plek in het concept komt, in de taal van de mail
+
+
+class OpenPunt(BaseModel):
+    """Iets wat de eigenaar moet beslissen of aanvullen. 'keuze' en 'invullen' horen bij een [FILL IN: …]-plek
+    in het concept; 'hele_mail' verandert het hele antwoord (ja of nee op een verzoek)."""
+    vraag: str
+    soort: str = "invullen"        # keuze | invullen | hele_mail
+    plek: Optional[str] = None     # de letterlijke [FILL IN: …]-tekst in het concept
+    opties: list[Optie] = []
+    suggestie: Optional[int] = None
+
+
 class Uitwerking(BaseModel):
     concept_antwoord: Optional[str]
     taken: list[Taak]
     agenda_voorstel: Optional[str]
     vragen_aan_jou: Optional[str]
+    open_punten: list[OpenPunt] = []
 
 
 class Taakplan(BaseModel):
@@ -116,10 +132,40 @@ SCHEMA_UITWERKING = {
         "agenda_voorstel": {"type": ["string", "null"]},
         "vragen_aan_jou": {
             "type": ["string", "null"],
-            "description": "Beslissingen die alleen de eigenaar kan nemen",
+            "description": "Alleen iets voor de eigenaar dat geen keuze of in te vullen detail is; anders null",
+        },
+        "open_punten": {
+            "type": "array",
+            "description": "Hoogstens drie punten die de eigenaar moet beslissen of aanvullen, in de volgorde van het concept",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "vraag": {"type": "string", "description": "Korte vraag aan de eigenaar, in Brits Engels"},
+                    "soort": {"type": "string", "enum": ["keuze", "invullen", "hele_mail"]},
+                    "plek": {"type": ["string", "null"],
+                             "description": "Letterlijk de [FILL IN: …]-tekst uit het concept die dit punt vervangt; null bij hele_mail"},
+                    "opties": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "label": {"type": "string", "description": "Op de knop, hoogstens vijf woorden, Brits Engels"},
+                                "tekst": {"type": ["string", "null"],
+                                          "description": "Wat op de plek komt, in de taal van de mail; null bij hele_mail"},
+                            },
+                            "required": ["label", "tekst"],
+                            "additionalProperties": False,
+                        },
+                    },
+                    "suggestie": {"type": ["integer", "null"],
+                                  "description": "Nummer (vanaf 0) van de optie die het meest voor de hand ligt, of null"},
+                },
+                "required": ["vraag", "soort", "plek", "opties", "suggestie"],
+                "additionalProperties": False,
+            },
         },
     },
-    "required": ["concept_antwoord", "taken", "agenda_voorstel", "vragen_aan_jou"],
+    "required": ["concept_antwoord", "taken", "agenda_voorstel", "vragen_aan_jou", "open_punten"],
     "additionalProperties": False,
 }
 

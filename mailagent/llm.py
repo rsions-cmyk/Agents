@@ -32,7 +32,8 @@ class LLMFout(Exception):
 class LLM(Protocol):
     def sorteer(self, mail: Email, tekst: str, vast_project: str | None) -> Sortering: ...
     def werk_uit(self, mail: Email, tekst: str, sortering: Sortering, voorbeelden: list[dict] | None = None,
-                 achtergrond: str | None = None, agenda_check: str | None = None) -> Uitwerking: ...
+                 achtergrond: str | None = None, agenda_check: str | None = None,
+                 keuzes: list[dict] | None = None, huidig_concept: str | None = None) -> Uitwerking: ...
     def plan_taak(self, mail: Email, tekst: str, project: str, achtergrond: str | None = None) -> Taakplan: ...
     def taken_gedaan(self, onderwerp: str, taken: list[tuple[int, str]], antwoord: str) -> TakenOordeel: ...
 
@@ -41,6 +42,30 @@ TAAL = (
     "Taal: schrijf alles wat de eigenaar in de app leest (samenvattingen, redenen, taken en stappen, titels, "
     "toelichtingen, vragen, onderwerpen, waarop hij wacht) in Brits Engels, ook als de mail in het Nederlands is. "
     "Een concept-antwoord, doorstuurtekst of herinnering schrijf je in de taal van de mail."
+)
+
+OPEN_PUNTEN_REGEL = (
+    "Laat zo weinig mogelijk open: hoogstens drie open punten per mail. Ontbreekt een detail dat het antwoord niet "
+    "nodig heeft, laat het dan weg of schrijf eromheen (\"ik kom hier volgende week op terug\") in plaats van een gat "
+    "te laten. Zet alleen [FILL IN: korte omschrijving] waar echt iets moet komen dat je niet weet of niet namens de "
+    "eigenaar mag beslissen, en maak van elke beslissing en elke [FILL IN] een punt in 'open_punten':\n"
+    "- soort 'keuze': de eigenaar kiest uit twee tot vier opties. 'plek' is letterlijk de [FILL IN: ...]-tekst uit het "
+    "concept, met de haken. Elke optie heeft een 'label' voor op de knop (hoogstens vijf woorden, Brits Engels) en een "
+    "'tekst' die die plek vervangt: een zinsdeel in de taal van de mail dat grammaticaal in de zin past.\n"
+    "- soort 'invullen': een feit dat je niet kunt weten, zoals een aantal, naam, bedrag of document. 'plek' zoals bij "
+    "'keuze', geen opties; de eigenaar typt het zelf.\n"
+    "- soort 'hele_mail': een beslissing die het hele antwoord verandert, zoals ja of nee op een uitnodiging, verzoek "
+    "of voorstel. Geen [FILL IN] en 'plek' is null. Schrijf het concept voor de optie die het meest voor de hand ligt "
+    "en geef de opties zonder 'tekst'.\n"
+    "'suggestie' is het nummer (vanaf 0) van de optie die het meest voor de hand ligt, of null als je dat niet kunt "
+    "zeggen. 'vraag' is een korte vraag aan de eigenaar in Brits Engels. Zet in 'vragen_aan_jou' alleen nog iets wat "
+    "geen keuze of in te vullen detail is, anders null.\n"
+)
+
+KEUZES_REGEL = (
+    "De eigenaar heeft de open punten beslist; zie <keuzes_van_de_eigenaar>. Schrijf het hele concept opnieuw met die "
+    "keuzes, zonder [FILL IN] voor wat de eigenaar besliste, en geef voor die punten geen open punten meer terug. "
+    "Staat er een <huidig_concept> bij, houd dan de formuleringen van de eigenaar aan waar ze nog kloppen.\n"
 )
 
 ACHTERGROND_REGEL = (
@@ -133,7 +158,8 @@ class ClaudeLLM:
         return Sortering.model_validate(data)
 
     def werk_uit(self, mail: Email, tekst: str, sortering: Sortering, voorbeelden: list[dict] | None = None,
-                 achtergrond: str | None = None, agenda_check: str | None = None) -> Uitwerking:
+                 achtergrond: str | None = None, agenda_check: str | None = None,
+                 keuzes: list[dict] | None = None, huidig_concept: str | None = None) -> Uitwerking:
         system = (
             f"Je bent de projectagent voor '{sortering.project}'. Je bereidt werk voor; de eigenaar keurt alles "
             "goed voordat er iets gebeurt. Je verstuurt niets en zegt niets toe wat volgens de projectinstructies "
@@ -142,17 +168,19 @@ class ClaudeLLM:
             "doorstuurtekst). Antwoord in de taal van de mail. "
             "Staan er eerdere antwoorden van de eigenaar bij, neem dan zijn aanhef, toon, lengte en afsluiting over, "
             "maar nooit de inhoud. Staan ze er niet bij, onderteken dan niet; de eigenaar voegt een handtekening toe. "
-            "Verzin geen feiten, data of afspraken die niet in de mail of de instructies staan. Ontbreekt informatie, "
-            "zet dan [FILL IN: ...] in het concept.\n"
+            "Verzin geen feiten, data of afspraken die niet in de mail of de instructies staan.\n"
+            f"{OPEN_PUNTEN_REGEL}"
             "Zeg nooit namens de eigenaar een datum of tijd toe. Staat er een <agenda_check>-blok bij, dan heeft de app "
             "zijn agenda nagekeken: ga alleen akkoord met een moment dat daar als vrij staat, en stel bij een bezet of "
-            "onhandig moment een of twee vrije momenten uit dat blok voor. Zonder dat blok zet je [FILL IN: ...] waar een "
-            "moment moet komen, en zet je de vraag in 'vragen_aan_jou'.\n"
+            "onhandig moment een of twee vrije momenten uit dat blok voor. Moet de eigenaar kiezen tussen vrije momenten "
+            "uit dat blok, maak dan een punt van soort 'keuze' met die momenten als opties. Zonder dat blok zet je "
+            "[FILL IN: ...] waar een moment moet komen, met een punt van soort 'invullen'.\n"
             f"{ACHTERGROND_REGEL}"
             "Zet concrete vervolgstappen in 'taken', elk met een realistische schatting van de minuten eigen werk "
             "(lezen, nadenken, schrijven, overleggen; geen wachttijd op anderen), afgerond op 15. Het beantwoorden "
             "van deze mail zelf hoort niet in 'taken'; dat regelt de app. Zet een afspraakvoorstel in "
-            "'agenda_voorstel', en beslissingen die alleen de eigenaar kan nemen in 'vragen_aan_jou'.\n\n"
+            "'agenda_voorstel'.\n"
+            f"{KEUZES_REGEL if keuzes else ''}\n"
             f"{TAAL}\n\n{VEILIGHEID}\n\n<projectinstructies>\n{self.cfg.project_instructies[sortering.project]}\n</projectinstructies>"
         )
         stijl = ""
@@ -160,8 +188,14 @@ class ClaudeLLM:
             stijl = "<eerdere_antwoorden_van_de_eigenaar>\n" + "\n\n".join(
                 f"<voorbeeld>\nOp: {v['onderwerp']} (van {v['van']})\nZijn antwoord:\n{v['antwoord'][:1500]}\n</voorbeeld>"
                 for v in voorbeelden) + "\n</eerdere_antwoorden_van_de_eigenaar>\n\n"
+        beslist = ""
+        if keuzes:
+            beslist = "<keuzes_van_de_eigenaar>\n" + "\n".join(
+                f"- {k['vraag']} -> {k['antwoord']}" for k in keuzes) + "\n</keuzes_van_de_eigenaar>\n\n"
+            if huidig_concept:
+                beslist += f"<huidig_concept>\n{huidig_concept}\n</huidig_concept>\n\n"
         gebruiker = (
-            f"{stijl}{achtergrond_blok(achtergrond)}{(agenda_check + chr(10) + chr(10)) if agenda_check else ''}"
+            f"{stijl}{achtergrond_blok(achtergrond)}{(agenda_check + chr(10) + chr(10)) if agenda_check else ''}{beslist}"
             f"{mail_blok(mail, tekst)}\n\nSortering door de chief of staff: actie={sortering.actie}, "
             f"prioriteit={sortering.prioriteit}, deadline={sortering.deadline}. Samenvatting: {sortering.samenvatting}"
         )
