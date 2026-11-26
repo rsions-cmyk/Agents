@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="nl">
+<html lang="en-GB">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>attaché</title>
 <meta name="application-name" content="attaché">
 <meta name="apple-mobile-web-app-title" content="attaché">
-<meta name="description" content="attaché. Minding the details. Je mail, taken en agenda, voorbereid door Claude; versturen doe je zelf.">
+<meta name="description" content="attaché. Minding the details. Your email, tasks and calendar, prepared by Claude; you do the sending yourself.">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.webmanifest">
@@ -660,21 +660,21 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
 <linearGradient id="amms" gradientUnits="userSpaceOnUse" x1="180" y1="0" x2="330" y2="0"><stop offset="0" stop-color="#b98a35"/><stop offset=".5" stop-color="#f3dd9a"/><stop offset="1" stop-color="#b48434"/></linearGradient>
 <mask id="amm" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512"><rect width="512" height="512" fill="#fff"/>
 <path transform="translate(242.17 268.50) rotate(-26.56) scale(.5)" d="M-72.92 29.18V-10.49Q-72.92 -35.29 -48.12 -35.29H34.54Q59.33 -35.29 59.33 -10.49V29.18Q59.33 47.37 41.15 47.37H-54.73Q-72.92 47.37 -72.92 29.18ZM-26.63 -32.29V-43.77Q-26.63 -54.13 -16.26 -54.13H2.68Q13.05 -54.13 13.05 -43.77V-32.29Z" fill="#000"/></mask></defs><rect width="512" height="512" rx="112" fill="url(#ambg)"/><g transform="translate(256 256) scale(1.0) translate(-256 -256)"><path d="M221.6 330.6 Q227.9 346.2 241.9 358.5 Q255.8 370.8 277.4 370.8 Q289.3 370.8 302.3 364.1 Q315.3 357.4 325.0 343.2 Q326.1 341.4 328.0 341.4 Q329.8 341.4 331.9 342.5 Q333.9 343.6 342.9 348.8 Q344.3 349.9 344.3 351.8 Q344.3 354.4 342.1 358.1 Q331.7 377.4 313.8 389.7 Q296.0 402.0 267.3 402.0 Q236.5 402.0 214.2 388.2 Q191.8 374.5 179.7 351.8 Q167.7 329.1 167.7 302.3 Q167.7 276.6 175.3 258.2 Q182.9 239.8 195.6 228.5 Q208.2 217.1 224.0 211.7 Q239.8 206.3 256.2 206.3 Q274.8 206.3 288.9 213.6 Q303.1 220.8 312.9 232.0 Q322.8 243.2 327.8 255.6 Q332.8 268.1 332.8 278.9 Q332.8 281.9 329.5 283.3 Z" fill="#efe8d8" mask="url(#amm)"/><path d="M225.3 182.2 Q237.2 166.9 244.1 156.5 Q251.0 146.1 255.6 136.6 Q260.3 127.1 265.1 115.2 Q266.6 111.9 270.9 110.9 Q275.2 110.0 278.9 110.0 Q289.7 110.0 297.3 114.6 Q304.9 119.3 304.9 129.0 Q304.9 143.1 295.8 154.5 Q286.7 165.8 273.9 174.2 Q261.0 182.5 249.5 187.7 Q248.0 188.5 246.3 189.2 Q244.7 190.0 242.8 190.0 Q241.3 190.0 239.1 188.9 Z" fill="url(#amms)"/></g></svg></span><span class="navtekst woordmerk" aria-label="attaché">attach<span class="woordmerk-e">é</span></span>
-      <button class="ikoon inklap" id="inklappen" title="Zijbalk inklappen ( [ )" aria-label="Zijbalk in- of uitklappen"><span data-ikoon="paneel"></span></button></div>
+      <button class="ikoon inklap" id="inklappen" title="Collapse sidebar ( [ )" aria-label="Collapse or expand sidebar"><span data-ikoon="paneel"></span></button></div>
     <div id="nav" style="display:contents"></div>
     <div class="onder">
-      <button class="knop-ophalen" id="ophalen" title="Mail ophalen"><span data-ikoon="refresh"></span><span class="navtekst">Mail ophalen</span></button>
+      <button class="knop-ophalen" id="ophalen" title="Get mail"><span data-ikoon="refresh"></span><span class="navtekst">Get mail</span></button>
       <div class="status" id="status"></div>
     </div>
   </aside>
   <main>
     <div class="kop">
-      <h1 id="titel">Te doen</h1>
+      <h1 id="titel">To do</h1>
       <span class="kop-tel" id="koptel"></span>
       <span id="kopschakel"></span>
       <div class="zoek" id="zoek" role="search">
         <span data-ikoon="zoek"></span>
-        <input id="zoekveld" type="search" placeholder="Zoek in mail, taken en antwoorden" autocomplete="off" spellcheck="false" aria-label="Zoeken" aria-controls="zoekres">
+        <input id="zoekveld" type="search" placeholder="Search email, tasks and replies" autocomplete="off" spellcheck="false" aria-label="Search" aria-controls="zoekres">
         <kbd>⌘K</kbd>
         <div class="zoek-res" id="zoekres" hidden></div>
       </div>
@@ -682,8 +682,8 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
     <div id="inhoud"></div>
   </main>
   <aside class="paneel" id="paneel" aria-hidden="true"></aside>
-  <div class="greep" id="greep-zij" title="Sleep om de breedte aan te passen; dubbelklik om te herstellen" role="separator" aria-orientation="vertical"></div>
-  <div class="greep" id="greep-lijst" title="Sleep om de breedte aan te passen; dubbelklik om te herstellen" role="separator" aria-orientation="vertical"></div>
+  <div class="greep" id="greep-zij" title="Drag to resize; double-click to reset" role="separator" aria-orientation="vertical"></div>
+  <div class="greep" id="greep-lijst" title="Drag to resize; double-click to reset" role="separator" aria-orientation="vertical"></div>
 </div>
 
 <div class="dek" id="dek"></div>
@@ -722,11 +722,12 @@ const IKONEN = {
 };
 const ik = n => `<svg viewBox="0 0 24 24" aria-hidden="true">${IKONEN[n]||""}</svg>`;
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const ACTIES = {antwoorden:["reply","Antwoorden"], taak:["task","Taak"], agenda:["calendar","Agenda"],
-                delegeren:["forward","Delegeren"], ter_info:["eye","Ter info"], negeren:["ban","Overgeslagen"]};
+const ACTIES = {antwoorden:["reply","Reply"], taak:["task","Task"], agenda:["calendar","Calendar"],
+                delegeren:["forward","Delegate"], ter_info:["eye","FYI"], negeren:["ban","Skipped"]};
 const KLEUREN = {onderwijs:"var(--onderwijs)", onderzoek:"var(--onderzoek)", istte:"var(--istte)", overig:"var(--overig)"};
 const kleur = p => KLEUREN[p] || `hsl(${[...p].reduce((a,c)=>a+c.charCodeAt(0),0)%360} 45% 50%)`;
-const naamProject = p => p === "alles" ? "Alles" : p === "istte" ? "ISTTE" : p[0].toUpperCase() + p.slice(1);
+const PROJECTNAMEN = {onderwijs:"Teaching", onderzoek:"Research", istte:"ISTTE", overig:"Other", alles:"All"};
+const naamProject = p => PROJECTNAMEN[p] || p[0].toUpperCase() + p.slice(1);
 
 function afzender(van){
   const m = String(van||"").match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>/);
@@ -744,8 +745,8 @@ function initialen(naam){
 function datum(iso){
   if(!iso) return "";
   const d = new Date(iso), nu = new Date();
-  if (d.toDateString() === nu.toDateString()) return d.toLocaleTimeString("nl-NL",{hour:"2-digit",minute:"2-digit"});
-  return d.toLocaleDateString("nl-NL",{day:"numeric",month:"short"});
+  if (d.toDateString() === nu.toDateString()) return d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
+  return d.toLocaleDateString("en-GB",{day:"numeric",month:"short"});
 }
 const PLETTER = {onderwijs:"O", onderzoek:"R", istte:"I", overig:""};
 const pletter = p => (p in PLETTER) ? PLETTER[p] : (p || "?")[0].toUpperCase();
@@ -778,7 +779,7 @@ async function laad(){
     if (afsSleep){ D = nieuw; peilTimer = setTimeout(laad, 1500); return; }   // niet hertekenen midden in het slepen
     D = nieuw;
   } catch(e){
-    document.getElementById("status").textContent = "Geen verbinding met de app; opnieuw over 10 seconden";
+    document.getElementById("status").textContent = "No connection to the app; retrying in 10 seconds";
     peilTimer = setTimeout(laad, 10000);
     return;
   }
@@ -792,7 +793,7 @@ async function actie(naam, data){
     const j = await r.json();
     toast(j.melding, !j.ok);
     return j.ok;
-  } catch(e){ toast("Geen verbinding met mailagent. Draait 'scripts/mailagent.sh inbox' nog?", true); return false; }
+  } catch(e){ toast("No connection to mailagent. Is 'scripts/mailagent.sh inbox' still running?", true); return false; }
 }
 
 // Eerst het scherm bijwerken, daarna de actie op de achtergrond uitvoeren.
@@ -821,8 +822,8 @@ async function controleerTaken(){
 // Afspraak plannen: wat de afzender voorstelt, of jij dan kunt, vrije momenten binnen jouw voorwaarden,
 // en de gekozen momenten in het concept (met Claude), voorlopig in je agenda of in Outlook
 const afspr = {};   // item-id -> {laden, fout, data, gekozen:Set(iso), vast, bezig}
-const langDag = iso => new Date(iso).toLocaleDateString("nl-NL", {weekday: "long", day: "numeric", month: "long"});
-const momentKort = (iso, duur) => `${new Date(iso).toLocaleDateString("nl-NL", {weekday: "short", day: "numeric", month: "short"})} ${tijdVan(Date.parse(iso))}–${tijdVan(Date.parse(iso) + duur * 60000)}`;
+const langDag = iso => new Date(iso).toLocaleDateString("en-GB", {weekday: "long", day: "numeric", month: "long"});
+const momentKort = (iso, duur) => `${new Date(iso).toLocaleDateString("en-GB", {weekday: "short", day: "numeric", month: "short"})} ${tijdVan(Date.parse(iso))}–${tijdVan(Date.parse(iso) + duur * 60000)}`;
 async function laadAfspraak(id, vw, opnieuw){
   const oud = afspr[id];
   afspr[id] = {laden: true, gekozen: oud ? oud.gekozen : new Set(), vast: oud ? oud.vast : false};
@@ -837,47 +838,47 @@ async function laadAfspraak(id, vw, opnieuw){
 }
 function afspraakHTML(it){
   const a = afspr[it.id];
-  const kop = `<div class="label">${ik("mensen")}Afspraak plannen</div>`;
-  if (!a) return `<div class="afspr">${kop}<button class="knop" data-afsprladen="${it.id}">${ik("sparkle")}Momenten zoeken</button>
-      <span class="meta">Claude leest wat de afzender voorstelt; de app kijkt in je agenda.</span></div>`;
-  if (a.laden) return `<div class="afspr">${kop}<span class="meta">Claude leest de mail en de app kijkt in je agenda…</span></div>`;
+  const kop = `<div class="label">${ik("mensen")}Schedule a meeting</div>`;
+  if (!a) return `<div class="afspr">${kop}<button class="knop" data-afsprladen="${it.id}">${ik("sparkle")}Find times</button>
+      <span class="meta">Claude reads what the sender proposes; the app checks your calendar.</span></div>`;
+  if (a.laden) return `<div class="afspr">${kop}<span class="meta">Claude is reading the email and the app is checking your calendar…</span></div>`;
   if (a.fout) return `<div class="afspr">${kop}<div class="melding fout">${ik("alert")}<div>${esc(a.fout)}</div></div></div>`;
   const d = a.data, v = d.verzoek, vw = d.vw;
   const rij = (iso, tekst, extra) => `<label class="af-r"><input type="checkbox" data-afkies="${it.id}" value="${esc(iso)}"${a.gekozen.has(iso) ? " checked" : ""}>
       <span>${tekst}</span>${extra || ""}</label>`;
   const metDatum = x => `${esc(x.omschrijving)} <span class="meta">(${esc(kortDatum(x.dag))})</span>`;
   const uitMail = d.voorgesteld.map(x => x.vrij
-      ? rij(x.vrij, metDatum(x), `<span class="af-ok">vrij ${tijdVan(Date.parse(x.vrij))}–${tijdVan(Date.parse(x.vrij) + vw.duur * 60000)}</span>`)
-      : `<div class="af-r af-niet"><span class="af-leeg"></span><span>${metDatum(x)}</span><span class="af-bezet">${x.verleden ? "voorbij"
-          : x.te_vroeg ? "vóór je startdatum" : "bezet" + (x.botsingen.length ? ": " + esc(x.botsingen.join(", ")) : "")}</span></div>`).join("");
+      ? rij(x.vrij, metDatum(x), `<span class="af-ok">free ${tijdVan(Date.parse(x.vrij))}–${tijdVan(Date.parse(x.vrij) + vw.duur * 60000)}</span>`)
+      : `<div class="af-r af-niet"><span class="af-leeg"></span><span>${metDatum(x)}</span><span class="af-bezet">${x.verleden ? "past"
+          : x.te_vroeg ? "before your start date" : "busy" + (x.botsingen.length ? ": " + esc(x.botsingen.join(", ")) : "")}</span></div>`).join("");
   const vrij = d.vrij.filter(m => !d.voorgesteld.some(x => x.vrij === m)).map(m => rij(m, esc(momentKort(m, vw.duur)))).join("");
   const n = a.gekozen.size;
   return `<div class="afspr">${kop}
-    <div class="af-wie">${esc(v.met || "de afzender")} · ${vw.duur} min${v.onderwerp ? " · " + esc(v.onderwerp) : ""}${v.locatie ? " · " + esc(v.locatie) : ""}</div>
+    <div class="af-wie">${esc(v.met || "the sender")} · ${vw.duur} min${v.onderwerp ? " · " + esc(v.onderwerp) : ""}${v.locatie ? " · " + esc(v.locatie) : ""}</div>
     <div class="af-vw">
-      <label>Niet vóór <input type="date" data-afvw="vanaf" data-id="${it.id}" value="${esc(vw.vanaf)}"></label>
-      <label>Uiterlijk <input type="date" data-afvw="uiterlijk" data-id="${it.id}" value="${esc(vw.uiterlijk)}"></label>
-      <select data-afvw="dagdeel" data-id="${it.id}" aria-label="Dagdeel"><option value="">Hele dag</option><option value="ochtend"${vw.dagdeel === "ochtend" ? " selected" : ""}>Ochtend</option><option value="middag"${vw.dagdeel === "middag" ? " selected" : ""}>Middag</option></select>
-      <select data-afvw="duur" data-id="${it.id}" aria-label="Duur">${[15, 30, 45, 60, 90, 120].map(m => `<option value="${m}"${m === vw.duur ? " selected" : ""}>${duurTekst(m)}</option>`).join("")}</select>
+      <label>Not before <input type="date" data-afvw="vanaf" data-id="${it.id}" value="${esc(vw.vanaf)}"></label>
+      <label>No later than <input type="date" data-afvw="uiterlijk" data-id="${it.id}" value="${esc(vw.uiterlijk)}"></label>
+      <select data-afvw="dagdeel" data-id="${it.id}" aria-label="Part of the day"><option value="">All day</option><option value="ochtend"${vw.dagdeel === "ochtend" ? " selected" : ""}>Morning</option><option value="middag"${vw.dagdeel === "middag" ? " selected" : ""}>Afternoon</option></select>
+      <select data-afvw="duur" data-id="${it.id}" aria-label="Duration">${[15, 30, 45, 60, 90, 120].map(m => `<option value="${m}"${m === vw.duur ? " selected" : ""}>${duurTekst(m)}</option>`).join("")}</select>
     </div>
     ${d.agenda_fout ? `<div class="melding">${ik("alert")}<div>${esc(d.agenda_fout)}</div></div>` : ""}
-    ${d.voorgesteld.length ? `<div class="af-kop">Voorgesteld in de mail</div>${uitMail}` : ""}
-    <div class="af-kop">Vrij in jouw agenda${vw.dagdeel ? " (" + vw.dagdeel + ")" : ""}</div>
-    ${vrij || `<div class="meta">Geen vrij moment tussen ${esc(kortDatum(vw.vanaf))} en ${esc(kortDatum(vw.uiterlijk))}. Verruim je voorwaarden.</div>`}
+    ${d.voorgesteld.length ? `<div class="af-kop">Proposed in the email</div>${uitMail}` : ""}
+    <div class="af-kop">Free in your calendar${vw.dagdeel ? " (" + ({ochtend:"morning", middag:"afternoon"}[vw.dagdeel] || vw.dagdeel) + ")" : ""}</div>
+    ${vrij || `<div class="meta">No free time between ${esc(kortDatum(vw.vanaf))} and ${esc(kortDatum(vw.uiterlijk))}. Widen your conditions.</div>`}
     <div class="af-acties">
-      <button class="knop klein goed" data-afconcept="${it.id}"${n && !a.bezig ? "" : " disabled"}>${ik("sparkle")}${a.bezig ? "Claude schrijft…" : n === 1 ? "Dit moment in het concept" : `Deze ${n} momenten in het concept`}</button>
-      <label class="af-vast"><input type="checkbox" data-afvast="${it.id}"${a.vast ? " checked" : ""}> Voorlopig vasthouden in je agenda</label>
-      <button class="knop klein" data-afoutlook="${it.id}"${n ? "" : " disabled"} title="Nieuwe afspraak in Outlook op het web voor het eerste gekozen moment, met tijd en onderwerp ingevuld. Voeg daar ${esc(v.met || "de ander")} toe; Outlook laat zien of die kan.">${ik("calendar")}Openen in Outlook</button>
-      <button class="knop klein" data-afopnieuw="${it.id}" title="Claude leest de mail opnieuw">Opnieuw lezen</button>
+      <button class="knop klein goed" data-afconcept="${it.id}"${n && !a.bezig ? "" : " disabled"}>${ik("sparkle")}${a.bezig ? "Claude is writing…" : n === 1 ? "Put this time in the draft" : `Put these ${n} times in the draft`}</button>
+      <label class="af-vast"><input type="checkbox" data-afvast="${it.id}"${a.vast ? " checked" : ""}> Hold as tentative in your calendar</label>
+      <button class="knop klein" data-afoutlook="${it.id}"${n ? "" : " disabled"} title="New event in Outlook on the web for the first chosen time, with time and subject filled in. Add ${esc(v.met || "the other person")} there; Outlook shows whether they are available.">${ik("calendar")}Open in Outlook</button>
+      <button class="knop klein" data-afopnieuw="${it.id}" title="Claude reads the email again">Read again</button>
     </div>
-    <div class="meta af-uitleg">De agenda van ${esc(v.met || "de ander")} kan de app niet zien. In Outlook zie je die beschikbaarheid wel als je hem of haar uitnodigt.</div>
+    <div class="meta af-uitleg">The app cannot see ${esc(v.met || "the other person")}’s calendar. In Outlook you can see their availability once you invite them.</div>
   </div>`;
 }
 function outlookLink(startIso, duur, onderwerp, locatie, tekst){
   const z = ms => new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z");
   const b = Date.parse(startIso);
   return "https://outlook.office.com/calendar/action/compose?rru=addevent"
-    + `&subject=${encodeURIComponent(onderwerp || "Afspraak")}&startdt=${z(b)}&enddt=${z(b + duur * 60000)}`
+    + `&subject=${encodeURIComponent(onderwerp || "Meeting")}&startdt=${z(b)}&enddt=${z(b + duur * 60000)}`
     + (locatie ? `&location=${encodeURIComponent(locatie)}` : "") + (tekst ? `&body=${encodeURIComponent(tekst)}` : "");
 }
 document.addEventListener("change", ev => {
@@ -904,7 +905,7 @@ async function afspraakNaarConcept(id){
   if (!j.ok){ toast(j.melding, true); return teken(); }
   it.concept = j.concept;
   const v2 = document.getElementById("concept"); if (v2) v2.value = j.concept;
-  let melding = "De momenten staan in je concept. Lees het na en zet het in Mail of verstuur het.";
+  let melding = "The times are in your draft. Check it, then reply in Mail or send it.";
   if (a.vast){
     const h = await stil("afspraak-vasthouden", {id, momenten: gekozen, duur: vw.duur, onderwerp: a.data.verzoek.onderwerp, met: a.data.verzoek.met});
     melding += " " + (h.ok ? h.melding + "." : h.melding);
@@ -921,14 +922,14 @@ function achtergrondHTML(context, van){
   const taken = c.find(x => x.soort === "taken"), wacht = c.find(x => x.soort === "wacht");
   if (!c.length) return "";
   const delen = [];
-  if (draad.length) delen.push(draad.length === 1 ? "1 mail uit dit gesprek" : `${draad.length} mails uit dit gesprek`);
-  if (eerder.length) delen.push(eerder.length === 1 ? "1 eerdere mail met deze persoon" : `${eerder.length} eerdere mails met deze persoon`);
-  if (taken) delen.push(taken.aantal === 1 ? "1 open taak" : `${taken.aantal} open taken`);
-  if (wacht) delen.push(wacht.aantal === 1 ? "1 vraag waarop je wacht" : `${wacht.aantal} vragen waarop je wacht`);
-  const regel = x => `<div class="ag-r"><span class="meta">${kortDatum(x.datum)}</span><span>${x.richting === "uit" ? "jij aan " + esc(wieNaam(x.wie)) : esc(afzender(x.wie).naam)} · ${esc(x.onderwerp)}</span></div>`;
-  return `<details class="achtergrond"><summary>${ik("mail")}Achtergrond voor dit concept: ${delen.join(", ")}</summary>
-    ${draad.length ? `<div class="ag-kop">Dit gesprek</div>${draad.map(regel).join("")}` : ""}
-    ${eerder.length ? `<div class="ag-kop">Eerder met deze persoon</div>${eerder.map(regel).join("")}` : ""}</details>`;
+  if (draad.length) delen.push(draad.length === 1 ? "1 email from this conversation" : `${draad.length} emails from this conversation`);
+  if (eerder.length) delen.push(eerder.length === 1 ? "1 earlier email with this person" : `${eerder.length} earlier emails with this person`);
+  if (taken) delen.push(taken.aantal === 1 ? "1 open task" : `${taken.aantal} open tasks`);
+  if (wacht) delen.push(wacht.aantal === 1 ? "1 question you are waiting on" : `${wacht.aantal} questions you are waiting on`);
+  const regel = x => `<div class="ag-r"><span class="meta">${kortDatum(x.datum)}</span><span>${x.richting === "uit" ? "you to " + esc(wieNaam(x.wie)) : esc(afzender(x.wie).naam)} · ${esc(x.onderwerp)}</span></div>`;
+  return `<details class="achtergrond"><summary>${ik("mail")}Background for this draft: ${delen.join(", ")}</summary>
+    ${draad.length ? `<div class="ag-kop">This conversation</div>${draad.map(regel).join("")}` : ""}
+    ${eerder.length ? `<div class="ag-kop">Earlier with this person</div>${eerder.map(regel).join("")}` : ""}</details>`;
 }
 
 // Concept laten schrijven voor een mail in Te doen die er nog geen heeft
@@ -949,7 +950,7 @@ async function schrijfConcept(id){
 // Taken uit een mail naar Planning, zonder nu te antwoorden
 async function zetTakenKlaar(id){
   const taken = (bewerkt[id] || []).filter(x => (x.omschrijving || "").trim());
-  if (!taken.length) return toast("Er staan geen taken in de lijst", true);
+  if (!taken.length) return toast("There are no tasks in the list", true);
   const veld = document.getElementById("concept"), concept = veld ? veld.value : null;
   if (concept !== null) bewaarTekst(id, concept);
   const volgende = drieKolommen() ? volgendeNa(id) : null;
@@ -959,7 +960,7 @@ async function zetTakenKlaar(id){
   verborgen.delete(id);
   if (!j.ok){ toast(j.melding, true); staat.open = id; teken(); return laad(); }
   delete bewerkt[id];
-  toast(j.melding, false, {label: "Ongedaan maken", doe: async () => {
+  toast(j.melding, false, {label: "Undo", doe: async () => {
     const r = await stil("taken-terug", {id, taken: j.taken});
     toast(r.melding, !r.ok); laad();
   }});
@@ -994,7 +995,7 @@ async function stil(naam, data){
   try {
     const r = await fetch("/api/"+naam, {method:"POST", headers:{"Content-Type":"application/json","X-Token":TOKEN}, body:JSON.stringify(data||{})});
     return await r.json();
-  } catch(e){ return {ok:false, melding:"Geen verbinding met mailagent"}; }
+  } catch(e){ return {ok:false, melding:"No connection to mailagent"}; }
 }
 
 async function vinkAf(id){
@@ -1005,9 +1006,9 @@ async function vinkAf(id){
   if (!j.ok) toast(j.melding, true);
   else {
     const oordeel = o => stil("taak-oordeel", {id, oordeel: o}).then(r => toast(r.melding, !r.ok));
-    toast("Afgevinkt. Duurde het…", false, [
-      {label: "korter", doe: () => oordeel(-1)}, {label: "klopt", doe: () => oordeel(0)},
-      {label: "langer", doe: () => oordeel(1)}, {label: "Ongedaan", doe: () => zetTerug(id)}]);
+    toast("Ticked off. How long did it take?", false, [
+      {label: "Shorter", doe: () => oordeel(-1)}, {label: "As expected", doe: () => oordeel(0)},
+      {label: "Longer", doe: () => oordeel(1)}, {label: "Undo", doe: () => zetTerug(id)}]);
   }
   laad();
 }
@@ -1015,7 +1016,7 @@ async function vinkAf(id){
 async function zetTerug(id){
   document.querySelectorAll(".toast .knop").forEach(k => k.closest(".toast").remove());  // oude 'ongedaan maken' weg
   const j = await stil("taak-heropen", {id});
-  toast(j.ok ? "Taak teruggezet" : j.melding, !j.ok);
+  toast(j.ok ? "Task restored" : j.melding, !j.ok);
   laad();
 }
 
@@ -1036,10 +1037,10 @@ function teken(){
   const tel = n => n === "alles" ? alleWacht.length : alleWacht.filter(i => i.project === n).length;
   const inPlan = filter(D.taken, true).filter(t => !t.gepland).length;
   const opruimN = filter(D.info).length + filter(D.overgeslagen).length;
-  const weergaven = [["te_doen","inbox","Te doen",teDoen().length],["planning","calendar","Planning",inPlan],["opruimen","sparkle","Opruimen",opruimN]];
+  const weergaven = [["te_doen","inbox","To do",teDoen().length],["planning","calendar","Planning",inPlan],["opruimen","sparkle","Tidy up",opruimN]];
   document.getElementById("nav").innerHTML =
     weergaven.map(([k,i,l,n]) => `<button class="nav${staat.tab===k?" actief":""}" data-tab="${k}" title="${l}">${ik(i)}<span class="navtekst">${l}</span>${n ? `<span class="tel">${n}</span>` : ""}</button>`).join("")
-    + `<div class="nav-kop">Projecten</div>`
+    + `<div class="nav-kop">Projects</div>`
     + [{naam:"alles"}, ...D.projecten].map(p => `
     <button class="nav${p.naam===staat.project?" actief":""}" data-project="${esc(p.naam)}" title="${esc(naamProject(p.naam))}">
       ${p.naam==="alles" ? `<span class="stip" style="background:var(--lijn)"></span>` : `<span class="stip" style="background:${kleur(p.naam)}"></span>`}
@@ -1047,20 +1048,20 @@ function teken(){
     </button>`).join("");
   const knop = document.getElementById("ophalen");
   knop.classList.toggle("bezig", D.ophalen.bezig);
-  knop.querySelector(".navtekst").textContent = D.ophalen.bezig ? "Bezig met ophalen…" : "Mail ophalen";
-  document.getElementById("status").textContent = D.ophalen.bezig ? "Claude sorteert en schrijft concepten" : (D.ophalen.laatste || "");
-  const titels = {te_doen:"Te doen", planning:"Planning", opruimen:"Opruimen"};
+  knop.querySelector(".navtekst").textContent = D.ophalen.bezig ? "Getting mail…" : "Get mail";
+  document.getElementById("status").textContent = D.ophalen.bezig ? "Claude is sorting your email and writing drafts" : (D.ophalen.laatste || "");
+  const titels = {te_doen:"To do", planning:"Planning", opruimen:"Tidy up"};
   document.getElementById("titel").textContent = titels[staat.tab] + (staat.project !== "alles" ? " · " + naamProject(staat.project) : "");
   document.getElementById("koptel").textContent = "";
-  document.getElementById("status").textContent = D.ophalen.bezig ? "Claude sorteert en schrijft concepten"
-    : (D.ophalen.laatste || (D.volgende_ronde ? `Volgende ronde ${D.volgende_ronde}` : ""));
+  document.getElementById("status").textContent = D.ophalen.bezig ? "Claude is sorting your email and writing drafts"
+    : (D.ophalen.laatste || (D.volgende_ronde ? `Next round at ${D.volgende_ronde}` : ""));
 
   const inhoud = document.getElementById("inhoud");
   const nAfg = filter(D.afgehandeld || []).length;
   document.getElementById("kopschakel").innerHTML = staat.tab !== "te_doen" ? "" :
-    `<span class="segment td-schakel" role="tablist" aria-label="Te doen of afgehandeld">
+    `<span class="segment td-schakel" role="tablist" aria-label="Open or handled">
       <button class="${staat.td !== "afgehandeld" ? "aan" : ""}" data-td="open" role="tab" aria-selected="${staat.td !== "afgehandeld"}">Open${teDoen().length ? ` · ${teDoen().length}` : ""}</button>
-      <button class="${staat.td === "afgehandeld" ? "aan" : ""}" data-td="afgehandeld" role="tab" aria-selected="${staat.td === "afgehandeld"}" title="Wat je de afgelopen drie weken uit Te doen haalde">Afgehandeld${nAfg ? ` · ${nAfg}` : ""}</button></span>`;
+      <button class="${staat.td === "afgehandeld" ? "aan" : ""}" data-td="afgehandeld" role="tab" aria-selected="${staat.td === "afgehandeld"}" title="What you cleared from To do in the past three weeks">Handled${nAfg ? ` · ${nAfg}` : ""}</button></span>`;
   if (staat.tab === "te_doen" && staat.td === "afgehandeld") inhoud.innerHTML = tekenAfgehandeld();
   else if (staat.tab === "te_doen") inhoud.innerHTML = tekenVandaag() + tekenVoortgang() + tekenWachtOp() + tekenBeoordelen(teDoen()) + tekenBelangrijk();
   else if (staat.tab === "planning") inhoud.innerHTML = tekenPlanning();
@@ -1105,9 +1106,9 @@ function tekenVoortgang(){
   const rest = teDoen().length, gedaan = (D.vandaag_afgehandeld || 0) + verborgen.size, totaal = gedaan + rest;
   if (!totaal) return "";
   const pct = Math.round(gedaan / totaal * 100);
-  const tekst = !rest ? `<b>Alles gedaan</b><span>${gedaan} vandaag</span>`
-    : pct < 50 ? `<span><b>${gedaan} gedaan</b> vandaag</span><span>${rest} te gaan</span>`
-    : `<span><b>Nog ${rest}</b>, dan ben je klaar</span><span>${gedaan} gedaan</span>`;
+  const tekst = !rest ? `<b>All done</b><span>${gedaan} today</span>`
+    : pct < 50 ? `<span><b>${gedaan} done</b> today</span><span>${rest} to go</span>`
+    : `<span><b>${rest} more</b> and you’re done</span><span>${gedaan} done</span>`;
   return `<div class="voortgang${rest ? "" : " klaar"}"><div class="voortgang-tekst">${tekst}</div><div class="voortgang-balk"><i style="width:${rest ? pct : 100}%"></i></div></div>`;
 }
 
@@ -1125,21 +1126,21 @@ function mailWeergave(id, tekst){
   const h = htmlCache[id];
   if (weergave === "opgemaakt" && h === undefined) laadHtml(id, false);
   const opgemaakt = weergave === "opgemaakt" && h && typeof h === "object" && h.html !== undefined;
-  const status = weergave !== "opgemaakt" ? "" : h === "laden" || h === undefined ? "opmaak laden…" : h && h.fout ? esc(h.fout) : "";
-  const balk = !opgemaakt ? "" : h.geblokkeerd ? `<div class="afbeeldingbalk">${ik("eye")}<span>${h.geblokkeerd === 1 ? "1 afbeelding" : h.geblokkeerd + " afbeeldingen"} tegengehouden. Laden laat de afzender zien dat je de mail opende.</span>
-      <button class="knop klein" data-afbladen="${id}">Laden</button>
-      ${h.adres ? `<button class="knop klein" data-afbaltijd="${id}" data-adres="${esc(h.adres)}" data-aan="1">Altijd voor ${esc(h.adres)}</button>` : ""}</div>`
-    : h.altijd ? `<div class="afbeeldingbalk stil"><span>Afbeeldingen van ${esc(h.adres)} laden altijd.</span>
-      <button class="knop klein" data-afbaltijd="${id}" data-adres="${esc(h.adres)}" data-aan="0">Niet meer</button></div>` : "";
+  const status = weergave !== "opgemaakt" ? "" : h === "laden" || h === undefined ? "loading formatting…" : h && h.fout ? esc(h.fout) : "";
+  const balk = !opgemaakt ? "" : h.geblokkeerd ? `<div class="afbeeldingbalk">${ik("eye")}<span>${h.geblokkeerd === 1 ? "1 image" : h.geblokkeerd + " images"} blocked. Loading them tells the sender you opened the email.</span>
+      <button class="knop klein" data-afbladen="${id}">Load</button>
+      ${h.adres ? `<button class="knop klein" data-afbaltijd="${id}" data-adres="${esc(h.adres)}" data-aan="1">Always for ${esc(h.adres)}</button>` : ""}</div>`
+    : h.altijd ? `<div class="afbeeldingbalk stil"><span>Images from ${esc(h.adres)} always load.</span>
+      <button class="knop klein" data-afbaltijd="${id}" data-adres="${esc(h.adres)}" data-aan="0">Stop</button></div>` : "";
   return `<div class="mailweergave" id="mw-${id}">
     <div class="weergavekeuze"><div class="segment">
-      <button class="${weergave === "opgemaakt" ? "aan" : ""}" data-weergave="opgemaakt">Opgemaakt</button>
-      <button class="${weergave === "tekst" ? "aan" : ""}" data-weergave="tekst">Tekst</button></div>
+      <button class="${weergave === "opgemaakt" ? "aan" : ""}" data-weergave="opgemaakt">Formatted</button>
+      <button class="${weergave === "tekst" ? "aan" : ""}" data-weergave="tekst">Plain text</button></div>
       <span class="meta">${status}</span>
-      <button class="knop klein" data-mailopen="${id}" style="margin-left:auto" title="Deze mail openen in Apple Mail">${ik("mail")}Open in Mail</button></div>
+      <button class="knop klein" data-mailopen="${id}" style="margin-left:auto" title="Open this email in Apple Mail">${ik("mail")}Open in Mail</button></div>
     ${balk}
-    ${opgemaakt ? `<iframe class="mailframe" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" srcdoc="${attr(h.html)}" title="Mail"></iframe>`
-                : `<div class="leesvlak">${tekst === null ? `<span class="meta">Mail laden…</span>` : esc(tekst || "(geen tekst)")}</div>`}
+    ${opgemaakt ? `<iframe class="mailframe" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" srcdoc="${attr(h.html)}" title="Email"></iframe>`
+                : `<div class="leesvlak">${tekst === null ? `<span class="meta">Loading email…</span>` : esc(tekst || "(no text)")}</div>`}
   </div>`;
 }
 function ververs(id){
@@ -1169,21 +1170,21 @@ function tekenLees(id){
   p.innerHTML = `
     <div class="p-kop">${avatar(basis)}
       <div style="min-width:0"><h2>${esc(basis.onderwerp)}</h2><div class="van">${esc(a.naam)} · ${esc(a.adres)} · ${datum(basis.datum)}</div>
-        <div class="chips"><span class="chip">${ik(basis.status === "genegeerd" ? "ban" : "eye")}${basis.status === "genegeerd" ? "Overgeslagen" : "Ter info"}</span>
+        <div class="chips"><span class="chip">${ik(basis.status === "genegeerd" ? "ban" : "eye")}${basis.status === "genegeerd" ? "Skipped" : "FYI"}</span>
           ${gw ? `<span class="chip">${esc(gw.tekst)}</span>` : ""}</div></div>
-      <button class="ikoon sluit-mail" id="sluit" title="Sluiten (Esc)">${ik("x")}</button></div>
+      <button class="ikoon sluit-mail" id="sluit" title="Close (Esc)">${ik("x")}</button></div>
     <div class="p-inhoud"${zelfde ? ' style="animation:none"' : ""}>
       ${basis.samenvatting && basis.samenvatting !== basis.onderwerp ? `<div class="melding info">${ik("sparkle")}<div>${esc(basis.samenvatting)}</div></div>` : ""}
       ${m && m.reden && basis.status === "genegeerd" ? `<div class="meta">${esc(m.reden)}</div>` : ""}
       ${mailWeergave(id, m ? m.tekst : null)}
     </div>
     <div class="p-voet">
-      <button class="knop" data-maaktaak="${id}" title="Taak maken (T)">${ik("calendar")}<span class="lbl">Taak</span><kbd>T</kbd></button>
-      <button class="knop" data-opbergen="${id}" title="Opbergen in een map (V)">${ik("folder")}<span class="lbl">Opbergen</span><kbd>V</kbd></button>
-      <button class="knop" data-een="overslaan" data-id="${id}" title="Afzender voortaan overslaan">${ik("ban")}</button>
+      <button class="knop" data-maaktaak="${id}" title="Create task (T)">${ik("calendar")}<span class="lbl">Task</span><kbd>T</kbd></button>
+      <button class="knop" data-opbergen="${id}" title="File in a folder (V)">${ik("folder")}<span class="lbl">File</span><kbd>V</kbd></button>
+      <button class="knop" data-een="overslaan" data-id="${id}" title="Skip this sender from now on">${ik("ban")}</button>
       <span style="flex:1"></span>
-      <button class="knop" data-een="prullenbak" data-id="${id}" title="Naar prullenbak (#)">${ik("trash")}<kbd>#</kbd></button>
-      <button class="knop goed" data-een="archief" data-id="${id}" title="Archiveren (E)">${ik("archive")}<span class="lbl">Archiveren</span><kbd>E</kbd></button>
+      <button class="knop" data-een="prullenbak" data-id="${id}" title="Move to Bin (#)">${ik("trash")}<kbd>#</kbd></button>
+      <button class="knop goed" data-een="archief" data-id="${id}" title="Archive (E)">${ik("archive")}<span class="lbl">Archive</span><kbd>E</kbd></button>
     </div>`;
   p.classList.add("open"); p.setAttribute("aria-hidden","false");
   if (!drieKolommen()) document.getElementById("dek").classList.add("open");
@@ -1191,25 +1192,25 @@ function tekenLees(id){
 
 // ---------------- Afgehandeld: terugvinden wat je uit Te doen haalde ----------------
 const detailCache = {};     // id -> volledige mail met je antwoord en taken
-const AFG = {gedaan:["check","Gedaan"], goedgekeurd:["mail","In Mail gezet"], verzonden:["forward","Verstuurd"],
-             afgewezen:["x","Afgewezen"], taak:["task","Taak gemaakt"], gearchiveerd:["archive","Gearchiveerd"],
-             opgeborgen:["folder","Opgeborgen"], verwijderd:["trash","In prullenbak"], ter_info:["eye","Ter info"],
-             genegeerd:["ban","Overgeslagen"], wacht:["inbox","In Te doen"], fout:["alert","In Te doen"], handmatig:["inbox","In Te doen"]};
+const AFG = {gedaan:["check","Done"], goedgekeurd:["mail","Reply in Mail"], verzonden:["forward","Sent"],
+             afgewezen:["x","Dismissed"], taak:["task","Task created"], gearchiveerd:["archive","Archived"],
+             opgeborgen:["folder","Filed"], verwijderd:["trash","In Bin"], ter_info:["eye","FYI"],
+             genegeerd:["ban","Skipped"], wacht:["inbox","In To do"], fout:["alert","In To do"], handmatig:["inbox","In To do"]};
 const afgLabel = it => { const [i, l] = AFG[it.status] || ["mail", it.status];
   return [i, it.status === "opgeborgen" && it.opmerking ? `In ${String(it.opmerking).split("/").pop()}` : l]; };
 const IN_TE_DOEN = ["wacht", "fout", "handmatig"];
 
 function dagKop(iso){
   const d = new Date(iso), nu = new Date(), gister = new Date(nu); gister.setDate(nu.getDate() - 1);
-  if (d.toDateString() === nu.toDateString()) return "Vandaag";
-  if (d.toDateString() === gister.toDateString()) return "Gisteren";
-  const tekst = d.toLocaleDateString("nl-NL", {weekday:"long", day:"numeric", month:"long"});
+  if (d.toDateString() === nu.toDateString()) return "Today";
+  if (d.toDateString() === gister.toDateString()) return "Yesterday";
+  const tekst = d.toLocaleDateString("en-GB", {weekday:"long", day:"numeric", month:"long"});
   return tekst[0].toUpperCase() + tekst.slice(1);
 }
 
 function tekenAfgehandeld(){
   const lijst = filter(D.afgehandeld || []);
-  if (!lijst.length) return leeg("Nog niets afgehandeld", "Wat je uit Te doen haalt, vind je hier drie weken terug.");
+  if (!lijst.length) return leeg("Nothing handled yet", "What you clear from To do stays here for three weeks.");
   const groepen = new Map();
   lijst.forEach(it => { const k = dagKop(it.afgehandeld); if (!groepen.has(k)) groepen.set(k, []); groepen.get(k).push(it); });
   return [...groepen].map(([kop, items]) => `<div class="groep"><div class="groep-kop"><h2>${esc(kop)} · ${items.length}</h2></div>
@@ -1221,7 +1222,7 @@ function tekenAfgehandeld(){
           <div class="samenvatting">${esc(it.samenvatting || it.onderwerp)}</div>
         </div>
         <span class="chip afg-chip">${ik(i)}${esc(l)}</span>
-        <div class="snel"><button class="ikoon" data-terugtd="${it.id}" title="Terug naar Te doen">${ik("terug")}</button></div>
+        <div class="snel"><button class="ikoon" data-terugtd="${it.id}" title="Back to To do">${ik("terug")}</button></div>
       </div>`; }).join("")}</div></div>`).join("");
 }
 
@@ -1243,27 +1244,27 @@ function tekenDetail(id){
   if (p.dataset.detail === String(id) && p.dataset.sleutel === sleutel && p.classList.contains("open")) return;
   p.dataset.id = ""; p.dataset.lees = ""; p.dataset.sig = ""; p.dataset.detail = id; p.dataset.sleutel = sleutel;
   if (!basis){
-    p.innerHTML = `<div class="leegpaneel"><span class="meta">Mail laden…</span></div>`;
+    p.innerHTML = `<div class="leegpaneel"><span class="meta">Loading email…</span></div>`;
   } else {
     const a = afzender(basis.van), [i, l] = afgLabel(m || basis), status = (m || basis).status;
     const wanneer = (m || basis).afgehandeld && !IN_TE_DOEN.includes(status) ? ` · ${datum((m || basis).afgehandeld)}` : "";
     const antwoord = m && m.eigen_antwoord && m.eigen_antwoord.trim();
     const taken = m ? m.taken_db || [] : [];
     const knop = IN_TE_DOEN.includes(status)
-      ? `<button class="knop goed" data-openmail="${id}">${ik("inbox")}<span class="lbl">Open in Te doen</span></button>`
-      : `<button class="knop goed" data-terugtd="${id}" title="${["ter_info", "genegeerd"].includes(status) ? "Toch iets mee doen: in Te doen zetten" : "Weer in Te doen zetten om het te veranderen"}">${ik("terug")}<span class="lbl">${["ter_info", "genegeerd"].includes(status) ? "Zet in Te doen" : "Terug naar Te doen"}</span></button>`;
+      ? `<button class="knop goed" data-openmail="${id}">${ik("inbox")}<span class="lbl">Open in To do</span></button>`
+      : `<button class="knop goed" data-terugtd="${id}" title="${["ter_info", "genegeerd"].includes(status) ? "Act on it after all: move to To do" : "Move back to To do to change it"}">${ik("terug")}<span class="lbl">${["ter_info", "genegeerd"].includes(status) ? "Move to To do" : "Back to To do"}</span></button>`;
     p.innerHTML = `
       <div class="p-kop">${avatar(basis)}
         <div style="min-width:0"><h2>${esc(basis.onderwerp)}</h2><div class="van">${esc(a.naam)} · ${esc(a.adres)} · ${datum(basis.datum)}</div>
           <div class="chips"><span class="chip">${ik(i)}${esc(l)}${wanneer}</span><span class="chip">${esc(naamProject(basis.project || "overig"))}</span></div></div>
-        <button class="ikoon sluit-mail" id="sluit" title="Sluiten (Esc)">${ik("x")}</button></div>
+        <button class="ikoon sluit-mail" id="sluit" title="Close (Esc)">${ik("x")}</button></div>
       <div class="p-inhoud">
         ${basis.samenvatting && basis.samenvatting !== basis.onderwerp ? `<div class="melding info">${ik("sparkle")}<div>${esc(basis.samenvatting)}</div></div>` : ""}
-        ${status === "verzonden" ? `<div class="melding">${ik("forward")}<div>Je antwoord is verstuurd. Zet je de mail terug, dan blijft dat zo; je kunt dan een vervolg sturen.</div></div>` : ""}
-        ${antwoord ? `<div><div class="label">${ik("reply")}${status === "verzonden" ? "Wat je verstuurde" : "Je antwoord"}</div><div class="leesvlak">${esc(antwoord)}</div></div>` : ""}
-        ${taken.length ? `<div><div class="label">${ik("task")}Taken</div><div class="afg-taken">${taken.map(t => `<div class="${t.klaar ? "klaar" : ""}">${ik(t.klaar ? "check" : "calendar")}<span>${esc(t.omschrijving)}</span>
-          <span class="meta">${t.klaar ? "afgevinkt" : t.gepland ? kortDatum(t.gepland.slice(0, 10)) : "nog in te plannen"}</span></div>`).join("")}</div></div>` : ""}
-        <div><div class="label">${ik("mail")}De mail</div>${mailWeergave(id, m ? m.tekst : null)}</div>
+        ${status === "verzonden" ? `<div class="melding">${ik("forward")}<div>Your reply has been sent. Moving the email back does not change that; you can then send a follow-up.</div></div>` : ""}
+        ${antwoord ? `<div><div class="label">${ik("reply")}${status === "verzonden" ? "What you sent" : "Your reply"}</div><div class="leesvlak">${esc(antwoord)}</div></div>` : ""}
+        ${taken.length ? `<div><div class="label">${ik("task")}Tasks</div><div class="afg-taken">${taken.map(t => `<div class="${t.klaar ? "klaar" : ""}">${ik(t.klaar ? "check" : "calendar")}<span>${esc(t.omschrijving)}</span>
+          <span class="meta">${t.klaar ? "ticked off" : t.gepland ? kortDatum(t.gepland.slice(0, 10)) : "to schedule"}</span></div>`).join("")}</div></div>` : ""}
+        <div><div class="label">${ik("mail")}The email</div>${mailWeergave(id, m ? m.tekst : null)}</div>
       </div>
       <div class="p-voet"><span style="flex:1"></span>${knop}</div>`;
   }
@@ -1294,10 +1295,10 @@ function tekenZoek(){
   const box = document.getElementById("zoekres"), alle = zoekResultaten();
   if (!zoekVraag){ box.hidden = true; box.innerHTML = ""; return; }
   box.hidden = false;
-  if (!zoekRes){ box.innerHTML = `<div class="zr-leeg meta">Zoeken…</div>`; return; }
-  if (!alle.length){ box.innerHTML = `<div class="zr-leeg">Niets gevonden voor <b>${esc(zoekVraag)}</b>. Zoeken gaat over mail die de app verwerkte, niet over je hele mailbox.</div>`; return; }
+  if (!zoekRes){ box.innerHTML = `<div class="zr-leeg meta">Searching…</div>`; return; }
+  if (!alle.length){ box.innerHTML = `<div class="zr-leeg">Nothing found for <b>${esc(zoekVraag)}</b>. Search covers email the app has processed, not your whole mailbox.</div>`; return; }
   zoekKeuze = Math.min(zoekKeuze, alle.length - 1);
-  const kop = {mail:"Mail", wacht:"Wacht op antwoord", taak:"Taken"};
+  const kop = {mail:"Email", wacht:"Awaiting reply", taak:"Tasks"};
   let vorige = "", html = "";
   alle.forEach((r, n) => {
     if (r.soort !== vorige){ html += `<div class="zr-kop">${kop[r.soort]}</div>`; vorige = r.soort; }
@@ -1305,13 +1306,13 @@ function tekenZoek(){
     if (r.soort === "mail"){
       const a = afzender(x.van), [i, l] = afgLabel(x);
       html += `<button class="zr-rij${aan}" data-zr="${n}" role="option">${avatar(x, true)}<span class="zr-midden"><span class="zr-r1"><b>${esc(a.naam)}</b><span class="meta">${datum(x.datum)}</span></span>
-        <span class="zr-r2">${esc(x.onderwerp || "(geen onderwerp)")}</span></span><span class="chip">${ik(i)}${esc(l)}</span></button>`;
+        <span class="zr-r2">${esc(x.onderwerp || "(no subject)")}</span></span><span class="chip">${ik(i)}${esc(l)}</span></button>`;
     } else if (r.soort === "wacht"){
-      html += `<button class="zr-rij${aan}" data-zr="${n}" role="option"><span class="avatar klein wacht-av">${ik("wacht")}</span><span class="zr-midden"><span class="zr-r1"><b>${esc(x.onderwerp || "(geen onderwerp)")}</b><span class="meta">${datum(x.verstuurd)}</span></span>
-        <span class="zr-r2">Aan ${esc((x.aan || "").split(",")[0])}</span></span></button>`;
+      html += `<button class="zr-rij${aan}" data-zr="${n}" role="option"><span class="avatar klein wacht-av">${ik("wacht")}</span><span class="zr-midden"><span class="zr-r1"><b>${esc(x.onderwerp || "(no subject)")}</b><span class="meta">${datum(x.verstuurd)}</span></span>
+        <span class="zr-r2">To ${esc((x.aan || "").split(",")[0])}</span></span></button>`;
     } else {
       html += `<button class="zr-rij${aan}" data-zr="${n}" role="option"><span class="avatar klein" style="background:${kleur(x.project || "overig")}">${ik(x.klaar ? "check" : "task")}</span><span class="zr-midden"><span class="zr-r1"><b>${esc(x.omschrijving)}</b></span>
-        <span class="zr-r2">${x.klaar ? "Afgevinkt" : x.gepland ? "Gepland " + kortDatum(x.gepland.slice(0, 10)) : "Nog in te plannen"}</span></span></button>`;
+        <span class="zr-r2">${x.klaar ? "Ticked off" : x.gepland ? "Scheduled " + kortDatum(x.gepland.slice(0, 10)) : "To schedule"}</span></span></button>`;
     }
   });
   box.innerHTML = html;
@@ -1355,7 +1356,7 @@ function openTreffer(r){
   bewaar(); sluitPaneel(); teken();
   const el = document.querySelector(`[data-kaart="${x.id}"]`) || document.querySelector(`[data-klaar="${x.id}"]`)?.closest(".kaart");
   if (el){ el.scrollIntoView({block:"center", behavior:"smooth"}); el.classList.add("zoek-flits"); setTimeout(() => el.classList.remove("zoek-flits"), 1800); }
-  else if (x.klaar) toast("Deze taak is al afgevinkt");
+  else if (x.klaar) toast("This task is already ticked off");
 }
 document.getElementById("zoekveld").addEventListener("input", ev => {
   clearTimeout(zoekTimer); const q = ev.target.value;
@@ -1390,13 +1391,13 @@ function tekenLeegPaneel(){
   p.dataset.id = ""; p.dataset.sleutel = ""; p.dataset.lees = ""; p.dataset.sig = "";
   const klaar = staat.tab === "te_doen" && !teDoen().length;
   p.innerHTML = `<div class="leegpaneel">
-      ${klaar ? `<div class="rond">${ik("check")}</div><b style="color:var(--tekst)">Alles bijgewerkt</b>Er wacht niets op je.` :
-        staat.tab === "opruimen" ? `${ik("sparkle")}<b style="color:var(--tekst)">Opruimen</b><p>Klik op een mail om hem te lezen. Vink mails aan om er meerdere tegelijk af te handelen.</p>` :
-        staat.tab === "te_doen" && staat.td === "afgehandeld" ? `${ik("check")}<b style="color:var(--tekst)">Afgehandeld</b><p>Mail die je de afgelopen drie weken uit Te doen haalde. Klik er een aan om te zien wat je ermee deed, of zet hem terug.</p>` :
-        `${ik("mail")}<b style="color:var(--tekst)">Kies een mail</b>`}
-      <div class="sneltoetsen"><span><kbd>J</kbd> <kbd>K</kbd> volgende, vorige</span><span><kbd>⌘</kbd><kbd>↵</kbd> in Mail</span><span><kbd>⇧⌘↵</kbd> verzenden</span><span><kbd>D</kbd> gedaan</span>
-        <span><kbd>V</kbd> opbergen</span><span><kbd>E</kbd> archiveren</span><span><kbd>#</kbd> prullenbak</span><span><kbd>T</kbd> taak</span><span><kbd>X</kbd> afwijzen</span>
-        <span><kbd>1</kbd>–<kbd>${D.projecten.length}</kbd> project</span><span><kbd>?</kbd> alle sneltoetsen</span></div>
+      ${klaar ? `<div class="rond">${ik("check")}</div><b style="color:var(--tekst)">All caught up</b>Nothing is waiting for you.` :
+        staat.tab === "opruimen" ? `${ik("sparkle")}<b style="color:var(--tekst)">Tidy up</b><p>Click an email to read it. Tick emails to handle several at once.</p>` :
+        staat.tab === "te_doen" && staat.td === "afgehandeld" ? `${ik("check")}<b style="color:var(--tekst)">Handled</b><p>Email you cleared from To do in the past three weeks. Click one to see what you did with it, or move it back.</p>` :
+        `${ik("mail")}<b style="color:var(--tekst)">Choose an email</b>`}
+      <div class="sneltoetsen"><span><kbd>J</kbd> <kbd>K</kbd> next, previous</span><span><kbd>⌘</kbd><kbd>↵</kbd> reply in Mail</span><span><kbd>⇧⌘↵</kbd> send</span><span><kbd>D</kbd> done</span>
+        <span><kbd>V</kbd> file</span><span><kbd>E</kbd> archive</span><span><kbd>#</kbd> Bin</span><span><kbd>T</kbd> task</span><span><kbd>X</kbd> dismiss</span>
+        <span><kbd>1</kbd>–<kbd>${D.projecten.length}</kbd> project</span><span><kbd>?</kbd> all shortcuts</span></div>
       ${klaar ? `<div class="leeg-merk"><span class="woordmerk">attach<span class="woordmerk-e">é</span></span><span class="tagline">Minding the details.</span></div>` : ""}</div>`;
   p.classList.add("open"); p.setAttribute("aria-hidden","false");
 }
@@ -1404,17 +1405,17 @@ function tekenLeegPaneel(){
 // na Gedaan: de mail meteen een plek geven, of laten staan
 async function gedaanMelding(id){
   const knoppen = (voorstel) => [
-    {label: "Archiveren", doe: () => verplaatsMetUndo([id], "archief")},
-    ...(voorstel ? [{label: `Naar ${voorstel.split("/").pop()}`, doe: () => verplaatsMetUndo([id], "map:" + voorstel)}] : []),
-    {label: "Map…", doe: () => openKiezer(id, null, [id])},
-    {label: "Ongedaan", doe: async () => { const r = await stil("niet-gedaan", {id}); toast(r.melding, !r.ok); staat.open = id; laad(); }}];
+    {label: "Archive", doe: () => verplaatsMetUndo([id], "archief")},
+    ...(voorstel ? [{label: `Move to ${voorstel.split("/").pop()}`, doe: () => verplaatsMetUndo([id], "map:" + voorstel)}] : []),
+    {label: "Folder…", doe: () => openKiezer(id, null, [id])},
+    {label: "Undo", doe: async () => { const r = await stil("niet-gedaan", {id}); toast(r.melding, !r.ok); staat.open = id; laad(); }}];
   // eerst meteen de melding; het mapvoorstel volgt als het er snel is
-  toast("Gedaan. Ook verplaatsen?", false, knoppen(null));
+  toast("Done. Move it as well?", false, knoppen(null));
   const melding = document.getElementById("toasts").lastElementChild;
   const j = await Promise.race([stil("mappen", {id}), new Promise(r => setTimeout(() => r(null), 2500))]);
   if (j && j.ok && j.voorstellen.length && melding && melding.isConnected){
     melding.remove();
-    toast("Gedaan. Ook verplaatsen?", false, knoppen(j.voorstellen[0].map));
+    toast("Done. Move it as well?", false, knoppen(j.voorstellen[0].map));
   }
 }
 
@@ -1435,42 +1436,42 @@ const leeg = (titel, tekst) => `<div class="lijst"><div class="leeg"><div class=
 // Vandaag: overzicht voor het begin van de dag, bovenaan Te doen; verbergen tot morgen kan
 let deadlineVoorstel = null;   // null | "laden" | {voorstellen}
 const vandaagDicht = () => { try { return localStorage.getItem("mailagent-vandaag-dicht") === isoDag(new Date()); } catch(e){ return false; } };
-const dagKort = iso => new Date(iso.slice(0, 10) + "T12:00").toLocaleDateString("nl-NL", {weekday:"short", day:"numeric", month:"short"});
+const dagKort = iso => new Date(iso.slice(0, 10) + "T12:00").toLocaleDateString("en-GB", {weekday:"short", day:"numeric", month:"short"});
 function tekenVandaag(){
   const o = D.ochtend;
   if (!o || staat.project !== "alles") return "";
-  if (vandaagDicht()) return `<div class="vandaag-terug"><button class="knop klein" data-vandaagopen="1">${ik("calendar")}Overzicht van vandaag</button></div>`;
+  if (vandaagDicht()) return `<div class="vandaag-terug"><button class="knop klein" data-vandaagopen="1">${ik("calendar")}Today’s overview</button></div>`;
   const vandaag = isoDag(new Date());
   if (dagen[vandaag] === undefined && D.agenda_aan) laadDag(vandaag);
   const afspr = Array.isArray(dagen[vandaag]) ? dagen[vandaag].filter(a => !a.heledag && !a.vrij).sort((a, b) => a.start.localeCompare(b.start)) : [];
   const regels = [];
   const dag = [];
-  if (afspr.length) dag.push(`${afspr.length} ${afspr.length === 1 ? "afspraak" : "afspraken"}, eerste om ${afspr[0].start.slice(11, 16)} (${esc(afspr[0].titel)})`);
-  if (o.ingepland.length) dag.push(`${o.ingepland.length === 1 ? "1 taak" : o.ingepland.length + " taken"} ingepland: ${o.ingepland.slice(0, 3).map(t => `${t.gepland.slice(11, 16)} ${esc(t.omschrijving)}`).join(", ")}`);
+  if (afspr.length) dag.push(`${afspr.length} ${afspr.length === 1 ? "event" : "events"}, first at ${afspr[0].start.slice(11, 16)} (${esc(afspr[0].titel)})`);
+  if (o.ingepland.length) dag.push(`${o.ingepland.length === 1 ? "1 task" : o.ingepland.length + " tasks"} scheduled: ${o.ingepland.slice(0, 3).map(t => `${t.gepland.slice(11, 16)} ${esc(t.omschrijving)}`).join(", ")}`);
   if (dag.length) regels.push(`<div class="vd-r">${ik("calendar")}<span>${dag.join(". ")}.</span><button class="knop klein" data-tab="planning">Planning</button></div>`);
   if (o.deadlines.length){
     const vs = deadlineVoorstel && deadlineVoorstel.voorstellen || {};
-    regels.push(`<div class="vd-r">${ik("clock")}<span><b>Deadlines tot ${dagKort(new Date(Date.now() + 7 * 864e5).toISOString())}</b></span>
-      ${o.zonder_moment.length && !deadlineVoorstel ? `<button class="knop klein goed" data-deadlinevoorstel="1">${o.zonder_moment.length === 1 ? "1 taak" : o.zonder_moment.length + " taken"} inplannen vóór de deadline</button>` : ""}
-      ${deadlineVoorstel === "laden" ? `<span class="meta">Vrije momenten zoeken…</span>` : ""}
-      ${Object.keys(vs).length > 1 ? `<button class="knop klein goed" data-deadlinealles="1">Alles volgens voorstel</button>` : ""}</div>`
+    regels.push(`<div class="vd-r">${ik("clock")}<span><b>Deadlines up to ${dagKort(new Date(Date.now() + 7 * 864e5).toISOString())}</b></span>
+      ${o.zonder_moment.length && !deadlineVoorstel ? `<button class="knop klein goed" data-deadlinevoorstel="1">Schedule ${o.zonder_moment.length === 1 ? "1 task" : o.zonder_moment.length + " tasks"} before the deadline</button>` : ""}
+      ${deadlineVoorstel === "laden" ? `<span class="meta">Finding free times…</span>` : ""}
+      ${Object.keys(vs).length > 1 ? `<button class="knop klein goed" data-deadlinealles="1">Schedule all as suggested</button>` : ""}</div>`
       + o.deadlines.map(d => `<div class="vd-sub"><span class="vd-dag${d.te_laat ? " te-laat" : ""}">${esc(dagKort(d.deadline))}</span>
         <div class="vd-mid"><div class="vd-titel">${esc(d.titel)}</div><div class="vd-acties">
-        ${d.te_laat ? `<span class="chip let">te laat</span>` : ""}
-        ${d.soort === "taak" && d.ingepland ? `<span class="chip">${ik("check")}ingepland</span>` : ""}
-        ${d.soort === "taak" && vs[d.id] ? `<button class="knop klein" data-afplan="${d.id}" data-start="${vs[d.id]}" title="Op dit vrije moment inplannen, met herinnering en slotje">${ik("calendar")}${esc(kortMoment(vs[d.id]))}</button>` : ""}
-        ${d.soort === "mail" ? `<button class="knop klein" data-openmail="${d.id}">Bekijk</button>` : ""}
-        ${d.in_agenda ? `<span class="chip">${ik("calendar")}in agenda</span>` : D.agenda_aan ? `<button class="knop klein" data-deadlineagenda="${d.id}" data-soort="${d.soort}" title="Hele-dag-afspraak met slotje, herinnering de dag ervoor om 09:00">In agenda</button>` : ""}</div></div></div>`).join(""));
+        ${d.te_laat ? `<span class="chip let">overdue</span>` : ""}
+        ${d.soort === "taak" && d.ingepland ? `<span class="chip">${ik("check")}scheduled</span>` : ""}
+        ${d.soort === "taak" && vs[d.id] ? `<button class="knop klein" data-afplan="${d.id}" data-start="${vs[d.id]}" title="Schedule at this free time, with a reminder, marked private">${ik("calendar")}${esc(kortMoment(vs[d.id]))}</button>` : ""}
+        ${d.soort === "mail" ? `<button class="knop klein" data-openmail="${d.id}">View</button>` : ""}
+        ${d.in_agenda ? `<span class="chip">${ik("calendar")}in calendar</span>` : D.agenda_aan ? `<button class="knop klein" data-deadlineagenda="${d.id}" data-soort="${d.soort}" title="All-day event, marked private, with a reminder at 09:00 the day before">Add to calendar</button>` : ""}</div></div></div>`).join(""));
   }
-  if (o.belangrijk) regels.push(`<div class="vd-r">${ik("ster")}<span>${o.belangrijk === 1 ? "1 mail" : o.belangrijk + " mails"} van een belangrijke afzender in Te doen.</span></div>`);
-  if (o.blijft_liggen_n) regels.push(`<div class="vd-r">${ik("alert")}<span>${o.blijft_liggen_n === 1 ? "1 mail ligt" : o.blijft_liggen_n + " mails liggen"} al twee werkdagen of langer: ${o.blijft_liggen.slice(0, 3).map(b => `${esc(afzender(b.van).naam)} (${b.dagen} d)`).join(", ")}.</span>
-      <button class="knop klein" data-openmail="${o.blijft_liggen[0].id}">Oudste openen</button></div>`);
-  if (o.wacht_op) regels.push(`<div class="vd-r">${ik("wacht")}<span>${o.wacht_op === 1 ? "Op 1 mail" : "Op " + o.wacht_op + " mails"} kwam na drie werkdagen geen antwoord. Ze staan hieronder.</span></div>`);
-  if (o.lijkt_gedaan) regels.push(`<div class="vd-r">${ik("check")}<span>${o.lijkt_gedaan === 1 ? "1 taak of mail lijkt" : o.lijkt_gedaan + " taken en mails lijken"} al gedaan. Vink af wat klopt.</span><button class="knop klein" data-tab="planning">Bekijken</button></div>`);
-  const titel = new Date().toLocaleDateString("nl-NL", {weekday:"long", day:"numeric", month:"long"});
-  return `<div class="vandaag"><div class="vd-kop"><b>Vandaag</b><span class="meta">${esc(titel)}</span>
-      <button class="ikoon" data-vandaagdicht="1" title="Verbergen tot morgen">${ik("x")}</button></div>
-    ${regels.length ? regels.join("") : `<div class="vd-r">${ik("check")}<span>Niets dringends: geen deadlines deze week en niets dat blijft liggen.</span></div>`}</div>`;
+  if (o.belangrijk) regels.push(`<div class="vd-r">${ik("ster")}<span>${o.belangrijk === 1 ? "1 email" : o.belangrijk + " emails"} from an important sender in To do.</span></div>`);
+  if (o.blijft_liggen_n) regels.push(`<div class="vd-r">${ik("alert")}<span>${o.blijft_liggen_n === 1 ? "1 email has" : o.blijft_liggen_n + " emails have"} been waiting for two working days or more: ${o.blijft_liggen.slice(0, 3).map(b => `${esc(afzender(b.van).naam)} (${b.dagen} d)`).join(", ")}.</span>
+      <button class="knop klein" data-openmail="${o.blijft_liggen[0].id}">Open oldest</button></div>`);
+  if (o.wacht_op) regels.push(`<div class="vd-r">${ik("wacht")}<span>${o.wacht_op === 1 ? "1 email has had no reply after three working days. It is listed below." : o.wacht_op + " emails have had no reply after three working days. They are listed below."}</span></div>`);
+  if (o.lijkt_gedaan) regels.push(`<div class="vd-r">${ik("check")}<span>${o.lijkt_gedaan === 1 ? "1 task or email looks" : o.lijkt_gedaan + " tasks and emails look"} done already. Tick off what is correct.</span><button class="knop klein" data-tab="planning">View</button></div>`);
+  const titel = new Date().toLocaleDateString("en-GB", {weekday:"long", day:"numeric", month:"long"});
+  return `<div class="vandaag"><div class="vd-kop"><b>Today</b><span class="meta">${esc(titel)}</span>
+      <button class="ikoon" data-vandaagdicht="1" title="Hide until tomorrow">${ik("x")}</button></div>
+    ${regels.length ? regels.join("") : `<div class="vd-r">${ik("check")}<span>Nothing urgent: no deadlines this week and nothing waiting for a while.</span></div>`}</div>`;
 }
 
 // Een open taak inplannen; nooit twee keer
@@ -1502,7 +1503,7 @@ async function verzetAfspraak(a, start, minuten, stil_){
   teken();
   const j = await stil("afspraak-verplaats", data);
   if (!j.ok){ a.start = oudStart; a.eind = lokaalIso(Date.parse(oudStart) + oudMin * 60000); if (t) t.gepland = oudStart; toast(j.melding, true); return teken(); }
-  if (!stil_) toast(j.melding, false, {label: "Ongedaan maken", doe: () => verzetAfspraak(a, Date.parse(oudStart), oudMin, true)});
+  if (!stil_) toast(j.melding, false, {label: "Undo", doe: () => verzetAfspraak(a, Date.parse(oudStart), oudMin, true)});
   legeDagen(); laad();
 }
 document.addEventListener("pointerdown", ev => {
@@ -1556,66 +1557,68 @@ function deelnameLink(a){
 }
 function sluitPop(){ document.getElementById("afs-pop")?.remove(); }
 // soort van de afspraak: wat de app denkt en waarom, en zelf kiezen (geldt ook voor de volgende keren)
-const SOORT_NAAM = {les: "Les", afdeling: "Afdeling of team", overleg: "Met anderen", eigen: "Eigen afspraak"};
+const SOORT_NAAM = {les: "Class", afdeling: "Department or team", overleg: "Meeting with others", eigen: "Personal event"};
 const SOORT_IK = {les: "les", afdeling: "afdeling", overleg: "mensen", eigen: "calendar"};
 function soortHTML(a){
   const huidig = a.soort || "eigen";
   const waarom = a.soort_waarom ? ` <span class="meta">· ${esc(a.soort_waarom)}${a.soort_door === "claude" ? " (Claude)" : ""}</span>` : "";
-  return `<div class="pop-r">${ik(SOORT_IK[huidig] || "calendar")}<span><b>${SOORT_NAAM[huidig] || "Afspraak"}</b>${waarom}</span></div>
-    ${huidig === "overleg" || huidig === "afdeling" ? `<div class="pop-r meta-r">Met anderen: verzetten doe je in Outlook</div>` : ""}
+  return `<div class="pop-r">${ik(SOORT_IK[huidig] || "calendar")}<span><b>${SOORT_NAAM[huidig] || "Event"}</b>${waarom}</span></div>
+    ${huidig === "overleg" || huidig === "afdeling" ? `<div class="pop-r meta-r">With others: reschedule it in Outlook</div>` : ""}
     <div class="pop-soort">${Object.keys(SOORT_NAAM).map(k => `<button class="knop klein${k === huidig ? " aan" : ""}" data-zetsoort="${k}" data-sleutel="${esc(a.sleutel || "")}"
-        data-titel="${esc(a.titel)}" data-herhaalt="${a.herhaalt ? 1 : 0}" title="${k === huidig ? "Huidige soort" : "Dit is " + SOORT_NAAM[k].toLowerCase()}">${ik(SOORT_IK[k])}${SOORT_NAAM[k]}</button>`).join("")}
-      ${a.soort_door === "jij" ? `<button class="knop klein" data-zetsoort="auto" data-sleutel="${esc(a.sleutel || "")}">Automatisch</button>` : ""}</div>`;
+        data-titel="${esc(a.titel)}" data-herhaalt="${a.herhaalt ? 1 : 0}" title="${k === huidig ? "Current type" : "Mark as " + SOORT_NAAM[k].toLowerCase()}">${ik(SOORT_IK[k])}${SOORT_NAAM[k]}</button>`).join("")}
+      ${a.soort_door === "jij" ? `<button class="knop klein" data-zetsoort="auto" data-sleutel="${esc(a.sleutel || "")}">Automatic</button>` : ""}</div>`;
 }
 
 // zelf leren wat een les is: titel, organisator of agenda; ook terugdraaien
 function lesKeuze(a){
   const org = a.organisator && (a.organisator.adres || a.organisator.naam);
   const r = a.les_regel;
-  if (r) return `<div class="pop-les"><span class="meta">${r.les ? "Les" : "Geen les"} door jouw regel (${esc(r.soort)}: ${esc(r.waarde)})</span>
-      <button class="knop klein" data-lesweg="${r.id}">Regel weghalen</button></div>`;
-  if (a.soort === "les") return `<details class="pop-les"><summary>Geen les?</summary>
-      <button class="knop klein" data-lesregel="titel" data-waarde="${esc(a.titel)}" data-les="0">Afspraken met deze titel zijn geen les</button></details>`;
-  return `<details class="pop-les"><summary>${ik("les")}Al deze lessen in één keer herkennen</summary>
+  if (r) return `<div class="pop-les"><span class="meta">${r.les ? "Class" : "Not a class"} because of your rule (${esc({titel: "title", organisator: "organiser", kalender: "calendar"}[r.soort] || r.soort)}: ${esc(r.waarde)})</span>
+      <button class="knop klein" data-lesweg="${r.id}">Remove rule</button></div>`;
+  if (a.soort === "les") return `<details class="pop-les"><summary>Not a class?</summary>
+      <button class="knop klein" data-lesregel="titel" data-waarde="${esc(a.titel)}" data-les="0">Events with this title are not classes</button></details>`;
+  return `<details class="pop-les"><summary>${ik("les")}Recognise all these classes at once</summary>
       <div class="pop-les-k">
-        <button class="knop klein" data-lesregel="titel" data-waarde="${esc(a.titel)}" data-les="1">Alles met deze titel</button>
-        ${org ? `<button class="knop klein" data-lesregel="organisator" data-waarde="${esc(org)}" data-label="${esc(a.organisator.naam || org)}" data-les="1">Alles van ${esc(a.organisator.naam || org)}</button>` : ""}
-        ${a.kalender && a.kalender !== D.agenda_naam ? `<button class="knop klein" data-lesregel="kalender" data-waarde="${esc(a.kalender)}" data-les="1">Alles in de agenda ‘${esc(a.kalender)}’</button>` : ""}
+        <button class="knop klein" data-lesregel="titel" data-waarde="${esc(a.titel)}" data-les="1">Everything with this title</button>
+        ${org ? `<button class="knop klein" data-lesregel="organisator" data-waarde="${esc(org)}" data-label="${esc(a.organisator.naam || org)}" data-les="1">Everything from ${esc(a.organisator.naam || org)}</button>` : ""}
+        ${a.kalender && a.kalender !== D.agenda_naam ? `<button class="knop klein" data-lesregel="kalender" data-waarde="${esc(a.kalender)}" data-les="1">Everything in the calendar ‘${esc(a.kalender)}’</button>` : ""}
       </div></details>`;
 }
+// deelnamestatus: de server stuurde eerst Nederlandse waarden; beide worden getoond als Engels
+const DEELNAME = {ja: "accepted", nee: "declined", misschien: "maybe", "nog geen antwoord": "no response yet", gedelegeerd: "delegated", klaar: "completed", bezig: "in process"};
 function openAfspraak(i, anker){
   const lijst = dagen[staat.planDag], a = Array.isArray(lijst) ? lijst[i] : null;
   if (!a) return;
   sluitPop();
   const t = appTaakBij(a), link = deelnameLink(a), dl = a.deelnemers || [];
-  const tel = st => dl.filter(d => d.status === st).length;
-  const dagTekst = new Date(a.start).toLocaleDateString("nl-NL", {weekday: "long", day: "numeric", month: "long"});
-  const tijd = a.heledag ? "hele dag" : `${tijdVan(Date.parse(a.start))}–${tijdVan(Date.parse(a.eind))}`;
+  const tel = st => dl.filter(d => (DEELNAME[d.status] || d.status) === st).length;
+  const dagTekst = new Date(a.start).toLocaleDateString("en-GB", {weekday: "long", day: "numeric", month: "long"});
+  const tijd = a.heledag ? "all day" : `${tijdVan(Date.parse(a.start))}–${tijdVan(Date.parse(a.eind))}`;
   const el = document.createElement("div");
-  el.id = "afs-pop"; el.className = "afs-pop"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Details van de afspraak");
+  el.id = "afs-pop"; el.className = "afs-pop"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Event details");
   el.innerHTML = `
-    <div class="pop-kop"><b>${esc(t ? t.omschrijving : a.titel)}</b><button class="ikoon" data-popdicht="1" title="Sluiten (Esc)">${ik("x")}</button></div>
-    <div class="pop-r">${ik("clock")}<span>${esc(dagTekst)} · ${tijd}${a.vrij ? " · telt als vrij" : ""}${isFocus(a) ? " · beschermd" : ""}</span></div>
-    ${a.voorlopig ? `<div class="pop-r">${ik("clock")}<span><b>Voorlopig vastgehouden</b> voor een afspraak die je voorstelde</span></div>
-      <div class="pop-acties"><button class="knop klein goed" data-bevestig="${esc(a.id)}">${ik("check")}Bevestigen</button>
-        <button class="knop klein" data-vrijgeven="${esc(a.id)}">Vrijgeven</button></div>
-      <div class="meta-r">Bevestigen maakt dit de echte afspraak en geeft de andere voorgestelde momenten vrij.</div>`
+    <div class="pop-kop"><b>${esc(t ? t.omschrijving : a.titel)}</b><button class="ikoon" data-popdicht="1" title="Close (Esc)">${ik("x")}</button></div>
+    <div class="pop-r">${ik("clock")}<span>${esc(dagTekst)} · ${tijd}${a.vrij ? " · counts as free" : ""}${isFocus(a) ? " · protected" : ""}</span></div>
+    ${a.voorlopig ? `<div class="pop-r">${ik("clock")}<span><b>Held as tentative</b> for a meeting you proposed</span></div>
+      <div class="pop-acties"><button class="knop klein goed" data-bevestig="${esc(a.id)}">${ik("check")}Confirm</button>
+        <button class="knop klein" data-vrijgeven="${esc(a.id)}">Release</button></div>
+      <div class="meta-r">Confirming makes this the actual meeting and releases the other proposed times.</div>`
       : !t && !a.vrij && !a.heledag ? soortHTML(a) : ""}
     ${a.locatie ? `<div class="pop-r">${ik("pin")}<span>${linkjes(a.locatie)}</span></div>` : ""}
     ${a.kalender ? `<div class="pop-r">${ik("calendar")}<span>${esc(a.kalender)}</span></div>` : ""}
-    ${a.organisator && (a.organisator.naam || a.organisator.adres) ? `<div class="pop-r">${ik("mail")}<span>Georganiseerd door ${esc(a.organisator.naam || a.organisator.adres)}</span></div>` : ""}
-    ${dl.length ? `<details class="pop-deel"><summary>${ik("mensen")}${dl.length} ${dl.length === 1 ? "deelnemer" : "deelnemers"}${tel("ja") ? ` · ${tel("ja")} ja` : ""}${tel("misschien") ? ` · ${tel("misschien")} misschien` : ""}${tel("nee") ? ` · ${tel("nee")} nee` : ""}</summary>
-        ${dl.map(d => `<div class="pop-d"><span>${esc(d.naam || d.adres)}${d.ik ? " (jij)" : ""}</span><span class="meta">${esc(d.status)}</span></div>`).join("")}</details>` : ""}
-    ${link ? `<a class="knop goed pop-deelnemen" href="${esc(link)}" target="_blank" rel="noopener noreferrer">${ik("forward")}Deelnemen aan de vergadering</a>` : ""}
+    ${a.organisator && (a.organisator.naam || a.organisator.adres) ? `<div class="pop-r">${ik("mail")}<span>Organised by ${esc(a.organisator.naam || a.organisator.adres)}</span></div>` : ""}
+    ${dl.length ? `<details class="pop-deel"><summary>${ik("mensen")}${dl.length} ${dl.length === 1 ? "attendee" : "attendees"}${tel("accepted") ? ` · ${tel("accepted")} accepted` : ""}${tel("maybe") ? ` · ${tel("maybe")} maybe` : ""}${tel("declined") ? ` · ${tel("declined")} declined` : ""}</summary>
+        ${dl.map(d => `<div class="pop-d"><span>${esc(d.naam || d.adres)}${d.ik ? " (you)" : ""}</span><span class="meta">${esc(DEELNAME[d.status] || d.status)}</span></div>`).join("")}</details>` : ""}
+    ${link ? `<a class="knop goed pop-deelnemen" href="${esc(link)}" target="_blank" rel="noopener noreferrer">${ik("forward")}Join the meeting</a>` : ""}
     ${t ? `<div class="pop-taak">
         ${t.stappen && t.stappen.length ? `<ul class="stappen-klein">${t.stappen.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
         ${lijktGedaan(t)}${taakMail(t)}
-        <div class="pop-acties"><button class="knop klein goed" data-klaar="${t.id}">${ik("check")}Afvinken</button>
-          <button class="knop klein" data-verzet="${t.id}" data-start="${esc(a.start)}" title="Uit je agenda halen en meteen op een ander moment zetten">${ik("clock")}Verzetten</button>
-          <button class="knop klein" data-uitagenda="${t.id}" title="Uit je agenda; de taak blijft staan bij Nog in te plannen">${ik("x")}Uit agenda</button></div></div>`
-      : a.notities ? `<details class="pop-notities"${link ? "" : " open"}><summary>Notities</summary><div>${linkjes(a.notities)}</div></details>` : ""}
+        <div class="pop-acties"><button class="knop klein goed" data-klaar="${t.id}">${ik("check")}Tick off</button>
+          <button class="knop klein" data-verzet="${t.id}" data-start="${esc(a.start)}" title="Remove from your calendar and move it straight to another time">${ik("clock")}Reschedule</button>
+          <button class="knop klein" data-uitagenda="${t.id}" title="Remove from your calendar; the task stays under To schedule">${ik("x")}Remove from calendar</button></div></div>`
+      : a.notities ? `<details class="pop-notities"${link ? "" : " open"}><summary>Notes</summary><div>${linkjes(a.notities)}</div></details>` : ""}
     ${!t && !a.vrij ? lesKeuze(a) : ""}
-    <div class="pop-voet"><button class="knop klein" data-agendaopen="${esc(a.start)}">${ik("calendar")}Open in Agenda</button></div>`;
+    <div class="pop-voet"><button class="knop klein" data-agendaopen="${esc(a.start)}">${ik("calendar")}Open in Calendar</button></div>`;
   document.body.append(el);
   // naast de afspraak, binnen het venster; op een smal scherm onderin (CSS)
   if (innerWidth > 700){
@@ -1669,7 +1672,7 @@ document.addEventListener("click", async ev => {
     if (!j.ok) return toast(j.melding, true);
     if (t){ t.gepland = null; plaatsing = {id, minuten: t.minuten || 30, start: Date.parse(d.start)}; }
     legeDagen();
-    toast("Sleep het blok naar een nieuw moment en klik op Inplannen");
+    toast("Drag the block to a new time and click Schedule");
     teken(); return laad();
   }
   if (d.klaar || d.mailopen || d.beantwoord) setTimeout(sluitPop, 0);   // die knoppen werken zoals op de kaart
@@ -1680,20 +1683,20 @@ document.addEventListener("keydown", ev => {
 }, true);
 
 // Wacht op antwoord: verstuurde mail met een vraag, zonder antwoord na een paar werkdagen
-const kortDatum = iso => new Date(iso.length > 10 ? iso : iso + "T12:00").toLocaleDateString("nl-NL", {day:"numeric", month:"short"});
+const kortDatum = iso => new Date(iso.length > 10 ? iso : iso + "T12:00").toLocaleDateString("en-GB", {day:"numeric", month:"short"});
 function tekenWachtOp(){
   const vandaag = isoDag(new Date()), lijst = D.wacht_op || [];
   const nu = lijst.filter(w => w.herinner_op <= vandaag), loopt = lijst.filter(w => w.herinner_op > vandaag);
   if (!lijst.length) return "";
-  const naam = w => esc((w.aan || "").split(",")[0].trim() || "de ontvanger");
+  const naam = w => esc((w.aan || "").split(",")[0].trim() || "the recipient");
   const rij = (w, open) => `<div class="rij wachtrij${staat.wacht === w.id ? " gekozen" : ""}" data-wacht="${w.id}" tabindex="0">
       <span class="ikoon" style="color:var(--let)">${ik("wacht")}</span>
-      <div class="midden"><div class="regel1"><span class="van">${esc(w.onderwerp || "(geen onderwerp)")}</span><span class="datum">${kortDatum(w.verstuurd)}</span></div>
-        <div class="samenvatting">Aan ${naam(w)}${w.wat ? ` · wacht op: ${esc(w.wat)}` : ""}${open ? "" : ` · komt terug op ${kortDatum(w.herinner_op)}`}</div>
-        ${w.sindsdien && w.sindsdien.length ? `<div class="chips"><span class="chip">${ik("mail")}sindsdien mail van ${naam(w)}</span></div>` : ""}
+      <div class="midden"><div class="regel1"><span class="van">${esc(w.onderwerp || "(no subject)")}</span><span class="datum">${kortDatum(w.verstuurd)}</span></div>
+        <div class="samenvatting">To ${naam(w)}${w.wat ? ` · waiting for: ${esc(w.wat)}` : ""}${open ? "" : ` · back on ${kortDatum(w.herinner_op)}`}</div>
+        ${w.sindsdien && w.sindsdien.length ? `<div class="chips"><span class="chip">${ik("mail")}email from ${naam(w)} since then</span></div>` : ""}
       </div></div>`;
-  return (nu.length ? `<div class="groep-kop"><h2>${ik("wacht")}Wacht op antwoord · ${nu.length}</h2></div><div class="lijst" style="margin-bottom:14px">${nu.map(w => rij(w, true)).join("")}</div>` : "")
-    + (loopt.length ? `<details class="regels wachtloopt"><summary>Je wacht op ${loopt.length} antwoord${loopt.length === 1 ? "" : "en"}</summary><div class="lijst">${loopt.map(w => rij(w, false)).join("")}</div></details>` : "");
+  return (nu.length ? `<div class="groep-kop"><h2>${ik("wacht")}Awaiting reply · ${nu.length}</h2></div><div class="lijst" style="margin-bottom:14px">${nu.map(w => rij(w, true)).join("")}</div>` : "")
+    + (loopt.length ? `<details class="regels wachtloopt"><summary>You are waiting for ${loopt.length} ${loopt.length === 1 ? "reply" : "replies"}</summary><div class="lijst">${loopt.map(w => rij(w, false)).join("")}</div></details>` : "");
 }
 
 // Paneel bij 'wacht op antwoord': wat je vroeg, wat er sindsdien kwam, en een herinnering
@@ -1713,34 +1716,34 @@ function tekenWachtPaneel(w){
   const concept = oud && Number(oud.dataset.wachtid) === w.id && !wachtSchrijft.has(-w.id) ? oud.value : (w.concept || "");
   wachtSchrijft.delete(-w.id);
   p.dataset.sig = sig; p.dataset.id = ""; p.dataset.lees = ""; p.dataset.sleutel = "";
-  const naam = esc((w.aan || "").split(",")[0].trim() || "de ontvanger");
+  const naam = esc((w.aan || "").split(",")[0].trim() || "the recipient");
   const nu = w.herinner_op <= isoDag(new Date()), n = werkdagenSinds(w.verstuurd);
   const bezig = wachtSchrijft.has(w.id);
   p.innerHTML = `
     <div class="p-kop"><span class="avatar wacht-av">${ik("wacht")}</span>
-      <div style="min-width:0"><h2>${esc(w.onderwerp || "(geen onderwerp)")}</h2>
-        <div class="van">Aan ${esc((w.aan || "").replace(/[,\s]+$/, "").replace(/,\s*,/g, ","))} · verstuurd ${datum(w.verstuurd)}</div>
-        <div class="chips">${nu ? `<span class="chip let">${ik("wacht")}${n === 1 ? "1 werkdag" : n + " werkdagen"} geen antwoord</span>`
-          : `<span class="chip">${ik("clock")}komt terug op ${kortDatum(w.herinner_op)}</span>`}</div></div>
-      <button class="ikoon sluit-mail" id="sluit" title="Sluiten (Esc)">${ik("x")}</button></div>
+      <div style="min-width:0"><h2>${esc(w.onderwerp || "(no subject)")}</h2>
+        <div class="van">To ${esc((w.aan || "").replace(/[,\s]+$/, "").replace(/,\s*,/g, ","))} · sent ${datum(w.verstuurd)}</div>
+        <div class="chips">${nu ? `<span class="chip let">${ik("wacht")}No reply for ${n === 1 ? "1 working day" : n + " working days"}</span>`
+          : `<span class="chip">${ik("clock")}back on ${kortDatum(w.herinner_op)}</span>`}</div></div>
+      <button class="ikoon sluit-mail" id="sluit" title="Close (Esc)">${ik("x")}</button></div>
     <div class="p-inhoud">
-      ${w.wat ? `<div class="melding info">${ik("sparkle")}<div><b>Je wacht op:</b> ${esc(w.wat)}</div></div>` : ""}
-      ${w.sindsdien && w.sindsdien.length ? `<div class="melding">${ik("mail")}<div><b>Sindsdien kwam er mail van ${naam}</b>. Misschien staat het antwoord in een ander gesprek.
-        ${w.sindsdien.map(m => `<div class="sinds"><span>${esc(m.onderwerp || "(geen onderwerp)")} · ${datum(m.datum)}</span>
-          ${m.item && ["wacht", "fout", "handmatig"].includes(m.status) ? `<button class="knop klein" data-openmail="${m.item}">Bekijk</button>` : ""}</div>`).join("")}
-        <div style="margin-top:8px"><button class="knop klein" data-wachtklaar="${w.id}">${ik("check")}Daar zat het antwoord in</button></div></div></div>` : ""}
-      <div><div class="label">${ik("forward")}Wat je schreef</div>
-        <div class="leesvlak">${w.tekst ? esc(w.tekst) : `<span class="meta">De tekst van deze mail is nog niet bewaard. Dat gebeurt bij de volgende ronde; tot dan open je hem in Mail.</span>`}</div></div>
-      <div><div class="label">${ik("reply")}Herinnering</div>
-        <textarea id="w-concept" data-wachtid="${w.id}" placeholder="Laat Claude een korte herinnering schrijven, of typ zelf.">${esc(concept)}</textarea>
-        <div class="c-schrijf"><button class="knop" id="w-claude" data-wachtid="${w.id}"${bezig || !w.tekst ? " disabled" : ""}>${ik("sparkle")}${bezig ? "Claude schrijft…" : concept.trim() ? "Opnieuw laten schrijven" : "Herinnering laten schrijven"}</button></div></div>
+      ${w.wat ? `<div class="melding info">${ik("sparkle")}<div><b>You are waiting for:</b> ${esc(w.wat)}</div></div>` : ""}
+      ${w.sindsdien && w.sindsdien.length ? `<div class="melding">${ik("mail")}<div><b>Since then, ${naam} has sent email</b>. The answer may be in another conversation.
+        ${w.sindsdien.map(m => `<div class="sinds"><span>${esc(m.onderwerp || "(no subject)")} · ${datum(m.datum)}</span>
+          ${m.item && ["wacht", "fout", "handmatig"].includes(m.status) ? `<button class="knop klein" data-openmail="${m.item}">View</button>` : ""}</div>`).join("")}
+        <div style="margin-top:8px"><button class="knop klein" data-wachtklaar="${w.id}">${ik("check")}That had the answer</button></div></div></div>` : ""}
+      <div><div class="label">${ik("forward")}What you wrote</div>
+        <div class="leesvlak">${w.tekst ? esc(w.tekst) : `<span class="meta">The text of this email has not been saved yet. That happens in the next round; until then, open it in Mail.</span>`}</div></div>
+      <div><div class="label">${ik("reply")}Reminder</div>
+        <textarea id="w-concept" data-wachtid="${w.id}" placeholder="Have Claude write a short reminder, or type your own.">${esc(concept)}</textarea>
+        <div class="c-schrijf"><button class="knop" id="w-claude" data-wachtid="${w.id}"${bezig || !w.tekst ? " disabled" : ""}>${ik("sparkle")}${bezig ? "Claude is writing…" : concept.trim() ? "Redraft with Claude" : "Have Claude write a reminder"}</button></div></div>
     </div>
     <div class="p-voet">
-      <button class="knop" data-wachtopen="${w.id}" title="De mail die je stuurde openen in Apple Mail">${ik("mail")}<span class="lbl">Open in Mail</span></button>
-      <button class="knop" data-wachtlater="${w.id}" title="Nog drie werkdagen wachten">${ik("clock")}<span class="lbl">Nog 3 werkdagen</span></button>
-      <button class="knop" data-wachtklaar="${w.id}" title="Geregeld: van de lijst">${ik("check")}<span class="lbl">Geregeld</span></button>
+      <button class="knop" data-wachtopen="${w.id}" title="Open the email you sent in Apple Mail">${ik("mail")}<span class="lbl">Open in Mail</span></button>
+      <button class="knop" data-wachtlater="${w.id}" title="Wait three more working days">${ik("clock")}<span class="lbl">3 more working days</span></button>
+      <button class="knop" data-wachtklaar="${w.id}" title="Resolved: remove from the list">${ik("check")}<span class="lbl">Resolved</span></button>
       <span style="flex:1"></span>
-      <button class="knop goed" id="w-kopieer" data-wachtid="${w.id}" title="Herinnering naar je klembord en je mail openen in Mail. Kies daar Allen beantwoorden en plak met ⌘V.">${ik("forward")}<span class="lbl">Kopiëren en openen in Mail</span></button>
+      <button class="knop goed" id="w-kopieer" data-wachtid="${w.id}" title="Copy the reminder to your clipboard and open your email in Mail. There, choose Reply All and paste with ⌘V.">${ik("forward")}<span class="lbl">Copy and open in Mail</span></button>
     </div>`;
   p.classList.add("open"); p.setAttribute("aria-hidden", "false");
   if (!drieKolommen()) document.getElementById("dek").classList.add("open");
@@ -1758,43 +1761,43 @@ async function schrijfHerinnering(id){
 
 async function kopieerHerinnering(id){
   const veld = document.getElementById("w-concept"), tekst = veld ? veld.value.trim() : "";
-  if (!tekst) return toast("Schrijf eerst een herinnering, of laat Claude er een schrijven", true);
-  if (/\[\s*AANVULLEN/i.test(tekst)) return toast("Vul eerst de plek met [AANVULLEN: …] in", true);
+  if (!tekst) return toast("Write a reminder first, or have Claude write one", true);
+  if (/\[\s*(FILL IN|AANVULLEN)/i.test(tekst)) return toast("Fill in the [FILL IN: …] placeholder first", true);
   let gekopieerd = false;
   try { await navigator.clipboard.writeText(tekst); gekopieerd = true; }
   catch(e){ veld.select(); try { gekopieerd = document.execCommand("copy"); } catch(e2){} }
-  if (!gekopieerd) return toast("Kopiëren lukte niet; selecteer de tekst en kopieer met ⌘C", true);
+  if (!gekopieerd) return toast("Copying did not work; select the text and copy with ⌘C", true);
   await stil("wacht-concept", {id, concept: tekst});
   const o = await stil("wacht-openen", {id});
   const l = await stil("wacht-later", {id, werkdagen: 3});
-  toast(`Herinnering staat op je klembord. ${o.ok ? "Kies in Mail Allen beantwoorden en plak met ⌘V." : o.melding} ${l.ok ? l.melding + "." : ""}`, !o.ok);
+  toast(`The reminder is on your clipboard. ${o.ok ? "In Mail, choose Reply All and paste with ⌘V." : o.melding} ${l.ok ? l.melding + "." : ""}`, !o.ok);
   laad();
 }
 
 function tekenBelangrijk(){
   const lijst = D.belangrijk || [];
-  return `<details class="regels"><summary>${ik("ster")}Belangrijke afzenders (${lijst.length})</summary><div class="lijst">
+  return `<details class="regels"><summary>${ik("ster")}Important senders (${lijst.length})</summary><div class="lijst">
     ${lijst.length ? lijst.map(b => `<div class="rij" style="cursor:default"><span class="ikoon" style="color:var(--let)">${ik("ster")}</span>
       <div class="midden">${esc(b.naam ? `${b.naam} · ${b.adres}` : b.adres)}</div>
-      ${b.vast ? `<span class="meta">in config.yaml</span>` : `<button class="knop klein" data-belangrijkweg="${esc(b.adres)}">Weghalen</button>`}</div>`).join("")
-      : `<div class="leeg" style="padding:18px">Klik bij een mail op het sterretje naast de afzender. Hun mail komt altijd in Te doen en je krijgt een melding op je Mac.</div>`}
+      ${b.vast ? `<span class="meta">in config.yaml</span>` : `<button class="knop klein" data-belangrijkweg="${esc(b.adres)}">Remove</button>`}</div>`).join("")
+      : `<div class="leeg" style="padding:18px">Click the star next to the sender of an email. Their email always goes to To do and you get a notification on your Mac.</div>`}
   </div></details>`;
 }
 
 function tekenBeoordelen(items){
-  if (!items.length) return leeg("Alles bijgewerkt", "Er wacht niets op je beoordeling.");
+  if (!items.length) return leeg("All caught up", "Nothing is waiting for your review.");
   return `<div class="lijst">${items.map(it => { const a = afzender(it.van), [ai, al] = ACTIES[it.actie] || ["mail", it.actie];
     // één label: wat er van jou nodig is; deadline erbij als die er is
-    const dl = it.deadline ? ` · ${new Date(it.deadline + "T12:00").toLocaleDateString("nl-NL",{day:"numeric",month:"short"})}` : "";
+    const dl = it.deadline ? ` · ${new Date(it.deadline + "T12:00").toLocaleDateString("en-GB",{day:"numeric",month:"short"})}` : "";
     const chips = [];
-    if (it.lijkt_beantwoord) chips.push(`<span class="chip ok">${ik("check")}Lijkt beantwoord</span>`);
-    if (it.status === "fout" || it.status === "handmatig") chips.push(`<span class="chip let">${ik("alert")}Zelf bekijken</span>`);
-    else if (it.vragen) chips.push(`<span class="chip let">Beslissing${dl}</span>`);
+    if (it.lijkt_beantwoord) chips.push(`<span class="chip ok">${ik("check")}Looks answered</span>`);
+    if (it.status === "fout" || it.status === "handmatig") chips.push(`<span class="chip let">${ik("alert")}Check it yourself</span>`);
+    else if (it.vragen) chips.push(`<span class="chip let">Decision${dl}</span>`);
     else chips.push(`<span class="chip">${ik(ai)}${al}${dl}</span>`);
     return `<div class="rij${staat.open===it.id?" gekozen":""}" data-open="${it.id}" tabindex="0">
       ${avatar(it)}
       <div class="midden">
-        <div class="regel1"><span class="van">${it.belangrijk ? `<span class="vip" title="Belangrijke afzender">${ik("ster")}</span>` : ""}${esc(a.naam)}${it.prioriteit === "hoog" ? `<span class="prio" title="Hoge prioriteit"></span>` : ""}</span><span class="datum">${datum(it.datum)}</span></div>
+        <div class="regel1"><span class="van">${it.belangrijk ? `<span class="vip" title="Important sender">${ik("ster")}</span>` : ""}${esc(a.naam)}${it.prioriteit === "hoog" ? `<span class="prio" title="High priority"></span>` : ""}</span><span class="datum">${datum(it.datum)}</span></div>
         <div class="onderwerp">${esc(it.onderwerp)}</div>
         <div class="samenvatting">${esc(it.samenvatting && it.samenvatting !== it.onderwerp ? it.samenvatting : (it.opmerking || ""))}</div>
         <div class="chips">${chips.join("")}</div>
@@ -1806,37 +1809,37 @@ function taakMail(t){
   if (!t.mail) return "";
   const a = afzender(t.mail.van);
   return `<div class="taakmail">${avatar(t.mail, true)}<div class="tekst"><b>${esc(a.naam)}</b> · ${esc(t.mail.onderwerp)}</div>
-    ${t.mail.kan_openen ? `<button class="knop" data-mailopen="${t.mail.id}" title="Open de mail in Apple Mail">${ik("mail")}Open</button>` : ""}
-    <button class="knop" data-beantwoord="${t.id}" title="Antwoord schrijven">${ik("reply")}Beantwoorden</button></div>`;
+    ${t.mail.kan_openen ? `<button class="knop" data-mailopen="${t.mail.id}" title="Open the email in Apple Mail">${ik("mail")}Open</button>` : ""}
+    <button class="knop" data-beantwoord="${t.id}" title="Write a reply">${ik("reply")}Reply</button></div>`;
 }
 
 function lijktGedaan(t){
   if (!t.lijkt_klaar) return "";
-  return `<div class="lijktgedaan">${ik("check")}<div><b>Lijkt gedaan.</b> ${esc(t.lijkt_klaar)}</div>
-    <button class="knop klein goed" data-klaar="${t.id}">Afvinken</button>
-    <button class="knop klein" data-nietklaar="${t.id}">Nog niet</button></div>`;
+  return `<div class="lijktgedaan">${ik("check")}<div><b>Looks done.</b> ${esc(t.lijkt_klaar)}</div>
+    <button class="knop klein goed" data-klaar="${t.id}">Tick off</button>
+    <button class="knop klein" data-nietklaar="${t.id}">Not yet</button></div>`;
 }
 
 function afgerondHTML(){
   const afgerond = filter(D.afgerond || [], true);
-  return afgerond.length ? `<details class="regels"><summary>Afgerond (${afgerond.length})</summary><div class="lijst">${afgerond.map(t => `
+  return afgerond.length ? `<details class="regels"><summary>Completed (${afgerond.length})</summary><div class="lijst">${afgerond.map(t => `
       <div class="rij afgerond" style="cursor:default"><span class="ikoon" style="color:var(--ok)">${ik("check")}</span>
         <div class="midden">${esc(t.omschrijving)}</div><span class="datum">${t.afgerond ? datum(t.afgerond) : ""}</span>
-        <button class="knop klein" data-terug="${t.id}">Terugzetten</button></div>`).join("")}</div></details>` : "";
+        <button class="knop klein" data-terug="${t.id}">Restore</button></div>`).join("")}</div></details>` : "";
 }
 
 function tekenTaken(items){
   const lijstAfgerond = afgerondHTML();
-  if (!items.length) return leeg("Geen open taken", "Taken verschijnen hier zodra je er een maakt of taken uit een mail klaarzet.") + lijstAfgerond;
+  if (!items.length) return leeg("No open tasks", "Tasks appear here as soon as you create one or move tasks from an email to Planning.") + lijstAfgerond;
   return `<div class="lijst">${items.map(t => `
     <div class="rij taak" data-taak="${t.id}">
-      <button class="rondje" data-klaar="${t.id}" title="Afvinken">${ik("check")}</button>
+      <button class="rondje" data-klaar="${t.id}" title="Tick off">${ik("check")}</button>
       <div class="midden"><div>${esc(t.omschrijving)}</div>
         ${t.stappen && t.stappen.length ? `<ul class="stappen-klein">${t.stappen.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
         <div class="chips">${staat.project==="alles" ? `<span class="chip project" style="background:${kleur(t.project)}">${esc(naamProject(t.project))}</span>` : ""}
         ${t.minuten ? `<span class="chip">${ik("clock")}${duurTekst(t.minuten)}</span>` : ""}
         ${t.gepland ? `<span class="chip let">${ik("calendar")}${momentTekst(t.gepland, t.minuten)}</span>` : ""}
-        ${t.deadline ? `<span class="chip">deadline ${esc(dagKort(t.deadline))}</span>${t.deadline_in_agenda ? `<span class="chip">${ik("calendar")}in agenda</span>` : D.agenda_aan ? `<button class="knop klein" data-deadlineagenda="${t.id}" data-soort="taak" title="Hele-dag-afspraak met slotje, herinnering de dag ervoor om 09:00">Deadline in agenda</button>` : ""}` : ""}</div>
+        ${t.deadline ? `<span class="chip">deadline ${esc(dagKort(t.deadline))}</span>${t.deadline_in_agenda ? `<span class="chip">${ik("calendar")}in calendar</span>` : D.agenda_aan ? `<button class="knop klein" data-deadlineagenda="${t.id}" data-soort="taak" title="All-day event, marked private, with a reminder at 09:00 the day before">Deadline in calendar</button>` : ""}` : ""}</div>
         ${lijktGedaan(t)}
         ${taakMail(t)}</div>
     </div>`).join("")}</div>` + lijstAfgerond;
@@ -1852,17 +1855,17 @@ function tekenAntwoord(){
   p.innerHTML = `<div class="p-kop">${avatar(m)}<div style="min-width:0"><h2>${esc(m.onderwerp)}</h2>
       <div class="van">${esc(a.naam)} · ${esc(a.adres)} · ${datum(m.datum)}</div>
       <div class="chips"><span class="chip">${ik("task")}${esc(t.omschrijving)}</span></div></div>
-      <button class="ikoon" id="sluit" title="Sluiten (Esc)">${ik("x")}</button></div>
+      <button class="ikoon" id="sluit" title="Close (Esc)">${ik("x")}</button></div>
     <div class="p-inhoud">
-      ${antwoord.vragen ? `<div class="melding">${ik("alert")}<div><b>Beslissing voor jou</b><br>${esc(antwoord.vragen)}</div></div>` : ""}
-      <div><div class="label">${ik("reply")}Antwoord</div>
-        <textarea id="a-tekst" placeholder="Typ je antwoord, of laat Claude een concept schrijven.">${esc(tekst)}</textarea></div>
-      <div><button class="knop" id="a-claude" ${antwoord.laden ? "disabled" : ""}>${ik("sparkle")}${antwoord.laden ? "Claude schrijft…" : "Concept door Claude"}</button></div>
-      <details class="origineel" open><summary>${ik("mail")}Oorspronkelijke mail</summary><pre>${esc(m.tekst)}</pre></details>
+      ${antwoord.vragen ? `<div class="melding">${ik("alert")}<div><b>Your decision</b><br>${esc(antwoord.vragen)}</div></div>` : ""}
+      <div><div class="label">${ik("reply")}Reply</div>
+        <textarea id="a-tekst" placeholder="Type your reply, or have Claude write a draft.">${esc(tekst)}</textarea></div>
+      <div><button class="knop" id="a-claude" ${antwoord.laden ? "disabled" : ""}>${ik("sparkle")}${antwoord.laden ? "Claude is writing…" : "Draft with Claude"}</button></div>
+      <details class="origineel" open><summary>${ik("mail")}Original email</summary><pre>${esc(m.tekst)}</pre></details>
     </div>
-    <div class="p-voet"><span class="uitleg">Opent een antwoord in Apple Mail. Je verstuurt zelf. De taak blijft staan.</span>
-      <button class="knop" id="sluit2">Annuleren</button>
-      <button class="knop goed" id="a-open">${ik("reply")}Openen in Apple Mail</button></div>`;
+    <div class="p-voet"><span class="uitleg">Opens a reply in Apple Mail. You send it yourself. The task stays.</span>
+      <button class="knop" id="sluit2">Cancel</button>
+      <button class="knop goed" id="a-open">${ik("reply")}Open in Apple Mail</button></div>`;
   p.classList.add("open"); p.setAttribute("aria-hidden","false");
   document.getElementById("dek").classList.add("open");
 }
@@ -1882,7 +1885,7 @@ async function claudeAntwoord(){
 async function openAntwoord(){
   const id = antwoord.taak.mail.id, tekst = document.getElementById("a-tekst").value;
   sluitPaneel();
-  toast("Antwoord gaat naar Apple Mail…");
+  toast("Opening your reply in Apple Mail…");
   const j = await stil("antwoord-openen", {id, tekst});
   toast(j.melding, !j.ok);
   laad();
@@ -1892,22 +1895,22 @@ async function openAntwoord(){
 function gewoonte(it){
   const g = (D.gedrag || {})[afzender(it.van).adres.toLowerCase()];
   if (!g) return null;
-  const opties = [["prullenbak", g.prullenbak||0, "weggegooid"], ["archief", g.archief||0, "gearchiveerd"], ["taak", g.taak||0, "taak van gemaakt"]]
+  const opties = [["prullenbak", g.prullenbak||0, "binned"], ["archief", g.archief||0, "archived"], ["taak", g.taak||0, "made into a task"]]
     .filter(o => o[1] >= 2).sort((a, b) => b[1] - a[1]);
-  return opties.length ? {actie: opties[0][0], tekst: `meestal ${opties[0][2]} (${opties[0][1]}×)`} : null;
+  return opties.length ? {actie: opties[0][0], tekst: `usually ${opties[0][2]} (${opties[0][1]}×)`} : null;
 }
 
 function opruimGroep(titel, items, hoofd){
   if (!items.length) return "";
   const ids = items.map(i => i.id).join(",");
   const groot = hoofd === "archief"
-    ? `<button class="knop klein" data-groep="archief" data-ids="${ids}">${ik("archive")}Alles archiveren</button>`
-    : `<button class="knop klein" data-groep="prullenbak" data-ids="${ids}">${ik("trash")}Alles naar prullenbak</button>`;
+    ? `<button class="knop klein" data-groep="archief" data-ids="${ids}">${ik("archive")}Archive all</button>`
+    : `<button class="knop klein" data-groep="prullenbak" data-ids="${ids}">${ik("trash")}Move all to Bin</button>`;
   const nGekozen = items.filter(i => staat.gekozen.has(i.id)).length;
-  return `<div class="groep"><div class="groep-kop"><input type="checkbox" class="vink groepvink" data-groepvink="${ids}" ${nGekozen === items.length ? "checked" : ""} data-deels="${nGekozen > 0 && nGekozen < items.length ? 1 : 0}" title="Hele groep selecteren" aria-label="Hele groep ${titel} selecteren"><h2>${titel} · ${items.length}</h2><div class="acties">${groot}</div></div>
+  return `<div class="groep"><div class="groep-kop"><input type="checkbox" class="vink groepvink" data-groepvink="${ids}" ${nGekozen === items.length ? "checked" : ""} data-deels="${nGekozen > 0 && nGekozen < items.length ? 1 : 0}" title="Select the whole group" aria-label="Select the whole ${titel} group"><h2>${titel} · ${items.length}</h2><div class="acties">${groot}</div></div>
     <div class="lijst">${items.map(it => { const a = afzender(it.van), gw = gewoonte(it);
       return `<div class="rij${staat.gekozen.has(it.id)?" gekozen":""}${staat.lees===it.id?" leest":""}" data-kies="${it.id}" tabindex="0">
-        <input type="checkbox" class="vink" data-vink="${it.id}" ${staat.gekozen.has(it.id)?"checked":""} aria-label="Selecteren">
+        <input type="checkbox" class="vink" data-vink="${it.id}" ${staat.gekozen.has(it.id)?"checked":""} aria-label="Select">
         ${avatar(it, true)}
         <div class="midden">
           <div class="regel1"><span class="van">${esc(a.naam)}</span><span class="datum">${datum(it.datum)}</span></div>
@@ -1915,11 +1918,11 @@ function opruimGroep(titel, items, hoofd){
         </div>
         ${gw ? `<span class="gewoonte">${esc(gw.tekst)}</span>` : ""}
         <div class="snel"${gw ? ' style="opacity:1"' : ""}>
-          <button class="ikoon${gw && gw.actie==="taak" ? " voorkeur" : ""}" data-maaktaak="${it.id}" title="Taak maken en inplannen">${ik("task")}</button>
-          <button class="ikoon" data-opbergen="${it.id}" title="Opbergen in een map">${ik("folder")}</button>
-          <button class="ikoon${gw && gw.actie==="archief" ? " voorkeur" : ""}" data-een="archief" data-id="${it.id}" title="Archiveren">${ik("archive")}</button>
-          <button class="ikoon rood${gw && gw.actie==="prullenbak" ? " voorkeur" : ""}" data-een="prullenbak" data-id="${it.id}" title="Naar prullenbak">${ik("trash")}</button>
-          <button class="ikoon" data-een="overslaan" data-id="${it.id}" title="Afzender voortaan overslaan">${ik("ban")}</button>
+          <button class="ikoon${gw && gw.actie==="taak" ? " voorkeur" : ""}" data-maaktaak="${it.id}" title="Create and schedule task">${ik("task")}</button>
+          <button class="ikoon" data-opbergen="${it.id}" title="File in a folder">${ik("folder")}</button>
+          <button class="ikoon${gw && gw.actie==="archief" ? " voorkeur" : ""}" data-een="archief" data-id="${it.id}" title="Archive">${ik("archive")}</button>
+          <button class="ikoon rood${gw && gw.actie==="prullenbak" ? " voorkeur" : ""}" data-een="prullenbak" data-id="${it.id}" title="Move to Bin">${ik("trash")}</button>
+          <button class="ikoon" data-een="overslaan" data-id="${it.id}" title="Skip this sender from now on">${ik("ban")}</button>
         </div>
       </div>`; }).join("")}</div></div>`;
 }
@@ -1927,26 +1930,26 @@ function opruimGroep(titel, items, hoofd){
 function tekenOpruimen(){
   const info = filter(D.info), over = filter(D.overgeslagen);
   const vs = D.voorstellen || [];
-  let html = vs.length ? `<div class="voorstel">${ik("sparkle")}<div class="namen"><b>Deze afzenders gooi je steeds weg.</b> Voortaan overslaan, zonder Claude?<br>
+  let html = vs.length ? `<div class="voorstel">${ik("sparkle")}<div class="namen"><b>You keep binning email from these senders.</b> Skip them from now on, without Claude?<br>
       <span class="meta">${vs.map(v => `${esc(afzender(v.van).naam)} (${v.weg}×)`).join(" · ")}</span></div>
-      <button class="knop klein" data-overslaanalle="${esc(vs.map(v => v.adres).join(","))}">${ik("ban")}Allemaal overslaan</button></div>` : "";
-  html += opruimGroep("Ter info", info, "archief") + opruimGroep("Overgeslagen", over, "prullenbak");
-  if (!info.length && !over.length) html = (vs.length ? html : "") + leeg("Niets op te ruimen", "Ter-info-mail en nieuwsbrieven verschijnen hier.");
-  if (D.regels.length) html += `<details class="regels"><summary>${D.regels.length} afzender(s) worden voortaan overgeslagen</summary>
+      <button class="knop klein" data-overslaanalle="${esc(vs.map(v => v.adres).join(","))}">${ik("ban")}Skip all</button></div>` : "";
+  html += opruimGroep("FYI", info, "archief") + opruimGroep("Skipped", over, "prullenbak");
+  if (!info.length && !over.length) html = (vs.length ? html : "") + leeg("Nothing to tidy up", "FYI email and newsletters appear here.");
+  if (D.regels.length) html += `<details class="regels"><summary>${D.regels.length === 1 ? "1 sender is" : D.regels.length + " senders are"} skipped from now on</summary>
     <div class="lijst">${D.regels.map(r => `<div class="rij" style="cursor:default"><span class="ikoon">${ik("ban")}</span>
-      <div class="midden">${esc(r.adres)}</div><button class="knop klein" data-regelweg="${esc(r.adres)}">Niet meer overslaan</button></div>`).join("")}</div></details>`;
+      <div class="midden">${esc(r.adres)}</div><button class="knop klein" data-regelweg="${esc(r.adres)}">Stop skipping</button></div>`).join("")}</div></details>`;
   return html;
 }
 
 function tekenBalk(){
   const b = document.getElementById("balk"), n = staat.gekozen.size;
   b.classList.toggle("open", n > 0 && staat.tab === "opruimen");
-  b.innerHTML = `<span>${n} geselecteerd</span>
-    <button class="knop klein" data-bulkmap="1">${ik("folder")}Opbergen</button>
-    <button class="knop klein" data-bulk="archief">${ik("archive")}Archiveren</button>
-    <button class="knop klein" data-bulk="prullenbak">${ik("trash")}Prullenbak</button>
-    <button class="knop klein" data-bulk="overslaan">${ik("ban")}Overslaan</button>
-    <button class="knop klein" data-bulk="leeg" title="Selectie wissen">${ik("x")}</button>`;
+  b.innerHTML = `<span>${n} selected</span>
+    <button class="knop klein" data-bulkmap="1">${ik("folder")}File</button>
+    <button class="knop klein" data-bulk="archief">${ik("archive")}Archive</button>
+    <button class="knop klein" data-bulk="prullenbak">${ik("trash")}Bin</button>
+    <button class="knop klein" data-bulk="overslaan">${ik("ban")}Skip</button>
+    <button class="knop klein" data-bulk="leeg" title="Clear selection">${ik("x")}</button>`;
 }
 
 function tekenPaneel(it){
@@ -1970,52 +1973,52 @@ function tekenPaneel(it){
     <div class="p-kop">${avatar(it)}
       <div style="min-width:0"><h2>${esc(it.onderwerp)}</h2><div class="van">${esc(a.naam)} · ${esc(a.adres)} · ${datum(it.datum)}
           <button class="ikoon sterknop${it.belangrijk ? " aan" : ""}" data-ster="${esc(a.adres)}" data-naam="${esc(a.naam)}" data-aan="${it.belangrijk ? "0" : "1"}"
-            title="${it.belangrijk ? "Belangrijke afzender: klik om weg te halen" : "Belangrijke afzender maken: altijd in Te doen, met een melding op je Mac"}">${ik("ster")}</button></div>
+            title="${it.belangrijk ? "Important sender: click to remove" : "Mark as important sender: always in To do, with a notification on your Mac"}">${ik("ster")}</button></div>
         <div class="chips"><select class="projectkies" data-projectkies="${it.id}" style="background-color:${kleur(it.project)}" aria-label="Project">
             ${D.projecten.map((pr, i) => `<option value="${esc(pr.naam)}"${pr.naam===it.project?" selected":""}>${esc(naamProject(pr.naam))} (${i+1})</option>`).join("")}</select>
-          <span class="chip">${ik(ai)}${al}</span>${it.prioriteit==="hoog"?`<span class="chip hoog">${ik("alert")}Hoog</span>`:""}
-          ${it.deadline?`<span class="chip">${ik("clock")}${esc(dagKort(it.deadline))}</span>${it.deadline_in_agenda ? `<span class="chip">${ik("calendar")}in agenda</span>` : D.agenda_aan ? `<button class="knop klein" data-deadlineagenda="${it.id}" data-soort="mail" title="Hele-dag-afspraak met slotje, herinnering de dag ervoor om 09:00">In agenda</button>` : ""}`:""}</div></div>
-      <button class="ikoon sluit-mail" id="sluit" title="Sluiten (Esc)">${ik("x")}</button></div>
+          <span class="chip">${ik(ai)}${al}</span>${it.prioriteit==="hoog"?`<span class="chip hoog">${ik("alert")}High</span>`:""}
+          ${it.deadline?`<span class="chip">${ik("clock")}${esc(dagKort(it.deadline))}</span>${it.deadline_in_agenda ? `<span class="chip">${ik("calendar")}in calendar</span>` : D.agenda_aan ? `<button class="knop klein" data-deadlineagenda="${it.id}" data-soort="mail" title="All-day event, marked private, with a reminder at 09:00 the day before">Add to calendar</button>` : ""}`:""}</div></div>
+      <button class="ikoon sluit-mail" id="sluit" title="Close (Esc)">${ik("x")}</button></div>
     <div class="p-inhoud">
-      ${beantwoord ? `<div class="lijktgedaan">${ik("check")}<div><b>Lijkt beantwoord.</b> ${esc(it.lijkt_beantwoord)}
+      ${beantwoord ? `<div class="lijktgedaan">${ik("check")}<div><b>Looks answered.</b> ${esc(it.lijkt_beantwoord)}
           ${it.jouw_antwoord && it.jouw_antwoord.tekst ? `<div class="jouw-antwoord">${esc(it.jouw_antwoord.tekst)}</div>` : ""}</div>
-        <button class="knop klein goed" data-gedaanmelding="1">Gedaan</button>
-        <button class="knop klein" data-nietbeantwoord="${it.id}">Nog niet</button></div>` : ""}
+        <button class="knop klein goed" data-gedaanmelding="1">Done</button>
+        <button class="knop klein" data-nietbeantwoord="${it.id}">Not yet</button></div>` : ""}
       ${it.samenvatting && it.samenvatting !== it.onderwerp ? `<div class="melding info">${ik("sparkle")}<div>${esc(it.samenvatting)}</div></div>` : ""}
-      ${zelf ? `<div class="melding fout">${ik("alert")}<div>${esc(it.opmerking || it.reden || "Bekijk deze mail zelf.")}</div></div>` : ""}
-      ${it.vragen && !beantwoord ? `<div class="melding">${ik("alert")}<div><b>Beslissing voor jou</b><br>${esc(it.vragen)}</div></div>` : ""}
+      ${zelf ? `<div class="melding fout">${ik("alert")}<div>${esc(it.opmerking || it.reden || "Check this email yourself.")}</div></div>` : ""}
+      ${it.vragen && !beantwoord ? `<div class="melding">${ik("alert")}<div><b>Your decision</b><br>${esc(it.vragen)}</div></div>` : ""}
       ${!beantwoord && (it.actie === "agenda" || afspr[it.id]) ? afspraakHTML(it) : ""}
-      ${beantwoord ? `<details class="al-beantwoord"${zelfdeMail && p.querySelector("details.al-beantwoord")?.open ? " open" : ""}><summary>Concept, achtergrond en taken toch tonen</summary>
-        ${it.vragen ? `<div class="melding" style="margin-bottom:12px">${ik("alert")}<div><b>Beslissing voor jou</b><br>${esc(it.vragen)}</div></div>` : ""}` : ""}
-      <div><div class="label">${ik("reply")}Concept-antwoord</div>
-        <textarea id="concept" placeholder="${it.status === "handmatig" ? "Deze afzender gaat niet naar Claude. Typ hier zelf je antwoord." : "Nog geen concept. Laat Claude er een schrijven, of typ zelf."}">${esc(concept)}</textarea>
-        ${it.status === "handmatig" ? "" : `<div class="c-schrijf"${concept.trim() && !schrijft.has(it.id) ? " hidden" : ""}><button class="knop" id="c-claude"${schrijft.has(it.id) ? " disabled" : ""}>${ik("sparkle")}${schrijft.has(it.id) ? "Claude schrijft…" : "Concept laten schrijven"}</button></div>`}</div>
+      ${beantwoord ? `<details class="al-beantwoord"${zelfdeMail && p.querySelector("details.al-beantwoord")?.open ? " open" : ""}><summary>Show draft, background and tasks anyway</summary>
+        ${it.vragen ? `<div class="melding" style="margin-bottom:12px">${ik("alert")}<div><b>Your decision</b><br>${esc(it.vragen)}</div></div>` : ""}` : ""}
+      <div><div class="label">${ik("reply")}Draft reply</div>
+        <textarea id="concept" placeholder="${it.status === "handmatig" ? "This sender is not sent to Claude. Type your reply here." : "No draft yet. Have Claude write one, or type your own."}">${esc(concept)}</textarea>
+        ${it.status === "handmatig" ? "" : `<div class="c-schrijf"${concept.trim() && !schrijft.has(it.id) ? " hidden" : ""}><button class="knop" id="c-claude"${schrijft.has(it.id) ? " disabled" : ""}>${ik("sparkle")}${schrijft.has(it.id) ? "Claude is writing…" : "Draft with Claude"}</button></div>`}</div>
       ${achtergrondHTML(it.context, it.van)}
-      <div><div class="label">${ik("task")}Taken uit deze mail</div>
+      <div><div class="label">${ik("task")}Tasks from this email</div>
         <div class="takenlijst" style="gap:6px">${bewerkTaken(it).map((t, i) => `
-          <div class="tk-rij${t.antwoord ? " tk-antwoord" : ""}">${t.antwoord ? `<span class="tk-ik" title="Vervalt als je nu antwoordt met In Mail zetten of Verzenden">${ik("reply")}</span>` : ""}<textarea class="groei" rows="1" data-tk="${i}" data-veld="omschrijving" placeholder="Wat moet er gebeuren?">${esc(t.omschrijving)}</textarea>
-            <input type="number" class="tk-min" min="15" max="480" step="15" data-tk="${i}" data-veld="minuten" value="${esc(String(t.minuten || ""))}" placeholder="min" aria-label="Minuten" title="Geschatte minuten">
+          <div class="tk-rij${t.antwoord ? " tk-antwoord" : ""}">${t.antwoord ? `<span class="tk-ik" title="Drops off if you reply now with Reply in Mail or Send">${ik("reply")}</span>` : ""}<textarea class="groei" rows="1" data-tk="${i}" data-veld="omschrijving" placeholder="What needs to happen?">${esc(t.omschrijving)}</textarea>
+            <input type="number" class="tk-min" min="15" max="480" step="15" data-tk="${i}" data-veld="minuten" value="${esc(String(t.minuten || ""))}" placeholder="min" aria-label="Minutes" title="Estimated minutes">
             <input type="date" data-tk="${i}" data-veld="deadline" value="${esc(t.deadline || "")}" aria-label="Deadline">
-            <button class="ikoon rood" data-tkweg="${i}" title="Taak weghalen">${ik("x")}</button></div>`).join("")}
-          <div class="tk-erbij"><button class="knop klein" data-tkerbij="1">+ Taak toevoegen</button>
-            <button class="knop klein" data-klaarzetten="${it.id}" title="Alle taken naar Planning, zonder nu te antwoorden. De mail en het concept blijven bij de taken.">${ik("calendar")}Taken klaarzetten</button></div>
-          <div class="tk-uitleg">Antwoord je nu, dan vervalt de antwoordtaak en gaan de andere taken mee naar Planning.</div></div></div>
+            <button class="ikoon rood" data-tkweg="${i}" title="Remove task">${ik("x")}</button></div>`).join("")}
+          <div class="tk-erbij"><button class="knop klein" data-tkerbij="1">+ Add task</button>
+            <button class="knop klein" data-klaarzetten="${it.id}" title="Move all tasks to Planning without replying now. The email and draft stay with the tasks.">${ik("calendar")}Move tasks to Planning</button></div>
+          <div class="tk-uitleg">If you reply now, the reply task drops off and the other tasks go to Planning.</div></div></div>
       ${beantwoord ? `</details>` : ""}
-      ${!(it.actie === "agenda" || afspr[it.id]) && it.agenda ? `<div class="melding info">${ik("calendar")}<div><b>Agendavoorstel</b><br>${esc(it.agenda)}</div></div>` : ""}
-      <details class="origineel" data-orig="${it.id}"><summary>${ik("mail")}Oorspronkelijke mail</summary>${p.querySelector(`details[data-orig="${it.id}"]`)?.open ? mailWeergave(it.id, it.tekst) : ""}</details>
+      ${!(it.actie === "agenda" || afspr[it.id]) && it.agenda ? `<div class="melding info">${ik("calendar")}<div><b>Calendar suggestion</b><br>${esc(it.agenda)}</div></div>` : ""}
+      <details class="origineel" data-orig="${it.id}"><summary>${ik("mail")}Original email</summary>${p.querySelector(`details[data-orig="${it.id}"]`)?.open ? mailWeergave(it.id, it.tekst) : ""}</details>
     </div>
     <div class="p-voet voet-acties">
       <div class="groepje">
-        <button class="knop ikoonknop" data-maaktaak="${it.id}" title="Taak maken en inplannen (T)">${ik("calendar")}<kbd>T</kbd></button>
-        ${it.actie === "agenda" ? "" : `<button class="knop ikoonknop" data-afsprladen="${it.id}" title="Afspraak plannen met de afzender">${ik("mensen")}</button>`}
-        <button class="knop ikoonknop" data-opbergen="${it.id}" title="Opbergen in een map (V)">${ik("folder")}<kbd>V</kbd></button>
-        <button class="knop ikoonknop" data-een="archief" data-id="${it.id}" title="Archiveren zonder antwoord (E)">${ik("archive")}<kbd>E</kbd></button>
-        <button class="knop ikoonknop" id="afwijzen" title="Afwijzen: het voorstel klopt niet (X)">${ik("x")}<kbd>X</kbd></button>
-        <button class="knop${beantwoord ? " goed" : ""}" id="gedaan" title="Gedaan: geen antwoord nodig. Daarna kun je de mail archiveren of opbergen (D; Shift+D kiest meteen een map)">${ik("check")}<span class="lbl">Gedaan</span><kbd>D</kbd></button>
+        <button class="knop ikoonknop" data-maaktaak="${it.id}" title="Create and schedule task (T)">${ik("calendar")}<kbd>T</kbd></button>
+        ${it.actie === "agenda" ? "" : `<button class="knop ikoonknop" data-afsprladen="${it.id}" title="Schedule a meeting with the sender">${ik("mensen")}</button>`}
+        <button class="knop ikoonknop" data-opbergen="${it.id}" title="File in a folder (V)">${ik("folder")}<kbd>V</kbd></button>
+        <button class="knop ikoonknop" data-een="archief" data-id="${it.id}" title="Archive without replying (E)">${ik("archive")}<kbd>E</kbd></button>
+        <button class="knop ikoonknop" id="afwijzen" title="Dismiss: the suggestion is wrong (X)">${ik("x")}<kbd>X</kbd></button>
+        <button class="knop${beantwoord ? " goed" : ""}" id="gedaan" title="Done: no reply needed. You can then archive or file the email (D; Shift+D picks a folder straight away)">${ik("check")}<span class="lbl">Done</span><kbd>D</kbd></button>
       </div>
       <div class="groepje">
-        <button class="knop" id="goedkeuren" title="Antwoord met deze tekst klaarzetten in Apple Mail; je verstuurt daar zelf (⌘↵)">${ik("reply")}<span class="lbl">In Mail zetten</span><kbd>⌘↵</kbd></button>
-        <button class="knop${beantwoord ? "" : " goed"}" id="verzenden" title="Meteen versturen; tweede klik bevestigt (⇧⌘↵)">${ik("forward")}<span class="lbl">Verzenden</span><kbd>⇧⌘↵</kbd></button>
+        <button class="knop" id="goedkeuren" title="Prepare a reply with this text in Apple Mail; you send it from there (⌘↵)">${ik("reply")}<span class="lbl">Reply in Mail</span><kbd>⌘↵</kbd></button>
+        <button class="knop${beantwoord ? "" : " goed"}" id="verzenden" title="Send straight away; a second click confirms (⇧⌘↵)">${ik("forward")}<span class="lbl">Send</span><kbd>⇧⌘↵</kbd></button>
       </div>
     </div>`;
   p.classList.add("open"); p.setAttribute("aria-hidden","false");
@@ -2025,11 +2028,11 @@ function tekenPaneel(it){
   if (focusId){ const f = document.getElementById(focusId); if (f) f.focus(); }
 }
 
-const duurTekst = m => m < 60 ? `${m} min` : `${Math.floor(m/60)} u${m%60 ? " " + (m%60) + " min" : ""}`;
+const duurTekst = m => m < 60 ? `${m} min` : `${Math.floor(m/60)} hr${m%60 ? " " + (m%60) + " min" : ""}`;
 function momentTekst(iso, minuten){
   const b = new Date(iso), e = new Date(b.getTime() + (minuten||30)*60000);
-  const tijd = d => d.toLocaleTimeString("nl-NL",{hour:"2-digit",minute:"2-digit"});
-  return `${b.toLocaleDateString("nl-NL",{weekday:"short",day:"numeric",month:"short"})} · ${tijd(b)}–${tijd(e)}`;
+  const tijd = d => d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
+  return `${b.toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})} · ${tijd(b)}–${tijd(e)}`;
 }
 const vindItem = id => [...D.zelf, ...D.wacht, ...D.info, ...D.overgeslagen].find(i => i.id === id);
 let taak = null;   // {id, item, voorstel, minuten, inplannen, start(ms), dag, archiveren}
@@ -2038,13 +2041,13 @@ const legeDagen = () => Object.keys(dagen).forEach(k => delete dagen[k]);   // a
 const indeelPogingen = {};
 const PX = 0.8;    // pixels per minuut in het dagoverzicht bij Taak maken
 let PLPX = 0.8;    // in Planning: zo dat de werkdag het paneel vult (zie plTijdlijnHTML)
-const kortTitel = t => String(t || "").split(" · begin met:")[0];
+const kortTitel = t => String(t || "").split(/ · (?:begin met|start with):/)[0];
 // rode lijn op het huidige moment, als de getoonde dag vandaag is
 function nuLijn(dag, van, tot, schaal){
   if (dag !== isoDag(new Date())) return "";
   const nu = new Date(), m = nu.getHours() * 60 + nu.getMinutes();
   if (m < van || m > tot) return "";
-  return `<div class="nu-lijn" style="top:${(m - van) * schaal}px" title="Nu, ${tijdVan(nu.getTime())}"></div>`;
+  return `<div class="nu-lijn" style="top:${(m - van) * schaal}px" title="Now, ${tijdVan(nu.getTime())}"></div>`;
 }
 // afspraken: vrije als achtergrond, bezette naast elkaar als ze overlappen
 function afsprakenHTML(lijst, d0, van, tot, schaal, kalenderInTitel, klikbaar){
@@ -2053,7 +2056,7 @@ function afsprakenHTML(lijst, d0, van, tot, schaal, kalenderInTitel, klikbaar){
                     .filter(a => a.e > a.b).sort((p, q) => p.b - q.b);
   let h = "";
   alle.filter(a => a.vrij && !isFocus(a)).forEach(a => {
-    h += `<div class="afs-vrij" style="top:${y(a.b)}px;height:${Math.max(16, (a.e-a.b)*schaal - 2)}px" title="${esc(a.titel)} (telt als vrij)"><span>${esc(a.titel)}</span></div>`;
+    h += `<div class="afs-vrij" style="top:${y(a.b)}px;height:${Math.max(16, (a.e-a.b)*schaal - 2)}px" title="${esc(a.titel)} (counts as free)"><span>${esc(a.titel)}</span></div>`;
   });
   // alleen afspraken die elkaar echt overlappen delen de breedte; de rest krijgt de hele breedte
   const bezet = alle.filter(a => !a.vrij || isFocus(a)), groepen = [];
@@ -2068,13 +2071,13 @@ function afsprakenHTML(lijst, d0, van, tot, schaal, kalenderInTitel, klikbaar){
     const hoog = Math.max(14, (a.e-a.b)*schaal - 2), n = a.n, sleep = klikbaar && sleepbaar(a);
     const taak = klikbaar ? appTaakBij(a) : null, soort = a.voorlopig ? "voorlopig" : taak ? "taak" : isFocus(a) ? "" : (a.soort || "");
     const anderen = (a.deelnemers || []).filter(d => !d.ik).length;
-    const voor = soort === "overleg" ? `<span class="afs-ik" title="Vergadering met ${anderen} ${anderen === 1 ? "ander" : "anderen"}">${ik("mensen")}${anderen}</span>`
-      : soort === "voorlopig" ? `<span class="afs-ik" title="Voorlopig vastgehouden">${ik("clock")}</span>`
-      : soort === "les" ? `<span class="afs-ik" title="Les">${ik("les")}</span>`
-      : soort === "afdeling" ? `<span class="afs-ik" title="Overleg van de afdeling of het team">${ik("afdeling")}${anderen || ""}</span>`
-      : soort === "taak" ? `<span class="afs-ik" title="Taak uit de app">${ik("check")}<span class="stip" style="background:${kleur(taak.project)}"></span></span>` : "";
+    const voor = soort === "overleg" ? `<span class="afs-ik" title="Meeting with ${anderen} ${anderen === 1 ? "other person" : "other people"}">${ik("mensen")}${anderen}</span>`
+      : soort === "voorlopig" ? `<span class="afs-ik" title="Held as tentative">${ik("clock")}</span>`
+      : soort === "les" ? `<span class="afs-ik" title="Class">${ik("les")}</span>`
+      : soort === "afdeling" ? `<span class="afs-ik" title="Department or team meeting">${ik("afdeling")}${anderen || ""}</span>`
+      : soort === "taak" ? `<span class="afs-ik" title="Task from the app">${ik("check")}<span class="stip" style="background:${kleur(taak.project)}"></span></span>` : "";
     h += `<div class="afs${isFocus(a) ? " focus" : ""}${soort ? " soort-" + soort : ""}${hoog < 30 ? " smal" : ""}${klikbaar ? " klik" : ""}${sleep ? " sleepbaar" : ""}"${klikbaar ? ` data-afs="${a.i}" tabindex="0"` : ""} style="top:${y(a.b)}px;height:${hoog}px;left:${a.kol*100/n}%;width:calc(${100/n}% - 3px)${hoog < 30 ? `;line-height:${hoog - 2}px` : ""}"
-      title="${esc(a.titel)}${kalenderInTitel && a.kalender ? " · " + esc(a.kalender) : ""}${sleep ? " · sleep om te verzetten" : ""}">${voor}${esc(kortTitel(a.titel))}${isFocus(a) ? " · beschermd" : ""}${sleep ? `<div class="rek" title="Sleep om langer of korter te maken"></div>` : ""}</div>`;
+      title="${esc(a.titel)}${kalenderInTitel && a.kalender ? " · " + esc(a.kalender) : ""}${sleep ? " · drag to reschedule" : ""}">${voor}${esc(kortTitel(a.titel))}${isFocus(a) ? " · protected" : ""}${sleep ? `<div class="rek" title="Drag to make longer or shorter"></div>` : ""}</div>`;
   });
   return h;
 }
@@ -2084,7 +2087,7 @@ const lokaalIso = ms => { const d = new Date(ms); return `${isoDag(d)}T${tweeCij
 const dagBegin = dag => new Date(dag + "T00:00").getTime();
 const uurMin = t => { const [h, m] = t.split(":").map(Number); return h*60 + m; };
 const kortMoment = iso => { const d = new Date(iso);
-  return `${d.toLocaleDateString("nl-NL",{weekday:"short",day:"numeric",month:"short"})} ${tweeCijfers(d.getHours())}:${tweeCijfers(d.getMinutes())}`; };
+  return `${d.toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})} ${tweeCijfers(d.getHours())}:${tweeCijfers(d.getMinutes())}`; };
 
 async function laadDag(dag){
   if (dagen[dag] !== undefined) return;
@@ -2097,7 +2100,7 @@ async function laadDag(dag){
       indeelPogingen[dag] = (indeelPogingen[dag] || 0) + 1;
       if (indeelPogingen[dag] <= 5) setTimeout(() => { if (Array.isArray(dagen[dag])) { delete dagen[dag]; laadDag(dag); } }, 5000);
     }
-  } catch(e){ dagen[dag] = {fout: "Agenda niet bereikbaar"}; }
+  } catch(e){ dagen[dag] = {fout: "Calendar not reachable"}; }
   if (taak && taak.dag === dag) tekenTaak();
   else if (staat.tab === "planning" && staat.planDag === dag) teken();
   else if (staat.tab === "te_doen" && dag === isoDag(new Date())) teken();   // afspraken in het overzicht van vandaag
@@ -2124,7 +2127,7 @@ function tijdlijnBereik(){
 
 function tijdlijnHTML(){
   const lijst = dagen[taak.dag];
-  if (lijst === undefined || lijst === "laden") return `<div class="tijdlijn"><div class="tl-laden">Agenda laden…</div></div>`;
+  if (lijst === undefined || lijst === "laden") return `<div class="tijdlijn"><div class="tl-laden">Loading calendar…</div></div>`;
   if (lijst.fout) return `<div class="melding">${ik("alert")}<div>${esc(lijst.fout)}</div></div>`;
   const {van, tot, w} = tijdlijnBereik(), d0 = dagBegin(taak.dag);
   const y = min => (min - van) * PX;
@@ -2142,7 +2145,7 @@ function tijdlijnHTML(){
   const heledag = lijst.filter(a => a.heledag);
   return (heledag.length ? `<div class="heledag">${heledag.map(a => `<span>${esc(a.titel)}</span>`).join("")}</div>` : "") +
     `<div class="tijdlijn" id="tijdlijn"><div class="tl-binnen" id="tl-binnen" data-van="${van}" style="height:${(tot-van)*PX}px">${h}</div></div>` +
-    (bots.length ? `<div class="melding fout">${ik("alert")}<div>Overlapt met ${esc(bots.map(a => a.titel).join(", "))}</div></div>` : "");
+    (bots.length ? `<div class="melding fout">${ik("alert")}<div>Overlaps with ${esc(bots.map(a => a.titel).join(", "))}</div></div>` : "");
 }
 
 const tijdVan = ms => { const d = new Date(ms); return `${tweeCijfers(d.getHours())}:${tweeCijfers(d.getMinutes())}`; };
@@ -2168,50 +2171,50 @@ async function openTaak(id){
     if (j.voorstel.momenten.length) zetStart(Date.parse(j.voorstel.momenten[0]));
     else if (!j.voorstel.agenda_fout){ const m = new Date(); m.setDate(m.getDate()+1); m.setHours(9,0,0,0); taak.start = m.getTime(); taak.dag = isoDag(m); }
     tekenTaak();
-  } catch(e){ toast("Geen verbinding met mailagent", true); sluitPaneel(); }
+  } catch(e){ toast("No connection to mailagent", true); sluitPaneel(); }
 }
 
 function tekenTaak(){
   const p = document.getElementById("paneel"), it = taak.item, a = afzender(it.van), v = taak.voorstel;
   p.dataset.id = "";
-  const kop = `<div class="p-kop">${avatar(it)}<div style="min-width:0"><h2>Taak maken</h2>
+  const kop = `<div class="p-kop">${avatar(it)}<div style="min-width:0"><h2>Create task</h2>
       <div class="van">${esc(it.onderwerp)} · ${esc(a.naam)}</div></div>
-      <button class="ikoon" id="sluit" title="Sluiten (Esc)">${ik("x")}</button></div>`;
+      <button class="ikoon" id="sluit" title="Close (Esc)">${ik("x")}</button></div>`;
   if (!v){
-    p.innerHTML = kop + `<div class="p-inhoud"><div class="laden">${ik("refresh")}<div><b style="color:var(--tekst)">Claude schat de taak in</b><br>tijd, stappen en vrije momenten in je agenda</div></div></div>`;
+    p.innerHTML = kop + `<div class="p-inhoud"><div class="laden">${ik("refresh")}<div><b style="color:var(--tekst)">Claude is estimating the task</b><br>time, steps and free slots in your calendar</div></div></div>`;
   } else {
     const duren = [15,30,45,60,90,120,180,240];
     if (!duren.includes(taak.minuten)) duren.push(taak.minuten), duren.sort((x,y)=>x-y);
     const inhoudOud = p.querySelector(".p-inhoud"), tlOud = document.getElementById("tijdlijn");
     const scrollInhoud = inhoudOud ? inhoudOud.scrollTop : 0, scrollTl = tlOud ? tlOud.scrollTop : null;
     const chips = v.momenten.map(m => `<button class="keuze${taak.inplannen && taak.start===Date.parse(m)?" aan":""}" data-moment="${m}">${esc(kortMoment(m))}</button>`).join("")
-      + `<button class="keuze${!taak.inplannen?" aan":""}" data-moment="">Niet inplannen</button>`;
-    const dagLabel = taak.dag ? new Date(taak.dag + "T12:00").toLocaleDateString("nl-NL",{weekday:"long",day:"numeric",month:"long"}) : "";
+      + `<button class="keuze${!taak.inplannen?" aan":""}" data-moment="">Don’t schedule</button>`;
+    const dagLabel = taak.dag ? new Date(taak.dag + "T12:00").toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"}) : "";
     p.innerHTML = kop + `<div class="p-inhoud">
       <div class="melding info">${ik("sparkle")}<div>${esc(v.toelichting)}</div></div>
-      <div class="veld"><div class="label">Taak</div><textarea class="groei" rows="1" id="t-titel">${esc(document.getElementById("t-titel")?.value ?? v.titel)}</textarea></div>
-      <div class="veld"><div class="label">${ik("clock")}Geschatte tijd</div>
+      <div class="veld"><div class="label">Task</div><textarea class="groei" rows="1" id="t-titel">${esc(document.getElementById("t-titel")?.value ?? v.titel)}</textarea></div>
+      <div class="veld"><div class="label">${ik("clock")}Estimated time</div>
         <div class="keuzes">${duren.map(d => `<button class="keuze${d===taak.minuten?" aan":""}" data-duur="${d}">${duurTekst(d)}</button>`).join("")}</div></div>
-      <div class="veld"><div class="label">${ik("task")}Wat te doen (één stap per regel)</div>
+      <div class="veld"><div class="label">${ik("task")}What to do (one step per line)</div>
         <textarea id="t-stappen">${esc(document.getElementById("t-stappen")?.value ?? v.stappen.join("\n"))}</textarea></div>
       <div class="veld"><div class="label">Deadline</div><input type="date" id="t-deadline" value="${esc(document.getElementById("t-deadline")?.value ?? (v.deadline || ""))}"></div>
-      <div class="veld"><div class="label">${ik("calendar")}Inplannen in je agenda</div>
+      <div class="veld"><div class="label">${ik("calendar")}Schedule in your calendar</div>
         ${v.agenda_fout ? `<div class="melding">${ik("alert")}<div>${esc(v.agenda_fout)}</div></div>` : ""}
         ${v.agenda_fout ? "" : `<div class="keuzes">${chips}</div>`}
         ${!v.agenda_fout && taak.inplannen ? `
-          <div class="tijdvelden"><input type="date" id="t-datum" value="${taak.dag}" aria-label="Datum">
-            <input type="time" id="t-tijd" step="900" value="${tijdVan(taak.start)}" aria-label="Begintijd">
-            <span id="t-tot">tot ${tijdVan(taak.start + taak.minuten*60000)}</span></div>
-          <div class="dagnav"><button class="ikoon" data-dagstap="-1" title="Vorige dag">${ik("chevron").replace("<path", '<path transform="rotate(180 12 12)"')}</button>
-            <b>${esc(dagLabel)}</b><button class="ikoon" data-dagstap="1" title="Volgende dag">${ik("chevron")}</button>
-            <span class="meta">Versleep het blok, rek de onderkant, of klik op een tijd</span></div>
+          <div class="tijdvelden"><input type="date" id="t-datum" value="${taak.dag}" aria-label="Date">
+            <input type="time" id="t-tijd" step="900" value="${tijdVan(taak.start)}" aria-label="Start time">
+            <span id="t-tot">until ${tijdVan(taak.start + taak.minuten*60000)}</span></div>
+          <div class="dagnav"><button class="ikoon" data-dagstap="-1" title="Previous day">${ik("chevron").replace("<path", '<path transform="rotate(180 12 12)"')}</button>
+            <b>${esc(dagLabel)}</b><button class="ikoon" data-dagstap="1" title="Next day">${ik("chevron")}</button>
+            <span class="meta">Drag the block, stretch the bottom edge, or click a time</span></div>
           ${tijdlijnHTML()}` : ""}
       </div>
-      ${it.status === "ter_info" || it.status === "genegeerd" ? `<label class="vinkregel"><input type="checkbox" class="vink" id="t-archief" ${taak.archiveren?"checked":""}> Mail archiveren (blijft aan de taak gekoppeld)</label>` : ""}
+      ${it.status === "ter_info" || it.status === "genegeerd" ? `<label class="vinkregel"><input type="checkbox" class="vink" id="t-archief" ${taak.archiveren?"checked":""}> Archive email (stays linked to the task)</label>` : ""}
     </div>
-    <div class="p-voet"><span class="uitleg">${taak.inplannen ? "Maakt een afspraak in je agenda, die naar Outlook synchroniseert." : "Komt in je takenlijst."}</span>
-      <button class="knop" id="sluit2">Annuleren</button>
-      <button class="knop goed" id="taakmaak">${ik("check")}${taak.inplannen ? "Maken en inplannen" : "Taak maken"}</button></div>`;
+    <div class="p-voet"><span class="uitleg">${taak.inplannen ? "Creates an event in your calendar, which syncs to Outlook." : "Goes into your task list."}</span>
+      <button class="knop" id="sluit2">Cancel</button>
+      <button class="knop goed" id="taakmaak">${ik("check")}${taak.inplannen ? "Create and schedule" : "Create task"}</button></div>`;
     const inhoudNieuw = p.querySelector(".p-inhoud"), tl = document.getElementById("tijdlijn");
     if (inhoudNieuw) inhoudNieuw.scrollTop = scrollInhoud;
     if (tl){
@@ -2243,7 +2246,7 @@ async function bevestigTaak(){
 const bewerkt = {};
 function bewerkTaken(it){
   if (!bewerkt[it.id]) bewerkt[it.id] = [
-    {omschrijving: `${it.actie === "delegeren" ? "Doorsturen" : "Beantwoorden"}: ${it.onderwerp}`,
+    {omschrijving: `${it.actie === "delegeren" ? "Forward" : "Reply"}: ${it.onderwerp}`,
      deadline: it.deadline || "", minuten: 15, antwoord: true},
     ...it.taken.map(t => ({omschrijving: t.omschrijving, deadline: t.deadline || "", minuten: t.minuten || ""}))];
   return bewerkt[it.id];
@@ -2307,7 +2310,7 @@ async function verplaatsMetUndo(ids, doel){
   const j = await stil("verplaats", {ids, doel});
   ids.forEach(i => verborgen.delete(i));
   if (!j.ok) toast(j.melding, true);
-  else toast(j.melding, false, {label: "Ongedaan maken", doe: async () => {
+  else toast(j.melding, false, {label: "Undo", doe: async () => {
     const r = await stil("terugzetten", {ids}); toast(r.melding, !r.ok); laad(); }});
   laad();
 }
@@ -2325,7 +2328,7 @@ document.addEventListener("click", async ev => {
   if (t.id === "c-claude") return schrijfConcept(Number(document.getElementById("paneel").dataset.id));
   if (t.dataset.afplan){
     t.disabled = true;
-    if (await planTaakIn(Number(t.dataset.afplan), t.dataset.start)) toast("Ingepland");
+    if (await planTaakIn(Number(t.dataset.afplan), t.dataset.start)) toast("Scheduled");
     if (deadlineVoorstel && deadlineVoorstel.voorstellen) delete deadlineVoorstel.voorstellen[t.dataset.afplan];
     return laad();
   }
@@ -2334,7 +2337,7 @@ document.addEventListener("click", async ev => {
     if (t.id === "afsluit-alles") afsluit = null; else deadlineVoorstel = null;
     let n = 0;
     for (const [id, start] of Object.entries(vs)) if (await planTaakIn(Number(id), start)) n++;
-    toast(n === 1 ? "1 taak ingepland" : `${n} taken ingepland`); return laad();
+    toast(n === 1 ? "1 task scheduled" : `${n} tasks scheduled`); return laad();
   }
   if (d.wacht && t.classList.contains("rij")){ staat.wacht = Number(d.wacht); staat.open = null; taak = null; antwoord = null; return teken(); }
   if (t.id === "w-claude") return schrijfHerinnering(Number(d.wachtid));
@@ -2345,7 +2348,7 @@ document.addEventListener("click", async ev => {
   if (d.afoutlook){
     const a = afspr[Number(d.afoutlook)]; if (!a || !a.data || !a.gekozen.size) return;
     const m = [...a.gekozen].sort()[0], v = a.data.verzoek;
-    window.open(outlookLink(m, a.data.vw.duur, v.onderwerp || "Afspraak", v.locatie, `Afspraak met ${v.met || ""}`), "_blank", "noopener");
+    window.open(outlookLink(m, a.data.vw.duur, v.onderwerp || "Meeting", v.locatie, `Meeting with ${v.met || ""}`), "_blank", "noopener");
     return;
   }
   if (t.id === "controleer") return controleerTaken();
@@ -2357,7 +2360,7 @@ document.addEventListener("click", async ev => {
     const j = await stil("deadline-voorstellen", {});
     deadlineVoorstel = j.ok ? j : null;
     if (!j.ok) toast(j.melding, true);
-    else if (!Object.keys(j.voorstellen).length) { toast("Geen vrij moment vóór de deadline gevonden", true); deadlineVoorstel = null; }
+    else if (!Object.keys(j.voorstellen).length) { toast("No free time found before the deadline", true); deadlineVoorstel = null; }
     return teken();
   }
   if (d.deadlineagenda){
@@ -2376,7 +2379,7 @@ document.addEventListener("click", async ev => {
   if (d.wachtlater){ const j = await stil("wacht-later", {id: Number(d.wachtlater), werkdagen: 3}); toast(j.melding, !j.ok); return laad(); }
   if (d.wachtklaar){
     const id = Number(d.wachtklaar), j = await stil("wacht-klaar", {id});
-    toast(j.melding, !j.ok, j.ok ? {label: "Ongedaan maken", doe: async () => { await stil("wacht-terug", {id}); laad(); }} : null);
+    toast(j.melding, !j.ok, j.ok ? {label: "Undo", doe: async () => { await stil("wacht-terug", {id}); laad(); }} : null);
     return laad();
   }
   if (d.nietklaar){ const j = await stil("taak-niet-klaar", {id: Number(d.nietklaar)}); toast(j.melding, !j.ok); return laad(); }
@@ -2385,9 +2388,9 @@ document.addEventListener("click", async ev => {
     await animeerWeg(ids); ids.forEach(i => takenVerborgen.add(i)); teken();
     for (const i of ids) await stil("taak-klaar", {id: i});
     ids.forEach(i => takenVerborgen.delete(i));
-    toast(`${ids.length} taken afgevinkt`, false, {label: "Ongedaan maken", doe: async () => {
+    toast(ids.length === 1 ? "1 task ticked off" : `${ids.length} tasks ticked off`, false, {label: "Undo", doe: async () => {
       for (const i of ids) await stil("taak-heropen", {id: i});
-      toast("Taken teruggezet"); laad();
+      toast(ids.length === 1 ? "Task restored" : "Tasks restored"); laad();
     }});
     return laad();
   }
@@ -2465,19 +2468,19 @@ document.addEventListener("click", async ev => {
   }
   if (t.id === "verzenden"){
     const id = Number(document.getElementById("paneel").dataset.id), concept = document.getElementById("concept").value;
-    if (!concept.trim()) return toast("Er staat geen tekst om te versturen", true);
-    if (/\[\s*AANVULLEN/i.test(concept)) return toast("Vul eerst de plek met [AANVULLEN: …] in, dan kun je versturen", true);
+    if (!concept.trim()) return toast("There is no text to send", true);
+    if (/\[\s*(FILL IN|AANVULLEN)/i.test(concept)) return toast("Fill in the [FILL IN: …] placeholder first, then you can send", true);
     if (!t.classList.contains("bevestig")){
       // eerste klik: bevestigen met de ontvanger in beeld; na 5 seconden weer terug
-      const it = [...D.zelf, ...D.wacht].find(x => x.id === id), naam = it ? afzender(it.van).naam : "de afzender";
-      t.classList.add("bevestig"); t.innerHTML = `${ik("forward")}Klik nogmaals: verzenden aan ${esc(naam)}`;
-      clearTimeout(t._terug); t._terug = setTimeout(() => { if (t.isConnected){ t.classList.remove("bevestig"); t.innerHTML = `${ik("forward")}<span class="lbl">Verzenden</span><kbd>⇧⌘↵</kbd>`; } }, 5000);
+      const it = [...D.zelf, ...D.wacht].find(x => x.id === id), naam = it ? afzender(it.van).naam : "the sender";
+      t.classList.add("bevestig"); t.innerHTML = `${ik("forward")}Click again to send to ${esc(naam)}`;
+      clearTimeout(t._terug); t._terug = setTimeout(() => { if (t.isConnected){ t.classList.remove("bevestig"); t.innerHTML = `${ik("forward")}<span class="lbl">Send</span><kbd>⇧⌘↵</kbd>`; } }, 5000);
       return;
     }
     const data = {id, concept, taken: (bewerkt[id] || null), verzenden: true};
     const volgende = drieKolommen() ? volgendeNa(id) : null;
     sluitPaneel(); if (volgende !== null) staat.open = volgende;
-    toast("Versturen via Apple Mail…");
+    toast("Sending via Apple Mail…");
     const ok = await meteen([id], "goedkeuren", data);
     if (!ok){ bewaarTekst(id, concept); staat.open = id; teken(); }   // niet verstuurd: jouw tekst blijft staan
     return;
@@ -2490,7 +2493,7 @@ document.addEventListener("click", async ev => {
     const volgende = drieKolommen() ? volgendeNa(id) : null;
     sluitPaneel();
     if (volgende !== null){ staat.open = volgende; }
-    if (goed && data.concept.trim()) toast("Concept gaat naar Apple Mail…");
+    if (goed && data.concept.trim()) toast("Opening your draft in Apple Mail…");
     const ok = await meteen([id], goed ? "goedkeuren" : "afwijzen", data);
     if (!ok){ if (goed) bewaarTekst(id, data.concept); staat.open = id; teken(); }   // mislukt: paneel met je tekst weer openen
   }
@@ -2523,7 +2526,7 @@ document.addEventListener("pointermove", ev => {
   document.getElementById("tb-tijd").textContent = blokTijd();
   const tv = document.getElementById("t-tijd"), tt = document.getElementById("t-tot");
   if (tv) tv.value = tijdVan(taak.start);
-  if (tt) tt.textContent = "tot " + tijdVan(taak.start + taak.minuten*60000);
+  if (tt) tt.textContent = "until " + tijdVan(taak.start + taak.minuten*60000);
 });
 
 // datum en tijd typen
@@ -2556,25 +2559,25 @@ function toonSneltoetsen(){
   if (document.querySelector(".overlay")) return document.querySelector(".overlay").remove();
   const o = document.createElement("div");
   o.className = "overlay";
-  o.innerHTML = `<div class="vel"><h3>Sneltoetsen</h3><dl>
-    <dt><kbd>J</kbd> <kbd>K</kbd></dt><dd>volgende en vorige mail</dd>
-    <dt><kbd>⌘</kbd> <kbd>↵</kbd></dt><dd>antwoord klaarzetten in Apple Mail</dd>
-    <dt><kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>↵</kbd></dt><dd>meteen verzenden (twee keer: de tweede bevestigt)</dd>
-    <dt><kbd>D</kbd></dt><dd>gedaan, geen antwoord nodig (daarna eventueel archiveren of opbergen)</dd>
-    <dt><kbd>⇧</kbd> <kbd>D</kbd></dt><dd>gedaan en meteen een map kiezen</dd>
-    <dt><kbd>V</kbd></dt><dd>opbergen in een map</dd>
-    <dt><kbd>E</kbd></dt><dd>archiveren</dd>
-    <dt><kbd>#</kbd></dt><dd>naar de prullenbak</dd>
-    <dt><kbd>T</kbd></dt><dd>taak maken en inplannen</dd>
-    <dt><kbd>X</kbd></dt><dd>afwijzen</dd>
-    <dt><kbd>1</kbd>–<kbd>${D ? D.projecten.length : 4}</kbd></dt><dd>project wijzigen</dd>
-    <dt><kbd>[</kbd></dt><dd>zijbalk in- of uitklappen</dd>
-    <dt>Shift-klik</dt><dd>reeks selecteren (Opruimen)</dd>
-    <dt>⌘-klik, <kbd>Spatie</kbd></dt><dd>één mail aan- of uitvinken</dd>
-    <dt><kbd>⇧</kbd> <kbd>J</kbd> <kbd>K</kbd></dt><dd>selectie uitbreiden</dd>
-    <dt><kbd>⌘</kbd> <kbd>A</kbd></dt><dd>alles in Opruimen selecteren</dd>
-    <dt><kbd>Esc</kbd></dt><dd>sluiten</dd>
-    <dt><kbd>?</kbd></dt><dd>dit overzicht</dd></dl></div>`;
+  o.innerHTML = `<div class="vel"><h3>Keyboard shortcuts</h3><dl>
+    <dt><kbd>J</kbd> <kbd>K</kbd></dt><dd>Next and previous email</dd>
+    <dt><kbd>⌘</kbd> <kbd>↵</kbd></dt><dd>Prepare reply in Apple Mail</dd>
+    <dt><kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>↵</kbd></dt><dd>Send straight away (press twice: the second press confirms)</dd>
+    <dt><kbd>D</kbd></dt><dd>Done, no reply needed (then archive or file it if you like)</dd>
+    <dt><kbd>⇧</kbd> <kbd>D</kbd></dt><dd>Done, and choose a folder straight away</dd>
+    <dt><kbd>V</kbd></dt><dd>File in a folder</dd>
+    <dt><kbd>E</kbd></dt><dd>Archive</dd>
+    <dt><kbd>#</kbd></dt><dd>Move to Bin</dd>
+    <dt><kbd>T</kbd></dt><dd>Create and schedule task</dd>
+    <dt><kbd>X</kbd></dt><dd>Dismiss</dd>
+    <dt><kbd>1</kbd>–<kbd>${D ? D.projecten.length : 4}</kbd></dt><dd>Change project</dd>
+    <dt><kbd>[</kbd></dt><dd>Collapse or expand sidebar</dd>
+    <dt>Shift-click</dt><dd>Select a range (Tidy up)</dd>
+    <dt>⌘-click, <kbd>Space</kbd></dt><dd>Tick or untick one email</dd>
+    <dt><kbd>⇧</kbd> <kbd>J</kbd> <kbd>K</kbd></dt><dd>Extend selection</dd>
+    <dt><kbd>⌘</kbd> <kbd>A</kbd></dt><dd>Select everything in Tidy up</dd>
+    <dt><kbd>Esc</kbd></dt><dd>Close</dd>
+    <dt><kbd>?</kbd></dt><dd>This overview</dd></dl></div>`;
   o.addEventListener("click", () => o.remove());
   document.body.append(o);
 }
@@ -2663,42 +2666,43 @@ function tekenPlanning(){
   const totaal = open.reduce((a, t) => a + (t.minuten || 30), 0);
   const kaart = (t, plan) => `
     <div class="kaart${plan ? " ingepland" : ""}${gekozenKaart === t.id ? " gekozen" : ""}" ${plan ? "" : `data-kaart="${t.id}"`}>
-      <div class="r"><button class="rondje" data-klaar="${t.id}" title="Afvinken">${ik("check")}</button>
+      <div class="r"><button class="rondje" data-klaar="${t.id}" title="Tick off">${ik("check")}</button>
         <span class="stip" style="background:${kleur(t.project)}"></span><span class="titel">${esc(t.omschrijving)}</span></div>
       ${t.stappen && t.stappen.length ? `<ul class="stappen-klein">${t.stappen.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
       <div class="chips">
         <span class="chip">${ik("clock")}${duurTekst(t.minuten || 30)}</span>
         ${plan ? `<span class="chip let">${ik("calendar")}${momentTekst(t.gepland, t.minuten)}</span>` : ""}
-        ${t.deadline ? `<span class="chip">deadline ${esc(dagKort(t.deadline))}</span>${t.deadline_in_agenda ? `<span class="chip">${ik("calendar")}in agenda</span>` : D.agenda_aan ? `<button class="knop klein" data-deadlineagenda="${t.id}" data-soort="taak" title="Hele-dag-afspraak met slotje, herinnering de dag ervoor om 09:00">Deadline in agenda</button>` : ""}` : ""}</div>
+        ${t.deadline ? `<span class="chip">deadline ${esc(dagKort(t.deadline))}</span>${t.deadline_in_agenda ? `<span class="chip">${ik("calendar")}in calendar</span>` : D.agenda_aan ? `<button class="knop klein" data-deadlineagenda="${t.id}" data-soort="taak" title="All-day event, marked private, with a reminder at 09:00 the day before">Deadline in calendar</button>` : ""}` : ""}</div>
       ${lijktGedaan(t)}
       ${taakMail(t)}
     </div>`;
   const gedaan = taken.filter(t => t.lijkt_klaar);
   const links = `<div class="kaarten">
-      <div class="controle">${gedaan.length > 1 ? `<button class="knop klein goed" data-allesklaar="1">${ik("check")}${gedaan.length} gedane taken afvinken</button>` : ""}
-        <button class="knop klein" id="controleer"${controleert ? " disabled" : ""} title="Kijkt in je verzonden mail of taken en mail in Te doen al gedaan zijn, en of er antwoord kwam waarop je wachtte">${ik("sparkle")}${controleert ? "Controleren…" : "Al gedaan? Controleren"}</button></div>
-      <div class="groep-kop"><h2>Nog in te plannen · ${open.length}</h2><span class="meta" style="margin-left:auto">${open.length ? duurTekst(totaal) : ""}</span></div>
-      ${open.length ? open.map(t => kaart(t, false)).join("") : `<div class="lijst"><div class="leeg" style="padding:30px"><b>Alles ingepland</b>Nieuwe taken verschijnen hier.</div></div>`}
-      ${ingepland.length ? `<div class="groep-kop" style="margin-top:14px"><h2>Ingepland · ${ingepland.length}</h2></div>${ingepland.map(t => kaart(t, true)).join("")}` : ""}
+      <div class="controle">${gedaan.length > 1 ? `<button class="knop klein goed" data-allesklaar="1">${ik("check")}Tick off ${gedaan.length} done tasks</button>` : ""}
+        ${open.length && !afsluit && new Date().getHours() < 15 ? `<button class="knop klein" id="afsluit-start" title="Give every open task a time, or move it to Later">Wrap up the day</button>` : ""}
+        <button class="knop klein" id="controleer"${controleert ? " disabled" : ""} title="Checks your sent email to see whether tasks and email in To do are already done, and whether replies you were waiting for have arrived">${ik("sparkle")}${controleert ? "Checking…" : "Already done? Check"}</button></div>
+      <div class="groep-kop"><h2>To schedule · ${open.length}</h2><span class="meta" style="margin-left:auto">${open.length ? duurTekst(totaal) : ""}</span></div>
+      ${open.length ? open.map(t => kaart(t, false)).join("") : `<div class="lijst"><div class="leeg" style="padding:30px"><b>Everything scheduled</b>New tasks appear here.</div></div>`}
+      ${ingepland.length ? `<div class="groep-kop" style="margin-top:14px"><h2>Scheduled · ${ingepland.length}</h2></div>${ingepland.map(t => kaart(t, true)).join("")}` : ""}
       ${later.length ? `<details class="regels"><summary>Later (${later.length})</summary><div class="kaarten" style="margin-top:6px">${later.map(t => `
         <div class="kaart ingepland"><div class="r"><span class="stip" style="background:${kleur(t.project)}"></span><span class="titel">${esc(t.omschrijving)}</span>
-          <button class="knop klein" data-later="${t.id}" data-waarde="0">Terug</button></div></div>`).join("")}</div></details>` : ""}
+          <button class="knop klein" data-later="${t.id}" data-waarde="0">Move back</button></div></div>`).join("")}</div></details>` : ""}
       ${afgerondHTML()}
     </div>`;
   let rechts;
-  if (!D.agenda_aan) rechts = `<div class="melding">${ik("alert")}<div>Koppel je agenda om taken te kunnen inplannen: zet <code>agenda:</code> in config.yaml (zie README).</div></div>`;
+  if (!D.agenda_aan) rechts = `<div class="melding">${ik("alert")}<div>Connect your calendar to schedule tasks: add <code>agenda:</code> to config.yaml (see README).</div></div>`;
   else {
-    const dagLabel = new Date(staat.planDag + "T12:00").toLocaleDateString("nl-NL", {weekday:"long", day:"numeric", month:"long"});
+    const dagLabel = new Date(staat.planDag + "T12:00").toLocaleDateString("en-GB", {weekday:"long", day:"numeric", month:"long"});
     laadDag(staat.planDag);
     const t = plaatsing && D.taken.find(x => x.id === plaatsing.id);
     rechts = `<div class="dagkop">
-        <button class="ikoon" data-pldag="-1" title="Vorige dag">${ik("chevron").replace("<path", '<path transform="rotate(180 12 12)"')}</button>
+        <button class="ikoon" data-pldag="-1" title="Previous day">${ik("chevron").replace("<path", '<path transform="rotate(180 12 12)"')}</button>
         <b>${esc(dagLabel)}</b>
-        <button class="ikoon" data-pldag="1" title="Volgende dag">${ik("chevron")}</button>
-        <button class="knop klein" data-pldag="0">Vandaag</button>
-        <span class="meta" style="margin-left:auto">${gekozenKaart ? "Tik op een tijd om de taak te plaatsen" : "Sleep een taak naar een tijd"}</span></div>
-      ${t ? `<div class="plaatsbalk">${ik("calendar")}<span><b>${esc(t.omschrijving)}</b> · ${blokTijdVan(plaatsing.start, plaatsing.minuten)}${plBotsingen().length ? ` · <span style="color:var(--hoog)">overlapt met ${esc(plBotsingen().map(a => a.titel).join(", "))}</span>` : ""}</span>
-          <button class="knop klein" id="pl-annuleer">Annuleren</button><button class="knop klein goed" id="pl-bevestig">${ik("check")}Inplannen</button></div>` : ""}
+        <button class="ikoon" data-pldag="1" title="Next day">${ik("chevron")}</button>
+        <button class="knop klein" data-pldag="0">Today</button>
+        <span class="meta" style="margin-left:auto">${gekozenKaart ? "Tap a time to place the task" : "Drag a task to a time"}</span></div>
+      ${t ? `<div class="plaatsbalk">${ik("calendar")}<span><b>${esc(t.omschrijving)}</b> · ${blokTijdVan(plaatsing.start, plaatsing.minuten)}${plBotsingen().length ? ` · <span style="color:var(--hoog)">overlaps with ${esc(plBotsingen().map(a => a.titel).join(", "))}</span>` : ""}</span>
+          <button class="knop klein" id="pl-annuleer">Cancel</button><button class="knop klein goed" id="pl-bevestig">${ik("check")}Schedule</button></div>` : ""}
       ${plTijdlijnHTML()}`;
   }
   return `${afsluitHTML(open)}<div class="planning-grid">${links}<div class="pl-rechts">${rechts}</div></div>`;
@@ -2710,13 +2714,12 @@ let afsluit = null;   // null | "laden" | {voorstellen}
 function afsluitHTML(open){
   if (!open.length) return "";
   const uur = new Date().getHours();
-  if (!afsluit) return uur >= 15 ? `<div class="afsluiten"><div class="r" style="border:0"><span class="titel"><b>Dag afsluiten</b> · ${open.length} taak/taken zonder moment</span>
-      <button class="knop klein goed" id="afsluit-start">Afsluiten</button></div></div>` :
-    `<div style="display:flex;justify-content:flex-end;margin:-46px 0 14px"><button class="knop klein" id="afsluit-start">Dag afsluiten</button></div>`;
-  if (afsluit === "laden") return `<div class="afsluiten"><span class="meta">Vrije momenten zoeken…</span></div>`;
+  if (!afsluit) return uur >= 15 ? `<div class="afsluiten"><div class="r" style="border:0"><span class="titel"><b>Wrap up the day</b> · ${open.length === 1 ? "1 task" : open.length + " tasks"} without a time</span>
+      <button class="knop klein goed" id="afsluit-start">Wrap up</button></div></div>` : "";
+  if (afsluit === "laden") return `<div class="afsluiten"><span class="meta">Finding free times…</span></div>`;
   const vs = afsluit.voorstellen || {};
-  return `<div class="afsluiten"><div class="r" style="border:0"><span class="titel"><b>Dag afsluiten</b> · plan in of zet op Later</span>
-      ${Object.keys(vs).length ? `<button class="knop klein goed" id="afsluit-alles">Alles volgens voorstel</button>` : ""}<button class="ikoon" id="afsluit-dicht" title="Sluiten">${ik("x")}</button></div>
+  return `<div class="afsluiten"><div class="r" style="border:0"><span class="titel"><b>Wrap up the day</b> · schedule or move to Later</span>
+      ${Object.keys(vs).length ? `<button class="knop klein goed" id="afsluit-alles">Schedule all as suggested</button>` : ""}<button class="ikoon" id="afsluit-dicht" title="Close">${ik("x")}</button></div>
     ${open.map(t => `<div class="r"><span class="stip" style="background:${kleur(t.project)}"></span><span class="titel">${esc(t.omschrijving)}</span>
       ${vs[t.id] ? `<button class="knop klein" data-afplan="${t.id}" data-start="${vs[t.id]}">${esc(kortMoment(vs[t.id]))}</button>` : ""}
       <button class="knop klein" data-later="${t.id}" data-waarde="1">Later</button></div>`).join("")}
@@ -2733,7 +2736,7 @@ function plBotsingen(){
 
 function plTijdlijnHTML(){
   const lijst = dagen[staat.planDag];
-  if (lijst === undefined || lijst === "laden") return `<div class="tijdlijn"><div class="tl-laden">Agenda laden…</div></div>`;
+  if (lijst === undefined || lijst === "laden") return `<div class="tijdlijn"><div class="tl-laden">Loading calendar…</div></div>`;
   if (lijst.fout) return `<div class="melding">${ik("alert")}<div>${esc(lijst.fout)}</div></div>`;
   const w = D.werktijd || {begin:"09:00", eind:"17:00"}, d0 = dagBegin(staat.planDag);
   let van = Math.max(0, uurMin(w.begin) - 60), tot = Math.min(24*60, uurMin(w.eind) + 60);
@@ -2753,11 +2756,11 @@ function plTijdlijnHTML(){
   if (plaatsing && isoDag(new Date(plaatsing.start)) === staat.planDag){
     const t = D.taken.find(x => x.id === plaatsing.id);
     h += `<div class="tb concept${plBotsingen().length ? " botst" : ""}" id="pl-blok" style="top:${y((plaatsing.start-d0)/60000)}px;height:${plaatsing.minuten*PLPX - 2}px">
-            <b>${esc(t ? t.omschrijving : "Taak")}</b><span id="pl-tijd">${blokTijdVan(plaatsing.start, plaatsing.minuten)}</span><div class="rek"></div></div>`;
+            <b>${esc(t ? t.omschrijving : "Task")}</b><span id="pl-tijd">${blokTijdVan(plaatsing.start, plaatsing.minuten)}</span><div class="rek"></div></div>`;
   }
   const heledag = lijst.map((a, i) => ({...a, i})).filter(a => a.heledag);
   const soorten = new Set(lijst.filter(a => !a.heledag).map(a => a.voorlopig ? "voorlopig" : appTaakBij(a) ? "taak" : isFocus(a) ? "focus" : a.vrij ? "" : (a.soort || "eigen")));
-  const legenda = [["voorlopig", "clock", "Voorlopig"], ["les", "les", "Les"], ["afdeling", "afdeling", "Afdeling of team"], ["overleg", "mensen", "Met anderen"], ["taak", "check", "Taak uit de app"], ["focus", "clock", "Beschermd"], ["eigen", "calendar", "Eigen afspraak"]]
+  const legenda = [["voorlopig", "clock", "Tentative"], ["les", "les", "Class"], ["afdeling", "afdeling", "Department or team"], ["overleg", "mensen", "Meeting with others"], ["taak", "check", "Task from the app"], ["focus", "clock", "Protected"], ["eigen", "calendar", "Personal event"]]
     .filter(([k]) => soorten.has(k)).map(([k, i, l]) => `<span class="lg lg-${k}">${ik(i)}${l}</span>`).join("");
   return (legenda && soorten.size > 1 ? `<div class="legenda">${legenda}</div>` : "") + (heledag.length ? `<div class="heledag">${heledag.map(a => `<span class="klik" data-afs="${a.i}" tabindex="0">${esc(a.titel)}</span>`).join("")}</div>` : "") +
     `<div class="tijdlijn" id="pl-tijdlijn"><div class="tl-binnen" id="pl-binnen" data-van="${van}" style="height:${(tot-van)*PLPX}px">${h}</div></div>`;
@@ -2816,7 +2819,7 @@ document.addEventListener("pointermove", ev => {
 document.addEventListener("pointerup", ev => {
   if (kaartSleep){
     const k = kaartSleep; kaartSleep = null;
-    if (k.spook){ k.spook.remove(); if (!plaats(k.id, ev.clientY)) toast("Laat de taak los boven een tijd in de dag", true); }
+    if (k.spook){ k.spook.remove(); if (!plaats(k.id, ev.clientY)) toast("Drop the task on a time in the day", true); }
     else { gekozenKaart = gekozenKaart === k.id ? null : k.id; teken(); }   // klik zonder slepen: kiezen
     return;
   }
@@ -2862,7 +2865,7 @@ async function openKiezer(id, anker, ids){
   sluitKiezer();
   const el = document.createElement("div");
   el.className = "kiezer";
-  el.innerHTML = `<input type="text" id="kiezer-zoek" placeholder="Zoek een map…" autocomplete="off"><div class="opties"><div class="leeg2">Mappen laden…</div></div>`;
+  el.innerHTML = `<input type="text" id="kiezer-zoek" placeholder="Find a folder…" autocomplete="off"><div class="opties"><div class="leeg2">Loading folders…</div></div>`;
   document.body.append(el);
   const r = anker ? anker.getBoundingClientRect() : {left: innerWidth/2 - 190, top: innerHeight/3, bottom: innerHeight/3};
   const boven = r.top > innerHeight * 0.55;
@@ -2879,9 +2882,9 @@ async function openKiezer(id, anker, ids){
 }
 function kiezerGroep(m){
   const l = m.toLowerCase(), inbox = (kiezer.inbox || "").toLowerCase(), arch = (kiezer.archief || "").split("/").pop().toLowerCase();
-  if (inbox && l.startsWith(inbox + "/")) return "In je inbox";
-  if (arch && l.startsWith(arch + "/")) return "In het archief";
-  return "Andere mappen";
+  if (inbox && l.startsWith(inbox + "/")) return "In your inbox";
+  if (arch && l.startsWith(arch + "/")) return "In the archive";
+  return "Other folders";
 }
 function kiezerOpties(){
   const ruw = kiezer.zoek.trim(), z = ruw.toLowerCase();
@@ -2898,7 +2901,7 @@ function tekenKiezer(){
   kiezer.index = Math.min(kiezer.index, Math.max(0, opties.length - 1));
   const inbox = (kiezer.inbox || "").toLowerCase();
   const regel = (o, i) => {
-    if (o.nieuw) return `<button class="optie nieuw${i === kiezer.index ? " actief" : ""}" data-nieuwemap="${esc(o.nieuw)}">${ik("folder")}<span>Nieuwe map <b>${esc(o.nieuw)}</b>${kiezer.inbox && !kiezer.archief.startsWith("[Gmail]") ? ` <span class="pad">in je inbox</span>` : ""}</span></button>`;
+    if (o.nieuw) return `<button class="optie nieuw${i === kiezer.index ? " actief" : ""}" data-nieuwemap="${esc(o.nieuw)}">${ik("folder")}<span>New folder <b>${esc(o.nieuw)}</b>${kiezer.inbox && !kiezer.archief.startsWith("[Gmail]") ? ` <span class="pad">in your inbox</span>` : ""}</span></button>`;
     let delen = o.map.split("/");
     if (inbox && delen.length > 1 && delen[0].toLowerCase() === inbox) delen = delen.slice(1);   // 'Inbox/' hoef je niet te zien
     const naam = delen.pop();
@@ -2906,21 +2909,21 @@ function tekenKiezer(){
   const groepen = new Set(opties.filter(o => o.groep).map(o => o.groep));
   let html = "", vorige = null;
   opties.forEach((o, i) => {
-    if (o.voorstel && i === 0) html += `<div class="kop2">Voorstel</div>`;
+    if (o.voorstel && i === 0) html += `<div class="kop2">Suggested</div>`;
     if (!o.voorstel && !o.nieuw){
-      const kop = groepen.size > 1 ? o.groep : (opties.some(x => x.voorstel) ? "Alle mappen" : null);
+      const kop = groepen.size > 1 ? o.groep : (opties.some(x => x.voorstel) ? "All folders" : null);
       if (kop && kop !== vorige){ html += `<div class="kop2">${esc(kop)}</div>`; vorige = kop; }
     }
-    if (o.nieuw) html += `<div class="kop2">Maken</div>`;
+    if (o.nieuw) html += `<div class="kop2">Create</div>`;
     html += regel(o, i);
   });
-  kiezer.el.querySelector(".opties").innerHTML = opties.length ? html : `<div class="leeg2">Geen map gevonden</div>`;
-  if (!kiezer.el.querySelector(".voet")) kiezer.el.insertAdjacentHTML("beforeend", `<div class="voet"><span><kbd>↑</kbd><kbd>↓</kbd> <kbd>↵</kbd> <kbd>Esc</kbd> · typ een naam voor een nieuwe map</span><button class="knop klein" id="kiezer-vernieuw" title="Mappen opnieuw ophalen uit Mail">Vernieuwen</button></div>`);
+  kiezer.el.querySelector(".opties").innerHTML = opties.length ? html : `<div class="leeg2">No folder found</div>`;
+  if (!kiezer.el.querySelector(".voet")) kiezer.el.insertAdjacentHTML("beforeend", `<div class="voet"><span><kbd>↑</kbd><kbd>↓</kbd> <kbd>↵</kbd> <kbd>Esc</kbd> · type a name for a new folder</span><button class="knop klein" id="kiezer-vernieuw" title="Fetch the folders from Mail again">Refresh</button></div>`);
   kiezer.el.querySelector(".optie.actief")?.scrollIntoView({block:"nearest"});
 }
 async function maakMap(naam){
   const id = kiezer.id, ids = kiezer.ids;
-  kiezer.el.querySelector(".opties").innerHTML = `<div class="leeg2">Map maken in Mail…</div>`;
+  kiezer.el.querySelector(".opties").innerHTML = `<div class="leeg2">Creating folder in Mail…</div>`;
   const j = await stil("map-maken", {id, naam});
   if (!j.ok){ toast(j.melding, true); if (kiezer) tekenKiezer(); return; }
   sluitKiezer();
@@ -2946,7 +2949,7 @@ document.addEventListener("mousedown", ev => {
   if (!kiezer) return;
   const o = ev.target.closest(".kiezer .optie");
   if (o){ ev.preventDefault(); return o.dataset.nieuwemap !== undefined ? maakMap(o.dataset.nieuwemap) : kiesMap(o.dataset.map); }
-  if (ev.target.closest("#kiezer-vernieuw")){ ev.preventDefault(); const id = kiezer.id; kiezer.el.querySelector(".opties").innerHTML = `<div class="leeg2">Mappen laden…</div>`;
+  if (ev.target.closest("#kiezer-vernieuw")){ ev.preventDefault(); const id = kiezer.id; kiezer.el.querySelector(".opties").innerHTML = `<div class="leeg2">Loading folders…</div>`;
     stil("mappen", {id, vernieuw: true}).then(j => { if (kiezer && j.ok){ kiezer.mappen = j.mappen; kiezer.voorstellen = j.voorstellen; tekenKiezer(); } }); return; }
   if (!ev.target.closest(".kiezer")) sluitKiezer();
 }, true);
@@ -2987,7 +2990,7 @@ function zetBreedtes(){
   app.style.setProperty("--lijst-b", breedte.lijst + "px");
   app.classList.toggle("ingeklapt", ingeklapt);
   const k = document.getElementById("inklappen");
-  if (k) k.title = ingeklapt ? "Zijbalk uitklappen ( [ )" : "Zijbalk inklappen ( [ )";
+  if (k) k.title = ingeklapt ? "Expand sidebar ( [ )" : "Collapse sidebar ( [ )";
 }
 function bewaarBreedtes(){
   try { localStorage.setItem("mailagent-breedte", JSON.stringify(breedte)); localStorage.setItem("mailagent-ingeklapt", ingeklapt ? "1" : "0"); } catch(e){}
