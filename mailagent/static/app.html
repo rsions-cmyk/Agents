@@ -374,8 +374,10 @@ details.regels summary svg{width:14px;height:14px;vertical-align:-2px;margin-rig
 .leegpaneel p{margin:0;text-wrap:balance}
 .leegpaneel .rond{width:56px;height:56px;border-radius:50%;background:var(--ok-zacht);color:var(--ok);display:grid;place-items:center}
 .leegpaneel .rond svg{width:26px;height:26px}
-.leeg-merk{margin-top:28px;display:flex;flex-direction:column;align-items:center;gap:6px;opacity:.85}
+.leeg-merk{margin-top:28px;display:flex;flex-direction:column;align-items:center;gap:6px}
 .leeg-merk .woordmerk{font-size:24px}
+.leeg-merk .leeg-teken{width:96px;height:96px;margin-bottom:10px;border-radius:21px}
+:root[data-theme=dark] .leeg-merk .leeg-teken{box-shadow:0 0 0 1px rgba(255,255,255,.1)}
 .leeg-merk .tagline{font-size:12.5px;letter-spacing:.01em;color:var(--zacht)}
 .sneltoetsen{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--zacht);justify-content:center;max-width:360px}
 kbd{font:600 11px var(--romp,inherit);font-family:inherit;padding:1px 6px;border-radius:5px;border:1px solid var(--lijn);border-bottom-width:2px;background:var(--vlak);color:var(--tekst)}
@@ -807,10 +809,12 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
 /* ================= indeling: rail, bovenbalk en kolom Vandaag ================= */
 .app{grid-template-columns:64px minmax(0,1fr);grid-template-rows:52px minmax(0,1fr);min-height:100vh}
 /* rail */
-.zij{grid-row:1 / span 2;grid-column:1;width:64px;padding:14px 0 12px;align-items:center;gap:6px;position:sticky;top:0;height:100vh;border-right:1px solid var(--line)}
-.zij .logo{padding:0 0 14px;justify-content:center;width:100%}
+.zij{grid-row:1 / span 2;grid-column:1;width:64px;padding:0 0 12px;align-items:center;gap:6px;position:sticky;top:0;height:100vh;border-right:1px solid var(--line);z-index:35}   /* boven de kolommen, zodat het themamenu er niet achter valt */
+.zij .logo{height:52px;padding:0;margin-bottom:8px;justify-content:center;width:100%;border-bottom:1px solid var(--line)}
 .zij .woordmerk{display:none}
-.zij .logo .blok.merk,.zij .logo .blok.merk svg.merkteken{width:34px;height:34px}
+.zij .logo .blok.merk,.zij .logo .blok.merk svg.merkteken{width:36px;height:36px}
+.kop-merk{font-size:21px;white-space:nowrap}
+.kop-streep{flex:none;width:1px;height:20px;background:var(--line2)}
 .zij .nav{width:46px;flex-direction:column;justify-content:center;gap:3px;padding:8px 0 6px;border-radius:10px;position:relative}
 .zij .nav .navtekst{display:none}
 .zij .nav .tel{margin:0;font-size:11px;line-height:1;padding:0;min-width:0}
@@ -889,6 +893,7 @@ main{grid-row:2;grid-column:2 / -1;min-width:0}
   .topbalk .knop-ophalen{margin-left:auto;padding:0 10px}
   .topbalk .knop-ophalen .navtekst{display:none}
   .topbalk{gap:8px}
+  .kop-merk,.kop-streep{display:none}
   main{grid-column:1;padding:12px 16px 96px}
   .balk{bottom:72px}
 }
@@ -910,6 +915,7 @@ main{grid-row:2;grid-column:2 / -1;min-width:0}
     </div>
   </aside>
   <header class="topbalk" id="topbalk">
+    <span class="woordmerk kop-merk" aria-label="attaché">attach<span class="woordmerk-e">é</span></span><span class="kop-streep" aria-hidden="true"></span>
     <h1 id="titel">To do</h1>
     <span class="pf" id="pf"><button class="pf-knop" id="pf-knop" aria-haspopup="menu" title="Filter by project"><span id="pf-naam">· All</span><span data-ikoon="chevron"></span></button></span>
     <span class="kop-tel" id="koptel"></span>
@@ -1818,7 +1824,7 @@ function tekenLeegPaneel(){
       <div class="sneltoetsen"><span><kbd>J</kbd> <kbd>K</kbd> next, previous</span><span><kbd>⌘</kbd><kbd>↵</kbd> reply in Mail</span><span><kbd>⇧⌘↵</kbd> send</span><span><kbd>D</kbd> done</span>
         <span><kbd>V</kbd> file</span><span><kbd>E</kbd> archive</span><span><kbd>#</kbd> Bin</span><span><kbd>T</kbd> task</span><span><kbd>X</kbd> dismiss</span>
         <span><kbd>1</kbd>–<kbd>${D.projecten.length}</kbd> project</span><span><kbd>?</kbd> all shortcuts</span></div>
-      ${klaar ? `<div class="leeg-merk"><span class="woordmerk">attach<span class="woordmerk-e">é</span></span><span class="tagline">Minding the details.</span></div>` : ""}</div>`;
+      ${klaar ? `<div class="leeg-merk"><img class="leeg-teken" src="/merk.svg" alt="" width="96" height="96"><span class="woordmerk">attach<span class="woordmerk-e">é</span></span><span class="tagline">Minding the details.</span></div>` : ""}</div>`;
   p.classList.add("open"); p.setAttribute("aria-hidden","false");
 }
 
