@@ -825,6 +825,30 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
 
 <script>
 const TOKEN = "__TOKEN__";
+let sleutel = TOKEN;   // de sessiesleutel; na een herstart van attaché haalt de pagina zelf de nieuwe op
+let sleutelHalen = null;
+function nieuweSleutel(){
+  sleutelHalen ||= (async () => {
+    try {
+      const r = await fetch("/", {cache:"no-store"});
+      const m = (await r.text()).match(/const TOKEN = "([\w-]+)";/);
+      if (!m || m[1] === sleutel) return false;
+      sleutel = m[1];
+      return true;
+    } catch(e){ return false; }
+  })().finally(() => { sleutelHalen = null; });
+  return sleutelHalen;
+}
+// Elk verzoek naar /api/ gaat hierlangs. Weigert de app de sleutel (403), dan is attaché waarschijnlijk
+// herstart: nieuwe sleutel ophalen en het verzoek één keer opnieuw sturen. Dat kan veilig, want een
+// geweigerd verzoek is niet uitgevoerd.
+async function api(pad, opties = {}){
+  const stuur = () => fetch(pad, {cache:"no-store", ...opties, headers:{...(opties.headers || {}), "X-Token":sleutel}});
+  const r = await stuur();
+  if (r.status === 403 && await nieuweSleutel()) return stuur();
+  return r;
+}
+const post = (naam, data) => api("/api/"+naam, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data||{})});
 const IKONEN = {
   thema:'<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor" stroke="none"/>',
   inbox:'<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/>',
@@ -910,7 +934,7 @@ let afsSleep = null, negeerKlik = false;   // een blok in Planning wordt verslee
 async function laad(){
   clearTimeout(peilTimer);
   try {
-    const r = await fetch("/api/data", {cache:"no-store", headers:{"X-Token":TOKEN}});
+    const r = await api("/api/data");
     if (!r.ok) throw new Error("status " + r.status);
     const nieuw = await r.json();
     if (afsSleep){ D = nieuw; peilTimer = setTimeout(laad, 1500); return; }   // niet hertekenen midden in het slepen
@@ -926,7 +950,7 @@ async function laad(){
 
 async function actie(naam, data){
   try {
-    const r = await fetch("/api/"+naam, {method:"POST", headers:{"Content-Type":"application/json","X-Token":TOKEN}, body:JSON.stringify(data||{})});
+    const r = await post(naam, data);
     const j = await r.json();
     toast(j.melding, !j.ok);
     return j.ok;
@@ -1131,7 +1155,7 @@ function animeerWeg(ids){
 
 async function stil(naam, data){
   try {
-    const r = await fetch("/api/"+naam, {method:"POST", headers:{"Content-Type":"application/json","X-Token":TOKEN}, body:JSON.stringify(data||{})});
+    const r = await post(naam, data);
     return await r.json();
   } catch(e){ return {ok:false, melding:"No connection to mailagent"}; }
 }
@@ -2235,7 +2259,7 @@ async function laadDag(dag){
   if (dagen[dag] !== undefined) return;
   dagen[dag] = "laden";
   try {
-    const r = await fetch("/api/dag", {method:"POST", headers:{"Content-Type":"application/json","X-Token":TOKEN}, body:JSON.stringify({datum:dag})});
+    const r = await post("dag", {datum:dag});
     const j = await r.json();
     dagen[dag] = j.ok ? j.afspraken : {fout: j.melding};
     if (j.ok && j.bezig){   // Claude deelt nieuwe afspraken in: zo meteen nog eens ophalen
@@ -2305,7 +2329,7 @@ async function openTaak(id){
           archiveren: false};
   tekenTaak();
   try {
-    const r = await fetch("/api/taak-voorstel", {method:"POST", headers:{"Content-Type":"application/json","X-Token":TOKEN}, body:JSON.stringify({id})});
+    const r = await post("taak-voorstel", {id});
     const j = await r.json();
     if (!taak || taak.id !== id) return;
     if (!j.ok){ toast(j.melding, true); return sluitPaneel(); }
