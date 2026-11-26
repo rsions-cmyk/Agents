@@ -36,10 +36,11 @@ class NepLLM:
         return Sortering(project="overig", actie="ter_info", prioriteit="laag",
                          deadline=None, samenvatting=mail.onderwerp, reden="test")
 
-    def werk_uit(self, mail, tekst, sortering, voorbeelden=None, achtergrond=None):
+    def werk_uit(self, mail, tekst, sortering, voorbeelden=None, achtergrond=None, agenda_check=None):
         self.gezien.append(tekst)
         self.voorbeelden = voorbeelden
         self.achtergrond = achtergrond
+        self.agenda_check = agenda_check
         return Uitwerking(concept_antwoord=f"Concept voor: {mail.onderwerp}",
                           taken=[Taak(omschrijving="Opvolgen", deadline=sortering.deadline)],
                           agenda_voorstel=None, vragen_aan_jou="Akkoord?")
@@ -1422,3 +1423,54 @@ def test_afgehandeld_terugvinden_zoeken_en_terugzetten(omgeving):
     assert terug_naar_te_doen(store, bronnen, ander).startswith("Back in your inbox")
     assert store.item(ander)["status"] == "wacht"
     assert istte not in [r["id"] for r in store.afgehandeld_uit_te_doen()]
+
+
+def test_afspraakvoorstel_eerst_agenda_nakijken(omgeving):
+    """Iemand stelt woensdag 9.30 voor terwijl je dan bezet bent: Claude krijgt te horen dat dat moment bezet is,
+    met vrije alternatieven, en het verzoek ligt klaar voor Afspraak plannen."""
+    from datetime import date, datetime, time, timedelta
+    from mailagent.models import Email
+    from mailagent.pipeline import lijkt_afspraak, verwerk_mail
+
+    cfg, store, bronnen = omgeving
+    woensdag = date.today() + timedelta(days=(2 - date.today().weekday()) % 7 or 7)
+
+    class Claude(NepLLM):
+        def sorteer(self, mail, tekst, vast_project):
+            return Sortering(project="onderzoek", actie="antwoorden", prioriteit="hoog", deadline=None,
+                             samenvatting="Kennismaking", reden="test")
+
+        def afspraak_uit_mail(self, mail, tekst, achtergrond=None):
+            return {"met": "Jeroen Schepers", "onderwerp": "Kennismaking PhD-voorstel", "duur_minuten": 60,
+                    "locatie": None, "vroegst": None, "uiterlijk": None,
+                    "voorgesteld": [{"dag": woensdag.isoformat(), "van": "09:30", "tot": "10:30",
+                                     "omschrijving": "woensdag 9.30 uur"}]}
+
+    class Agenda:   # woensdag de hele ochtend bezet
+        def bezet(self, van, tot):
+            return [(datetime.combine(woensdag, time(9, 0)).astimezone(), datetime.combine(woensdag, time(12, 0)).astimezone())]
+
+    tekst = ("Beste Rob,\n\nLeuk voorstel! Zullen we een kennismaking plannen op woensdag 2 december om 9.30 uur, "
+             "online of op de TU/e-campus?\n\nGroet, Jeroen\n\nOp 20 nov schreef Rob:\n> Volgende week maandag?")
+    assert lijkt_afspraak("antwoorden", tekst)
+    assert not lijkt_afspraak("antwoorden", "Dank voor je mail, ik lees het stuk deze week.\n\n> Kun je dinsdag om 10.00?")
+    mail = Email(bron="test", bron_id="jeroen.eml", van="Jeroen Schepers <j.schepers@tue.nl>", aan="rob@buas.nl",
+                 onderwerp="RE: PhD-voorstel", datum=datetime.now().astimezone(), tekst=tekst, thread_id="<j1@tue.nl>")
+    llm = Claude()
+    item_id = verwerk_mail(cfg, store, llm, mail, Agenda())
+    blok = llm.agenda_check
+    assert blok and "woensdag 9.30 uur" in blok and ": bezet" in blok and "Vrije momenten van 60 minuten" in blok
+    assert "12:00" in blok or "13:00" in blok or "14:00" in blok   # een vrij alternatief, na de bezette ochtend
+    it = store.item(item_id)
+    assert json.loads(it["afspraak"])["met"] == "Jeroen Schepers"          # Afspraak plannen hoeft niet opnieuw te vragen
+    agd = next(c for c in json.loads(it["context"]) if c["soort"] == "agenda")
+    assert agd["bezet"] == 1 and agd["voorgesteld"] == 1 and agd["vrij"] >= 1
+
+    # zonder agenda: geen blok, en Claude zegt dan niets toe (regel in de prompt)
+    llm2 = Claude()
+    import dataclasses
+    verwerk_mail(cfg, store, llm2, dataclasses.replace(mail, bron_id="jeroen2.eml"), None)
+    assert llm2.agenda_check is None
+    from mailagent.llm import ClaudeLLM
+    import inspect
+    assert "Zeg nooit namens de eigenaar een datum of tijd toe" in inspect.getsource(ClaudeLLM.werk_uit)

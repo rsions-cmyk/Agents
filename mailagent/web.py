@@ -30,7 +30,7 @@ from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
 from .opmaak import externe_afbeeldingen, html_uit_bron, veilig
-from .pipeline import RondeBezig, terug_naar_te_doen, achtergrond_voor_item, afspraak_momenten, bevestig_voorlopig, geef_voorlopig_vrij, haal_uit_agenda, houd_vast, verzet_taak, afzender_adres, deadline_in_agenda, ochtend, voorstellen_voor, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
+from .pipeline import RondeBezig, terug_naar_te_doen, agenda_check, lijkt_afspraak, achtergrond_voor_item, afspraak_momenten, bevestig_voorlopig, geef_voorlopig_vrij, haal_uit_agenda, houd_vast, verzet_taak, afzender_adres, deadline_in_agenda, ochtend, voorstellen_voor, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
 from .melding import meld
 from .store import Store
 
@@ -223,7 +223,7 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
     def ophalen_op_achtergrond():
         try:
             rest: dict = {}
-            res = run(cfg, Store(db_pad), bronnen, llm_factory(), voortgang=rest)
+            res = run(cfg, Store(db_pad), bronnen, llm_factory(), voortgang=rest, agenda=lambda: agenda()[0])
             ophalen["laatste"] = ", ".join(
                 f"{k}: failed" if v < 0 else f"{k}: {v} new" + (f", {rest[k]} still to go" if rest.get(k) else "")
                 for k, v in res.items())
@@ -435,8 +435,21 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                     s = Sortering(project=it["project"], actie="antwoorden", prioriteit=it["prioriteit"],
                                   deadline=it["deadline"], samenvatting=it["samenvatting"] or it["onderwerp"], reden="")
                     extra, context = achtergrond_voor_item(cfg, store, it)
-                    u = llm_factory().werk_uit(mail, anonimiseer(cfg, mail.tekst), s,
-                                               stijlvoorbeelden(cfg, store, mail, it["project"]), achtergrond=extra or None)
+                    llm = llm_factory()
+                    tekst_a = anonimiseer(cfg, mail.tekst)
+                    check = None
+                    if lijkt_afspraak(it["actie"], mail.tekst):
+                        ag, _ = agenda()
+                        if ag is not None:
+                            try:
+                                verzoek = json.loads(it["afspraak"]) if it["afspraak"] else llm.afspraak_uit_mail(mail, tekst_a, extra or None)
+                                store.zet_afspraak_verzoek(it["id"], verzoek)
+                                check = agenda_check(cfg, ag, verzoek)
+                                context = context + [{"soort": "agenda", **check["telling"]}]
+                            except Exception as ex:
+                                logging.getLogger("mailagent").warning("agenda nakijken: %s", ex)
+                    u = llm.werk_uit(mail, tekst_a, s, stijlvoorbeelden(cfg, store, mail, it["project"]),
+                                     achtergrond=extra or None, agenda_check=check["blok"] if check else None)
                     if context:
                         store.zet_context(it["id"], context)
                     if not (u.concept_antwoord or "").strip():

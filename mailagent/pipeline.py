@@ -42,7 +42,7 @@ def stijlvoorbeelden(cfg: Config, store: Store, mail: Email, project: str, aanta
     return (zelfde + project_)[:aantal]
 
 
-def verwerk_mail(cfg: Config, store: Store, llm: LLM, mail: Email) -> int:
+def verwerk_mail(cfg: Config, store: Store, llm: LLM, mail: Email, agenda=None) -> int:
     """Verwerkt één mail en geeft het id van het item in de wachtrij terug.
 
     De mail wordt pas als verwerkt opgeslagen samen met zijn item (zie Store.nieuw_item)."""
@@ -67,7 +67,7 @@ def verwerk_mail(cfg: Config, store: Store, llm: LLM, mail: Email) -> int:
         return store.nieuw_item(mail, s, None, "genegeerd")
 
     tekst = anonimiseer(cfg, mail.tekst)
-    uitwerking, context = None, []
+    uitwerking, context, verzoek = None, [], None
     try:
         if sortering is None:
             sortering = llm.sorteer(mail, tekst, vast_project)
@@ -75,8 +75,11 @@ def verwerk_mail(cfg: Config, store: Store, llm: LLM, mail: Email) -> int:
             extra, context = achtergrond(cfg, store, sleutel=mail.sleutel, van=mail.van, onderwerp=mail.onderwerp,
                                          thread_id=mail.thread_id, verwijzingen=mail.extra.get("verwijzingen"),
                                          datum=mail.datum)
+            verzoek, check = afspraak_nakijken(cfg, llm, agenda, mail, tekst, sortering.actie, extra or None)
+            if check:
+                context.append({"soort": "agenda", **check["telling"]})
             uitwerking = llm.werk_uit(mail, tekst, sortering, stijlvoorbeelden(cfg, store, mail, sortering.project),
-                                      achtergrond=extra or None)
+                                      achtergrond=extra or None, agenda_check=check["blok"] if check else None)
     except Exception as e:  # ook een kapot antwoord of een onverwachte fout: de mail komt bij 'zelf doen'
         soort = "Claude-fout" if isinstance(e, LLMFout) else f"onverwachte fout ({type(e).__name__})"
         log.warning("%s bij %s: %s", soort, mail.sleutel, e)
@@ -90,11 +93,85 @@ def verwerk_mail(cfg: Config, store: Store, llm: LLM, mail: Email) -> int:
         item_id = store.nieuw_item(mail, sortering, uitwerking, "wacht")
         if context:
             store.zet_context(item_id, context)
+        if verzoek:   # Afspraak plannen hoeft de mail dan niet opnieuw aan Claude voor te leggen
+            store.zet_afspraak_verzoek(item_id, verzoek)
         return item_id
     if belangrijk:
         return store.nieuw_item(mail, sortering, None, "wacht")
     status = "genegeerd" if sortering.actie == "negeren" else "ter_info"
     return store.nieuw_item(mail, sortering, None, status)
+
+
+# Een mail waarin iemand wil afspreken of een moment noemt: eerst de agenda nakijken, zodat het concept niets toezegt
+# op een moment dat je niet kunt. Alleen de nieuwe tekst telt, niet het geciteerde origineel.
+AFSPRAAK_WOORDEN = re.compile(
+    r"\b(afspraak|afspreken|afspreekt|meeting|meet|call|bellen|koffie|coffee|kennismak\w*|overleg|gesprek|zoom|teams|"
+    r"beschikbaar|available|availability|schikt|uitkomt|past het|inplannen|plannen|schedule)\b", re.IGNORECASE)
+MOMENT_WOORDEN = re.compile(
+    r"\b(maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|monday|tuesday|wednesday|thursday|friday|"
+    r"saturday|sunday|morgen|overmorgen|tomorrow|volgende week|next week)\b|\b\d{1,2}[.:]\d{2}\b|\b\d{1,2}\s*(uur|u|am|pm)\b|"
+    r"\b\d{1,2}\s+(jan|feb|mrt|maart|apr|mei|may|jun|jul|aug|sep|okt|oct|nov|dec)", re.IGNORECASE)
+
+
+def lijkt_afspraak(actie: str, tekst: str) -> bool:
+    eigen = _eigen_tekst(tekst or "")
+    return actie == "agenda" or bool(AFSPRAAK_WOORDEN.search(eigen) and MOMENT_WOORDEN.search(eigen))
+
+
+def agenda_check(cfg: Config, agenda, verzoek: dict) -> dict:
+    """Wat de app in je agenda zag bij de voorgestelde momenten, als blok voor Claude, plus een telling voor het
+    paneel. Zonder titels van afspraken: Claude hoort alleen vrij of bezet."""
+    from datetime import date as _date
+    morgen = _date.today() + timedelta(days=1)
+
+    def dag(x, standaard):
+        try:
+            return _date.fromisoformat(str(x)[:10]) if x else standaard
+        except ValueError:
+            return standaard
+    vanaf = max(morgen, dag(verzoek.get("vroegst"), morgen))
+    uiterlijk = dag(verzoek.get("uiterlijk"), vanaf + timedelta(days=14))
+    if uiterlijk < vanaf:
+        uiterlijk = vanaf + timedelta(days=7)
+    duur = max(15, min(480, int(verzoek.get("duur_minuten") or 30)))
+    m = afspraak_momenten(cfg, agenda, verzoek, vanaf, uiterlijk, "", duur)
+    noem = lambda d: f"{d:%A} {d.day} {d:%B %Y}"
+    regels, bezet = [], 0
+    for p in m["voorgesteld"]:
+        d = _date.fromisoformat(p["dag"])
+        if p["verleden"]:
+            stand = "ligt in het verleden"
+        elif p["te_vroeg"]:
+            stand = "vandaag, te kort dag"
+        elif p["vrij"]:
+            stand = f"vrij, bijvoorbeeld om {p['vrij'][11:16]}"
+        else:
+            stand, bezet = "bezet", bezet + 1
+        regels.append(f"- {p['omschrijving']} ({noem(d)}): {stand}")
+    vrij = [datetime.fromisoformat(x) for x in m["vrij"]]
+    blok = ["<agenda_check>", "De app heeft de agenda van de eigenaar nagekeken (werktijd en bestaande afspraken)."]
+    if regels:
+        blok += ["Momenten uit de mail:"] + regels
+    blok.append(f"Vrije momenten van {duur} minuten: " + ", ".join(f"{noem(v)} om {v:%H:%M}" for v in vrij)
+                if vrij else "Geen vrije momenten gevonden in de komende twee weken.")
+    blok.append("</agenda_check>")
+    return {"blok": "\n".join(blok), "telling": {"bezet": bezet, "vrij": len(vrij), "voorgesteld": len(regels)}}
+
+
+def afspraak_nakijken(cfg: Config, llm, agenda, mail: Email, tekst: str, actie: str, achtergrond: str | None):
+    """Bij een mail over een afspraak: wat de afzender wil (Claude) en of je dan kunt (agenda).
+    Geeft (verzoek, check) of (None, None). Een fout hier houdt het concept niet tegen; Claude zegt dan niets toe."""
+    if not lijkt_afspraak(actie, mail.tekst) or not hasattr(llm, "afspraak_uit_mail"):
+        return None, None
+    ag = agenda() if callable(agenda) else agenda
+    if ag is None:
+        return None, None
+    try:
+        verzoek = llm.afspraak_uit_mail(mail, tekst, achtergrond)
+        return verzoek, agenda_check(cfg, ag, verzoek)
+    except Exception as e:
+        log.warning("agenda nakijken voor %s mislukt: %s", mail.sleutel, e)
+        return None, None
 
 
 def afzender_adres(van: str) -> str:
@@ -366,13 +443,21 @@ def ronde_slot(store: Store):
 
 
 def run(cfg: Config, store: Store, bronnen: dict, llm: LLM, dagen: int | None = None,
-        maximum: int | None = None, voortgang: dict | None = None) -> dict[str, int]:
+        maximum: int | None = None, voortgang: dict | None = None, agenda=None) -> dict[str, int]:
     """Verwerkt per bron de mail van de afgelopen `terugkijken_dagen` die nog niet verwerkt is, oudste eerst.
 
     Elke ronde neemt hoogstens `maximum` mails per bron; de volgende ronde gaat verder.
     Al verwerkte mail wordt herkend en niet opnieuw naar Claude gestuurd.
     `voortgang` krijgt per bron het aantal mails dat daarna nog te gaan is.
     """
+    if agenda is None:   # pas koppelen als een mail over een afspraak gaat
+        cache: dict = {}
+
+        def agenda():
+            if "ag" not in cache:
+                from .agenda import maak_agenda
+                cache["ag"] = maak_agenda(cfg)[0] if (cfg.agenda or {}).get("kalender") else None
+            return cache["ag"]
     with ronde_slot(store):
         resultaat: dict[str, int] = {}
         uitgaand: dict[str, list] = {}   # per bron: je verstuurde mail van de laatste 30 dagen
@@ -403,7 +488,7 @@ def run(cfg: Config, store: Store, bronnen: dict, llm: LLM, dagen: int | None = 
             for i, mail in enumerate(te_doen, 1):
                 log.info("%s %d/%d: %s", naam, i, len(te_doen), mail.onderwerp[:70])
                 try:
-                    item_id = verwerk_mail(cfg, store, llm, mail)
+                    item_id = verwerk_mail(cfg, store, llm, mail, agenda)
                 except Exception as e:  # deze mail is niet opgeslagen; de volgende ronde probeert hem opnieuw
                     log.error("%s: %s overgeslagen door een fout, volgende ronde opnieuw: %s", naam, mail.sleutel, e)
                     continue

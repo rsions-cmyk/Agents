@@ -32,7 +32,7 @@ class LLMFout(Exception):
 class LLM(Protocol):
     def sorteer(self, mail: Email, tekst: str, vast_project: str | None) -> Sortering: ...
     def werk_uit(self, mail: Email, tekst: str, sortering: Sortering, voorbeelden: list[dict] | None = None,
-                 achtergrond: str | None = None) -> Uitwerking: ...
+                 achtergrond: str | None = None, agenda_check: str | None = None) -> Uitwerking: ...
     def plan_taak(self, mail: Email, tekst: str, project: str, achtergrond: str | None = None) -> Taakplan: ...
     def taken_gedaan(self, onderwerp: str, taken: list[tuple[int, str]], antwoord: str) -> TakenOordeel: ...
 
@@ -133,7 +133,7 @@ class ClaudeLLM:
         return Sortering.model_validate(data)
 
     def werk_uit(self, mail: Email, tekst: str, sortering: Sortering, voorbeelden: list[dict] | None = None,
-                 achtergrond: str | None = None) -> Uitwerking:
+                 achtergrond: str | None = None, agenda_check: str | None = None) -> Uitwerking:
         system = (
             f"Je bent de projectagent voor '{sortering.project}'. Je bereidt werk voor; de eigenaar keurt alles "
             "goed voordat er iets gebeurt. Je verstuurt niets en zegt niets toe wat volgens de projectinstructies "
@@ -144,6 +144,10 @@ class ClaudeLLM:
             "maar nooit de inhoud. Staan ze er niet bij, onderteken dan niet; de eigenaar voegt een handtekening toe. "
             "Verzin geen feiten, data of afspraken die niet in de mail of de instructies staan. Ontbreekt informatie, "
             "zet dan [FILL IN: ...] in het concept.\n"
+            "Zeg nooit namens de eigenaar een datum of tijd toe. Staat er een <agenda_check>-blok bij, dan heeft de app "
+            "zijn agenda nagekeken: ga alleen akkoord met een moment dat daar als vrij staat, en stel bij een bezet of "
+            "onhandig moment een of twee vrije momenten uit dat blok voor. Zonder dat blok zet je [FILL IN: ...] waar een "
+            "moment moet komen, en zet je de vraag in 'vragen_aan_jou'.\n"
             f"{ACHTERGROND_REGEL}"
             "Zet concrete vervolgstappen in 'taken', elk met een realistische schatting van de minuten eigen werk "
             "(lezen, nadenken, schrijven, overleggen; geen wachttijd op anderen), afgerond op 15. Het beantwoorden "
@@ -157,7 +161,8 @@ class ClaudeLLM:
                 f"<voorbeeld>\nOp: {v['onderwerp']} (van {v['van']})\nZijn antwoord:\n{v['antwoord'][:1500]}\n</voorbeeld>"
                 for v in voorbeelden) + "\n</eerdere_antwoorden_van_de_eigenaar>\n\n"
         gebruiker = (
-            f"{stijl}{achtergrond_blok(achtergrond)}{mail_blok(mail, tekst)}\n\nSortering door de chief of staff: actie={sortering.actie}, "
+            f"{stijl}{achtergrond_blok(achtergrond)}{(agenda_check + chr(10) + chr(10)) if agenda_check else ''}"
+            f"{mail_blok(mail, tekst)}\n\nSortering door de chief of staff: actie={sortering.actie}, "
             f"prioriteit={sortering.prioriteit}, deadline={sortering.deadline}. Samenvatting: {sortering.samenvatting}"
         )
         data = self._vraag(system, gebruiker, SCHEMA_UITWERKING, self.cfg.uitwerken_effort)

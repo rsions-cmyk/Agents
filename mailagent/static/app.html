@@ -919,13 +919,14 @@ async function afspraakNaarConcept(id){
 function achtergrondHTML(context, van){
   const ik_ = afzender(van || ""), wieNaam = w => (w || "").toLowerCase() === (ik_.adres || "").toLowerCase() ? ik_.naam : w;
   const c = context || [], draad = c.filter(x => x.soort === "draad"), eerder = c.filter(x => x.soort === "eerder");
-  const taken = c.find(x => x.soort === "taken"), wacht = c.find(x => x.soort === "wacht");
+  const taken = c.find(x => x.soort === "taken"), wacht = c.find(x => x.soort === "wacht"), agd = c.find(x => x.soort === "agenda");
   if (!c.length) return "";
   const delen = [];
   if (draad.length) delen.push(draad.length === 1 ? "1 email from this conversation" : `${draad.length} emails from this conversation`);
   if (eerder.length) delen.push(eerder.length === 1 ? "1 earlier email with this person" : `${eerder.length} earlier emails with this person`);
   if (taken) delen.push(taken.aantal === 1 ? "1 open task" : `${taken.aantal} open tasks`);
   if (wacht) delen.push(wacht.aantal === 1 ? "1 question you are waiting on" : `${wacht.aantal} questions you are waiting on`);
+  if (agd) delen.push(agd.bezet ? `your calendar (${agd.bezet === 1 ? "1 proposed time is" : agd.bezet + " proposed times are"} busy)` : "your calendar");
   const regel = x => `<div class="ag-r"><span class="meta">${kortDatum(x.datum)}</span><span>${x.richting === "uit" ? "you to " + esc(wieNaam(x.wie)) : esc(afzender(x.wie).naam)} · ${esc(x.onderwerp)}</span></div>`;
   return `<details class="achtergrond"><summary>${ik("mail")}Background for this draft: ${delen.join(", ")}</summary>
     ${draad.length ? `<div class="ag-kop">This conversation</div>${draad.map(regel).join("")}` : ""}
