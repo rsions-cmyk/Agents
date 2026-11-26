@@ -1474,3 +1474,25 @@ def test_afspraakvoorstel_eerst_agenda_nakijken(omgeving):
     from mailagent.llm import ClaudeLLM
     import inspect
     assert "Zeg nooit namens de eigenaar een datum of tijd toe" in inspect.getsource(ClaudeLLM.werk_uit)
+
+
+def test_map_verzonden_zelf_opzoeken(monkeypatch):
+    """Gmail in het Nederlands heet '[Gmail]/Verzonden berichten': de app zoekt de echte map op en onthoudt hem."""
+    from mailagent.sources import applemail
+    bron = applemail.AppleMailBron("google", "Google", mailbox="INBOX", archief="Archive", prullenbak="Trash")
+    assert bron.mappen["verzonden"] == "Sent Items"          # de oude gok, die bij Gmail niet klopt
+    aanroepen = []
+
+    def nep(script, *args):
+        aanroepen.append(args[:2])
+        if script is applemail.SCRIPT_MAPPEN:
+            return "INBOX\n[Gmail]\n[Gmail]/Alle berichten\n[Gmail]/Verzonden berichten\n[Gmail]/Prullenbak\nFamilie\n"
+        if args[1] != "[Gmail]/Verzonden berichten":
+            raise RuntimeError("AppleScript error: folder 'Sent Items' not found in account Google (-2700)")
+        return ""
+    monkeypatch.setattr(applemail, "_osascript", nep)
+    from datetime import datetime, timedelta
+    assert bron.verzonden_sinds(datetime.now().astimezone() - timedelta(days=1)) == []
+    assert bron.mappen["verzonden"] == "[Gmail]/Verzonden berichten"
+    bron.verzonden_sinds(datetime.now().astimezone() - timedelta(days=1))   # tweede keer meteen de goede map
+    assert aanroepen[-1] == ("Google", "[Gmail]/Verzonden berichten")

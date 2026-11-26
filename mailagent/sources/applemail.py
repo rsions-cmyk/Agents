@@ -556,11 +556,39 @@ class AppleMailBron:
                 rijen.append((velden[0].strip(), velden[1], US.join(velden[2:]).strip()))
         return rijen
 
+    # namen van de map Verzonden, per taal van Gmail of Exchange; volledige paden eerst
+    VERZONDEN_NAMEN = ["[gmail]/sent mail", "[google mail]/sent mail", "[gmail]/verzonden berichten",
+                       "[google mail]/verzonden berichten", "[gmail]/gesendet", "sent items", "verzonden items",
+                       "sent messages", "verzonden berichten", "sent mail", "sent", "verzonden"]
+
+    def zoek_verzonden(self) -> str | None:
+        """De echte map Verzonden van dit account, opgezocht in Mail (de naam hangt af van taal en dienst)."""
+        paden = [p.strip().strip("/") for p in _osascript(SCRIPT_MAPPEN, self.account).splitlines() if p.strip()]
+        laag = {p.lower(): p for p in paden}
+        for naam in self.VERZONDEN_NAMEN:
+            if naam in laag:
+                return laag[naam]
+        for naam in self.VERZONDEN_NAMEN:
+            for p in paden:
+                if p.lower().split("/")[-1] == naam.split("/")[-1]:
+                    return p
+        return None
+
     def verzonden_sinds(self, sinds: datetime) -> list[dict]:
-        """Mail die je zelf verstuurde sinds `sinds`, vanaf elk apparaat (de map Verzonden synchroniseert)."""
+        """Mail die je zelf verstuurde sinds `sinds`, vanaf elk apparaat (de map Verzonden synchroniseert).
+        Bestaat de ingestelde map niet, dan zoekt de app de echte map Verzonden op en onthoudt die."""
         nu = datetime.now().astimezone()
         seconden = max(60, int((nu - sinds).total_seconds()))
-        uit = _osascript(SCRIPT_VERZONDEN, self.account, self.mappen["verzonden"], str(seconden))
+        try:
+            uit = _osascript(SCRIPT_VERZONDEN, self.account, self.mappen["verzonden"], str(seconden))
+        except RuntimeError as e:
+            gevonden = self.zoek_verzonden()
+            if not gevonden or gevonden == self.mappen["verzonden"]:
+                raise
+            log.info("%s: map Verzonden is '%s', niet '%s' (zet verzonden: in config.yaml om dit vast te leggen)",
+                     self.naam, gevonden, self.mappen["verzonden"])
+            self.mappen["verzonden"] = gevonden
+            uit = _osascript(SCRIPT_VERZONDEN, self.account, self.mappen["verzonden"], str(seconden))
         berichten = []
         for rec in uit.split(RS):
             velden = rec.split(US)
