@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import re
+import hashlib
+import hmac
+import secrets
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -123,10 +126,37 @@ def mag_naar_claude(cfg: Config, mail: Email) -> bool:
     return True
 
 
+# Omkeerbaar anonimiseren (fout 11). Elke gevonden waarde krijgt een eigen code, zoals [NUMMER-a3f9c1]: dezelfde
+# waarde steeds dezelfde code, zodat Claude ziet dat twee keer hetzelfde nummer bedoeld is. De app onthoudt in het
+# geheugen welke code bij welke waarde hoort en zet in het antwoord van Claude de echte waarde terug. De sleutel is
+# per keer dat de app start nieuw, dus de codes zeggen buiten deze app niets.
+_ANON_SLEUTEL = secrets.token_bytes(16)
+_ANONIEM: dict[str, str] = {}
+ANON_CODE = re.compile(r"\[([A-Z][A-Z_]*)-([0-9a-fA-F]{6})\]")
+
+
 def anonimiseer(cfg: Config, tekst: str) -> str:
     for patroon, vervang in cfg.anonimiseren:
-        tekst = patroon.sub(vervang, tekst)
+        label = re.sub(r"[^A-Z_]", "", str(vervang).upper()) or "ANON"
+
+        def code(m, label=label):
+            waarde = m.group(0)
+            c = f"[{label}-{hmac.new(_ANON_SLEUTEL, waarde.encode(), hashlib.sha256).hexdigest()[:6]}]"
+            _ANONIEM[c] = waarde
+            return c
+        tekst = patroon.sub(code, tekst)
     return tekst
+
+
+def herstel_anoniem(waarde):
+    """De codes van anonimiseer() in tekst, lijsten en woordenboeken terug naar de echte waarde."""
+    if isinstance(waarde, str):
+        return ANON_CODE.sub(lambda m: _ANONIEM.get(f"[{m.group(1)}-{m.group(2).lower()}]", m.group(0)), waarde)
+    if isinstance(waarde, list):
+        return [herstel_anoniem(v) for v in waarde]
+    if isinstance(waarde, dict):
+        return {k: herstel_anoniem(v) for k, v in waarde.items()}
+    return waarde
 
 
 def sorteer_met_regels(cfg: Config, mail: Email) -> tuple[Optional[str], Optional[Sortering]]:

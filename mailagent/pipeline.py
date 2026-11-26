@@ -78,8 +78,28 @@ def schone_open_punten(concept: str | None, punten: list) -> list[OpenPunt]:
     return sorted(uit, key=lambda p: volgorde.get(p.plek, -1) if p.plek else -1)
 
 
+GROET = re.compile(r"\b(groet|groeten|regards|wishes|hartelijk|vriendelijke|cheers|best|thanks|dank)\b", re.IGNORECASE)
+
+
+def stijl_van(antwoord: str) -> str:
+    """Alleen de vorm van een antwoord: aanhef zonder naam, afsluiting en lengte. Voor antwoorden aan andere mensen,
+    zodat Claude je toon leert zonder iets uit dat antwoord te kunnen citeren (fout 10)."""
+    regels = [r.strip() for r in (antwoord or "").strip().splitlines() if r.strip()]
+    if not regels:
+        return ""
+    m = re.match(r"^(\S+)(\s+[^,!]+)?([,!]?)\s*$", regels[0])
+    aanhef = (f"{m.group(1)}{' [naam]' if m.group(2) else ''}{m.group(3)}" if m and len(regels[0]) <= 50
+              else "(geen vaste aanhef)")
+    groet = max((i for i, r in enumerate(regels) if i > 0 and len(r) <= 50 and GROET.search(r)), default=None)
+    afsluiting = "\n".join(regels[groet:groet + 3]) if groet is not None else "(geen vaste afsluiting)"
+    woorden = len(re.findall(r"\w+", antwoord))
+    alineas = len([b for b in re.split(r"\n\s*\n", antwoord.strip()) if b.strip()])
+    return f"Aanhef: {aanhef}\nAfsluiting:\n{afsluiting}\nLengte: {woorden} woorden in {alineas} alinea's"
+
+
 def stijlvoorbeelden(cfg: Config, store: Store, mail: Email, project: str, aantal: int = 3) -> list[dict]:
-    """Eerdere antwoorden van de eigenaar: eerst aan dezelfde afzender, dan binnen hetzelfde project.
+    """Eerdere antwoorden van de eigenaar: eerst aan dezelfde afzender, volledig, dan binnen hetzelfde project,
+    maar daarvan alleen de vorm (aanhef, afsluiting, lengte), want dat zijn antwoorden aan andere mensen.
 
     Antwoorden aan afzenders op de lijst 'nooit naar Claude' gaan nooit mee.
     """
@@ -95,7 +115,8 @@ def stijlvoorbeelden(cfg: Config, store: Store, mail: Email, project: str, aanta
         if afzender_adres(r["van"] or "") == adres:
             zelfde.append(v)
         elif r["project"] == project:
-            project_.append(v)
+            project_.append({**v, "onderwerp": "", "van": "", "soort": "stijl",
+                             "antwoord": stijl_van(r["eigen_antwoord"] or "")})
     return (zelfde + project_)[:aantal]
 
 

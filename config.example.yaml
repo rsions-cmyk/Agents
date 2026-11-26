@@ -90,7 +90,8 @@ nooit_naar_claude:
     # - "vertrouwelijk"
     # - "medisch"
 
-# Text replaced before anything goes to Claude (regular expressions).
+# Text replaced before anything goes to Claude (regular expressions), in every field. Each value gets its own
+# code with the word under 'vervang', such as [NUMMER-a3f9c1]; the app puts the real value back in drafts and tasks.
 # By default: student numbers of 6 or 7 digits, and IBANs.
 anonimiseren:
   - patroon: '\b\d{6,7}\b'
