@@ -6,7 +6,8 @@
 <title>attaché</title>
 <script>(function(){var m="auto";try{m=localStorage.getItem("attache-thema")||"auto"}catch(e){}
 var d=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches;
-document.documentElement.dataset.theme=m==="auto"?(d?"dark":"paper"):m;document.documentElement.dataset.themaKeuze=m})();</script>
+document.documentElement.dataset.theme=m==="auto"?(d?"dark":"paper"):m;document.documentElement.dataset.themaKeuze=m;
+try{if(sessionStorage.getItem("attache-opgestart"))document.documentElement.classList.add("al-gestart")}catch(e){}})();</script>
 <meta name="application-name" content="attaché">
 <meta name="apple-mobile-web-app-title" content="attaché">
 <meta name="description" content="attaché. Minding the details. Your email, tasks and calendar, prepared by Claude; you do the sending yourself.">
@@ -376,8 +377,20 @@ details.regels summary svg{width:14px;height:14px;vertical-align:-2px;margin-rig
 .leegpaneel .rond svg{width:26px;height:26px}
 .leeg-merk{margin-top:28px;display:flex;flex-direction:column;align-items:center;gap:6px}
 .leeg-merk .woordmerk{font-size:24px}
-.leeg-merk .leeg-teken{width:96px;height:96px;margin-bottom:10px;border-radius:21px}
-:root[data-theme=dark] .leeg-merk .leeg-teken{box-shadow:0 0 0 1px rgba(255,255,255,.1)}
+.leegpaneel .leeg-teken{width:96px;height:96px;margin-bottom:6px;border-radius:21px}
+.leeg .leeg-logo{width:64px;height:64px;border-radius:14px;display:block;margin:0 auto 14px}
+:root[data-theme=dark] .leeg-teken,:root[data-theme=dark] .leeg-logo{box-shadow:0 0 0 1px rgba(255,255,255,.1)}
+.app.drie .leeg.klaar .leeg-logo{display:none}   /* drie kolommen: het logo staat al groot in het leespaneel */
+/* opstartscherm: alleen als je attaché opent, zolang de app laadt en minstens een ogenblik */
+.opstart{position:fixed;inset:0;z-index:300;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:var(--canvas);transition:opacity .4s ease}
+.al-gestart .opstart{display:none}
+.opstart img{width:112px;height:112px;border-radius:25px;animation:opstart-in .6s cubic-bezier(.2,.7,.2,1) both}
+:root[data-theme=dark] .opstart img{box-shadow:0 0 0 1px rgba(255,255,255,.1)}
+.opstart .woordmerk{font-size:34px;margin-top:10px;opacity:0;transition:opacity .35s ease}
+.opstart .opstart-regel{font-size:14px;color:var(--t2);opacity:0;transition:opacity .35s ease .08s}
+.opstart.letter .woordmerk,.opstart.letter .opstart-regel{opacity:1}
+.opstart.weg{opacity:0;pointer-events:none}
+@keyframes opstart-in{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}
 .leeg-merk .tagline{font-size:12.5px;letter-spacing:.01em;color:var(--zacht)}
 .sneltoetsen{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--zacht);justify-content:center;max-width:360px}
 kbd{font:600 11px var(--romp,inherit);font-family:inherit;padding:1px 6px;border-radius:5px;border:1px solid var(--lijn);border-bottom-width:2px;background:var(--vlak);color:var(--tekst)}
@@ -836,6 +849,8 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
 .pf-menu .nav{width:100%;padding:7px 10px;font-size:13.5px}
 .pf-menu .nav .tel{margin-left:auto}
 .topbalk .zoek{margin-left:auto;flex:0 1 420px;width:auto;height:32px}
+.topbalk .zoek{min-width:0}   /* mag krimpen, zodat Get mail in beeld blijft */
+@media (max-width:999px){.topbalk .zoek kbd{display:none}}
 .topbalk .status{font-size:12.5px;color:var(--t2);white-space:nowrap;min-height:0;text-align:right;max-width:280px;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
 .topbalk .knop-ophalen{height:32px;padding:0 12px;flex:none;border-radius:8px;display:flex;align-items:center;gap:6px;font-weight:500;font-size:13px}
 .topbalk .knop-ophalen svg{width:16px;height:16px}
@@ -901,13 +916,14 @@ main{grid-row:2;grid-column:2 / -1;min-width:0}
 </style>
 </head>
 <body>
+<div class="opstart" id="opstart" aria-hidden="true"><img src="/merk.svg" alt="" width="112" height="112"><span class="woordmerk">attach<span class="woordmerk-e">é</span></span><span class="opstart-regel">Minding the details.</span></div>
 <div class="app" id="app">
   <aside class="zij">
     <div class="logo"><span class="blok merk"><svg class="merkteken" aria-hidden="true" viewBox="0 0 512 512"><defs>
 <linearGradient id="ambg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#243047"/><stop offset="1" stop-color="#10151f"/></linearGradient>
 <linearGradient id="amms" gradientUnits="userSpaceOnUse" x1="180" y1="0" x2="330" y2="0"><stop offset="0" stop-color="#b98a35"/><stop offset=".5" stop-color="#f3dd9a"/><stop offset="1" stop-color="#b48434"/></linearGradient>
 <mask id="amm" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512"><rect width="512" height="512" fill="#fff"/>
-<path transform="translate(242.17 268.50) rotate(-26.56) scale(.5)" d="M-72.92 29.18V-10.49Q-72.92 -35.29 -48.12 -35.29H34.54Q59.33 -35.29 59.33 -10.49V29.18Q59.33 47.37 41.15 47.37H-54.73Q-72.92 47.37 -72.92 29.18ZM-26.63 -32.29V-43.77Q-26.63 -54.13 -16.26 -54.13H2.68Q13.05 -54.13 13.05 -43.77V-32.29Z" fill="#000"/></mask></defs><rect width="512" height="512" rx="112" fill="url(#ambg)"/><g transform="translate(256 256) scale(1.0) translate(-256 -256)"><path d="M221.6 330.6 Q227.9 346.2 241.9 358.5 Q255.8 370.8 277.4 370.8 Q289.3 370.8 302.3 364.1 Q315.3 357.4 325.0 343.2 Q326.1 341.4 328.0 341.4 Q329.8 341.4 331.9 342.5 Q333.9 343.6 342.9 348.8 Q344.3 349.9 344.3 351.8 Q344.3 354.4 342.1 358.1 Q331.7 377.4 313.8 389.7 Q296.0 402.0 267.3 402.0 Q236.5 402.0 214.2 388.2 Q191.8 374.5 179.7 351.8 Q167.7 329.1 167.7 302.3 Q167.7 276.6 175.3 258.2 Q182.9 239.8 195.6 228.5 Q208.2 217.1 224.0 211.7 Q239.8 206.3 256.2 206.3 Q274.8 206.3 288.9 213.6 Q303.1 220.8 312.9 232.0 Q322.8 243.2 327.8 255.6 Q332.8 268.1 332.8 278.9 Q332.8 281.9 329.5 283.3 Z" fill="#efe8d8" mask="url(#amm)"/><path d="M225.3 182.2 Q237.2 166.9 244.1 156.5 Q251.0 146.1 255.6 136.6 Q260.3 127.1 265.1 115.2 Q266.6 111.9 270.9 110.9 Q275.2 110.0 278.9 110.0 Q289.7 110.0 297.3 114.6 Q304.9 119.3 304.9 129.0 Q304.9 143.1 295.8 154.5 Q286.7 165.8 273.9 174.2 Q261.0 182.5 249.5 187.7 Q248.0 188.5 246.3 189.2 Q244.7 190.0 242.8 190.0 Q241.3 190.0 239.1 188.9 Z" fill="url(#amms)"/></g></svg></span><span class="navtekst woordmerk" aria-label="attaché">attach<span class="woordmerk-e">é</span></span>
+<path transform="translate(242.17 268.50) rotate(-26.56) scale(.5)" d="M-72.92 29.18V-10.49Q-72.92 -35.29 -48.12 -35.29H34.54Q59.33 -35.29 59.33 -10.49V29.18Q59.33 47.37 41.15 47.37H-54.73Q-72.92 47.37 -72.92 29.18ZM-26.63 -32.29V-43.77Q-26.63 -54.13 -16.26 -54.13H2.68Q13.05 -54.13 13.05 -43.77V-32.29Z" fill="#000"/></mask></defs><rect width="512" height="512" rx="112" fill="url(#ambg)"/><g transform="translate(256 256) scale(1.2) translate(-256 -256)"><path d="M221.6 330.6 Q227.9 346.2 241.9 358.5 Q255.8 370.8 277.4 370.8 Q289.3 370.8 302.3 364.1 Q315.3 357.4 325.0 343.2 Q326.1 341.4 328.0 341.4 Q329.8 341.4 331.9 342.5 Q333.9 343.6 342.9 348.8 Q344.3 349.9 344.3 351.8 Q344.3 354.4 342.1 358.1 Q331.7 377.4 313.8 389.7 Q296.0 402.0 267.3 402.0 Q236.5 402.0 214.2 388.2 Q191.8 374.5 179.7 351.8 Q167.7 329.1 167.7 302.3 Q167.7 276.6 175.3 258.2 Q182.9 239.8 195.6 228.5 Q208.2 217.1 224.0 211.7 Q239.8 206.3 256.2 206.3 Q274.8 206.3 288.9 213.6 Q303.1 220.8 312.9 232.0 Q322.8 243.2 327.8 255.6 Q332.8 268.1 332.8 278.9 Q332.8 281.9 329.5 283.3 Z" fill="#efe8d8" mask="url(#amm)"/><path d="M225.3 182.2 Q237.2 166.9 244.1 156.5 Q251.0 146.1 255.6 136.6 Q260.3 127.1 265.1 115.2 Q266.6 111.9 270.9 110.9 Q275.2 110.0 278.9 110.0 Q289.7 110.0 297.3 114.6 Q304.9 119.3 304.9 129.0 Q304.9 143.1 295.8 154.5 Q286.7 165.8 273.9 174.2 Q261.0 182.5 249.5 187.7 Q248.0 188.5 246.3 189.2 Q244.7 190.0 242.8 190.0 Q241.3 190.0 239.1 188.9 Z" fill="url(#amms)"/></g></svg></span><span class="navtekst woordmerk" aria-label="attaché">attach<span class="woordmerk-e">é</span></span>
 </div>
     <div id="nav" style="display:contents"></div>
     <div class="onder">
@@ -966,6 +982,22 @@ async function api(pad, opties = {}){
   const r = await stuur();
   if (r.status === 403 && await nieuweSleutel()) return stuur();
   return r;
+}
+// opstartscherm: de naam pas tonen als Young Serif er is; weg zodra de app er staat, maar niet eerder dan na
+// 0,8 seconde, anders flitst het. Alleen bij openen: een herlaadbeurt in hetzelfde venster slaat het over.
+const opstart = document.getElementById("opstart");
+let opstartKlaar = false;
+if (opstart && !document.documentElement.classList.contains("al-gestart")){
+  const letter = document.fonts && document.fonts.load ? document.fonts.load('34px "Young Serif"').catch(() => {}) : Promise.resolve();
+  Promise.race([letter, new Promise(r => setTimeout(r, 400))]).then(() => opstart.classList.add("letter"));
+  setTimeout(() => opstartWeg(), 4000);   // hoe dan ook weg, ook als de app niet bereikbaar is
+}
+function opstartWeg(){
+  if (opstartKlaar || !opstart) return;
+  opstartKlaar = true;
+  try { sessionStorage.setItem("attache-opgestart", "1"); } catch(e){}
+  if (document.documentElement.classList.contains("al-gestart")) return opstart.remove();
+  setTimeout(() => { opstart.classList.add("weg"); setTimeout(() => opstart.remove(), 450); }, Math.max(0, 800 - performance.now()));
 }
 const post = (naam, data) => api("/api/"+naam, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data||{})});
 const IKONEN = {
@@ -1061,9 +1093,11 @@ async function laad(){
   } catch(e){
     document.getElementById("status").textContent = "No connection to the app; retrying in 10 seconds";
     peilTimer = setTimeout(laad, 10000);
+    opstartWeg();
     return;
   }
   teken();
+  opstartWeg();
   if (D.ophalen.bezig) peilTimer = setTimeout(laad, 4000);
 }
 
@@ -1817,14 +1851,14 @@ function tekenLeegPaneel(){
   p.dataset.id = ""; p.dataset.sleutel = ""; p.dataset.lees = ""; p.dataset.sig = "";
   const klaar = staat.tab === "te_doen" && !teDoen().length;
   p.innerHTML = `<div class="leegpaneel">
-      ${klaar ? `<div class="rond">${ik("check")}</div><b style="color:var(--tekst)">All caught up</b>Nothing is waiting for you.` :
+      ${klaar ? `<img class="leeg-teken" src="/merk.svg" alt="" width="96" height="96"><b style="color:var(--tekst)">All caught up</b>Nothing is waiting for you.` :
         staat.tab === "opruimen" ? `${ik("sparkle")}<b style="color:var(--tekst)">Tidy up</b><p>Click an email to read it. Tick emails to handle several at once.</p>` :
         staat.tab === "te_doen" && staat.td === "afgehandeld" ? `${ik("check")}<b style="color:var(--tekst)">Handled</b><p>Email you cleared from To do in the past three weeks. Click one to see what you did with it, or move it back.</p>` :
         `${ik("mail")}<b style="color:var(--tekst)">Choose an email</b>`}
       <div class="sneltoetsen"><span><kbd>J</kbd> <kbd>K</kbd> next, previous</span><span><kbd>⌘</kbd><kbd>↵</kbd> reply in Mail</span><span><kbd>⇧⌘↵</kbd> send</span><span><kbd>D</kbd> done</span>
         <span><kbd>V</kbd> file</span><span><kbd>E</kbd> archive</span><span><kbd>#</kbd> Bin</span><span><kbd>T</kbd> task</span><span><kbd>X</kbd> dismiss</span>
         <span><kbd>1</kbd>–<kbd>${D.projecten.length}</kbd> project</span><span><kbd>?</kbd> all shortcuts</span></div>
-      ${klaar ? `<div class="leeg-merk"><img class="leeg-teken" src="/merk.svg" alt="" width="96" height="96"><span class="woordmerk">attach<span class="woordmerk-e">é</span></span><span class="tagline">Minding the details.</span></div>` : ""}</div>`;
+      ${klaar ? `<div class="leeg-merk"><span class="woordmerk">attach<span class="woordmerk-e">é</span></span><span class="tagline">Minding the details.</span></div>` : ""}</div>`;
   p.classList.add("open"); p.setAttribute("aria-hidden","false");
 }
 
@@ -1857,7 +1891,7 @@ function volgendeNa(id){
   return i < 0 ? null : (lijst[i+1] ?? lijst[i-1] ?? null);
 }
 
-const leeg = (titel, tekst) => `<div class="lijst"><div class="leeg"><div class="rond">${ik("check")}</div><b>${titel}</b>${tekst}</div></div>`;
+const leeg = (titel, tekst, klaar = false) => `<div class="lijst"><div class="leeg${klaar ? " klaar" : ""}"><img class="leeg-logo" src="/merk.svg" alt="" width="64" height="64"><b>${titel}</b>${tekst}</div></div>`;
 
 // Vandaag: overzicht voor het begin van de dag, bovenaan Te doen; verbergen tot morgen kan
 let deadlineVoorstel = null;   // null | "laden" | {voorstellen}
@@ -2241,7 +2275,7 @@ function tekenBelangrijk(){
 }
 
 function tekenBeoordelen(items){
-  if (!items.length) return leeg("All caught up", "Nothing is waiting for your review.");
+  if (!items.length) return leeg("All caught up", "Nothing is waiting for your review.", true);
   return `<div class="lijst">${items.map(it => { const a = afzender(it.van), [ai, al] = ACTIES[it.actie] || ["mail", it.actie];
     // één label: wat er van jou nodig is; deadline erbij als die er is
     const dl = it.deadline ? ` · ${new Date(it.deadline + "T12:00").toLocaleDateString("en-GB",{day:"numeric",month:"short"})}` : "";
