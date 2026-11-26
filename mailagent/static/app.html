@@ -1067,6 +1067,8 @@ function initialen(naam){
   const w = naam.replace(/[^\p{L}\s]/gu," ").trim().split(/\s+/).filter(Boolean);
   return ((w[0]||"?")[0] + (w.length > 1 ? w[w.length-1][0] : "")).toUpperCase();
 }
+const wanneerTerug = iso => { const d = new Date(iso);
+  return isoDag(d) === isoDag(new Date()) ? `today at ${tijdVan(d.getTime())}` : `on ${d.toLocaleDateString("en-GB", {day: "numeric", month: "short"})}`; };
 function datum(iso){
   if(!iso) return "";
   const d = new Date(iso), nu = new Date();
@@ -2491,6 +2493,8 @@ function tekenPaneel(it){
           ${it.jouw_antwoord && it.jouw_antwoord.tekst ? `<div class="jouw-antwoord">${esc(it.jouw_antwoord.tekst)}</div>` : ""}</div>
         <button class="knop klein goed" data-gedaanmelding="1">Done</button>
         <button class="knop klein" data-nietbeantwoord="${it.id}">Not yet</button></div>` : ""}
+      ${it.terug_in_inbox && !beantwoord ? `<div class="melding info">${ik("inbox")}<div><b>Back in your inbox.</b> You moved this email back to your inbox ${wanneerTerug(it.terug_in_inbox)}.
+          ${it.eigen_antwoord ? `<details class="al-beantwoord"><summary>Your earlier reply</summary><div class="jouw-antwoord">${esc(it.eigen_antwoord)}</div></details>` : ""}</div></div>` : ""}
       ${it.samenvatting && it.samenvatting !== it.onderwerp ? `<div class="melding info">${ik("sparkle")}<div>${esc(it.samenvatting)}</div></div>` : ""}
       ${zelf ? `<div class="melding fout">${ik("alert")}<div>${esc(it.opmerking || it.reden || "Check this email yourself.")}</div></div>` : ""}
       ${it.vragen && !beantwoord ? `<div class="melding">${ik("alert")}<div><b>Your decision</b><br>${esc(it.vragen)}</div></div>` : ""}

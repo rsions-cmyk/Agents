@@ -27,16 +27,18 @@ on run argv
     set grens to nu - secondenTerug
     tell application "Mail"
         set mb to mailbox mailboxNaam of account accountNaam
-        -- twee vragen voor alle berichten tegelijk; veel sneller dan per bericht
+        -- drie vragen voor alle berichten tegelijk; veel sneller dan per bericht. Het Message-ID verandert nooit,
+        -- het nummer (id) wel als een mail verplaatst wordt of Mail de inbox opnieuw opbouwt.
         repeat 3 times
             set ids to id of (every message of mb whose date received > grens)
             set datums to date received of (every message of mb whose date received > grens)
-            if (count of ids) = (count of datums) then exit repeat
+            set mids to message id of (every message of mb whose date received > grens)
+            if (count of ids) = (count of datums) and (count of ids) = (count of mids) then exit repeat
         end repeat
     end tell
     set uitvoer to ""
     repeat with i from 1 to count of ids
-        set uitvoer to uitvoer & (item i of ids as string) & US & ((nu - (item i of datums)) as integer as string) & RS
+        set uitvoer to uitvoer & (item i of ids as string) & US & ((nu - (item i of datums)) as integer as string) & US & (item i of mids as string) & RS
     end repeat
     return uitvoer
 end run
@@ -641,28 +643,29 @@ class AppleMailBron:
                               "tekst": US.join(velden[6:]).strip()})
         return berichten
 
-    def lijst(self, sinds) -> list[tuple[str, datetime]]:
-        """Alle berichten sinds `sinds` als (id, datum), oudste eerst. Snel: zonder inhoud."""
+    def lijst(self, sinds) -> list[tuple[str, datetime, str]]:
+        """Alle berichten sinds `sinds` als (id, datum, Message-ID), oudste eerst. Snel: zonder inhoud."""
         nu = datetime.now().astimezone()
         seconden = int((nu - sinds).total_seconds()) if sinds else 2 * 86400
         uit = _osascript(SCRIPT_LIJST, self.account, self.mailbox, str(seconden))
         rijen = []
         for rec in uit.split(RS):
             velden = rec.split(US)
-            if len(velden) == 2 and velden[0].strip():
-                rijen.append((velden[0].strip(), nu - timedelta(seconds=int(velden[1] or 0))))
+            if len(velden) >= 2 and velden[0].strip():
+                rijen.append((velden[0].strip(), nu - timedelta(seconds=int(velden[1] or 0)),
+                              velden[2].strip() if len(velden) > 2 else ""))
         return sorted(rijen, key=lambda r: r[1])
 
     def haal_op(self, sinds, maximum: int, overslaan=None) -> list[Email]:
         """De oudste `maximum` nog niet verwerkte berichten sinds `sinds`."""
         self.laatste_rijen = self.lijst(sinds)
-        rijen = [r for r in self.laatste_rijen if not (overslaan and overslaan(r[0]))]
+        rijen = [r for r in self.laatste_rijen if not (overslaan and overslaan(r[0], r[2]))]
         self.laatste_totaal = len(rijen)
-        kies = [mid for mid, _ in rijen[:maximum]]
+        kies = [bid for bid, _, _ in rijen[:maximum]]
         if not kies:
             return []
         nu = datetime.now().astimezone()
-        oudste = min(d for mid, d in rijen[:maximum])
+        oudste = min(d for _, d, _ in rijen[:maximum])
         seconden = int((nu - oudste).total_seconds()) + 120
         mails = []
         stuk = 20   # in stukken, zodat je voortgang ziet en een trage mail niet alles ophoudt

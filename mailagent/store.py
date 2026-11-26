@@ -135,6 +135,14 @@ CREATE TABLE IF NOT EXISTS log (
 PRIO_VOLGORDE = "CASE prioriteit WHEN 'hoog' THEN 0 WHEN 'normaal' THEN 1 ELSE 2 END"
 
 
+OPEN_STATUSSEN = ("wacht", "fout", "handmatig", "ter_info", "genegeerd")   # in To do of Tidy up
+
+
+def normaal_message_id(mid: Optional[str]) -> str:
+    """Message-ID zonder punthaken en hoofdletters: Apple Mail en de mail zelf schrijven het niet altijd gelijk."""
+    return (mid or "").strip().strip("<>").strip().lower()
+
+
 def nu() -> str:
     return datetime.now().astimezone().isoformat(timespec="seconds")
 
@@ -167,7 +175,8 @@ class Store:
         for kolom in ("lijkt_beantwoord", "bewijs", "deadline_in_agenda", "context",   # context: gebruikte achtergrond
                       "afspraak",                                                      # afspraak: verzoek uit de mail (JSON)
                       "opgeruimd",      # na je antwoord gearchiveerd (tijdstip), of 'weg' als hij al niet meer in de inbox stond
-                      "open_punten"):   # wat je in het concept nog moet beslissen of aanvullen (JSON)
+                      "open_punten",    # wat je in het concept nog moet beslissen of aanvullen (JSON)
+                      "terug_in_inbox"):  # wanneer je deze mail zelf terugzette in je inbox
             if kolom not in itemkolommen:
                 self.db.execute(f"ALTER TABLE items ADD COLUMN {kolom} TEXT")
         wachtkolommen = {r["name"] for r in self.db.execute("PRAGMA table_info(wacht_op)")}
@@ -179,6 +188,7 @@ class Store:
         # mail met een open taak hoort niet meer in Beoordelen (oudere versies lieten hem staan)
         self.db.execute("UPDATE items SET status='taak' WHERE status IN ('wacht','fout','handmatig') "
                         "AND id IN (SELECT item_id FROM taken WHERE klaar=0 AND item_id IS NOT NULL)")
+        self.voeg_dubbele_samen()
         # één item per mail; een oudere database met dubbele items houdt het zonder (de vergrendeling
         # van de ronde voorkomt dan nieuwe dubbele)
         try:
@@ -186,6 +196,57 @@ class Store:
         except sqlite3.IntegrityError:
             pass
         self.db.commit()
+
+    # --- herkennen op Message-ID (fout 5) ----------------------------------------
+    def item_bij_message_id(self, bron: str, message_id: str) -> Optional[sqlite3.Row]:
+        """Het (oudste) item van deze mail, gevonden op het Message-ID, dat nooit verandert."""
+        mid = normaal_message_id(message_id)
+        if not mid:
+            return None
+        r = self.db.execute("SELECT i.id FROM items i JOIN mails m USING(sleutel) WHERE m.bron=? "
+                            "AND lower(trim(m.thread_id, '<> ')) = ? ORDER BY i.id LIMIT 1", (bron, mid)).fetchone()
+        return self.item(r["id"]) if r else None
+
+    def voeg_dubbele_samen(self) -> int:
+        """Eenmalig, voor mail die attaché vóór deze versie dubbel verwerkte: per Message-ID blijft het oudste item
+        over. Taken en voorlopige afspraken gaan mee. Stond het nieuwe item nog open (To do of Tidy up), dan neemt
+        het oude die stand en het nieuwe concept over, want daar staat de mail nu."""
+        rijen = self.db.execute(
+            "SELECT i.id, i.status, i.sleutel, m.bron, m.bron_id, lower(trim(m.thread_id, '<> ')) AS mid "
+            "FROM items i JOIN mails m USING(sleutel) WHERE trim(COALESCE(m.thread_id, ''), '<> ') <> '' "
+            "ORDER BY i.id").fetchall()
+        groepen: dict = {}
+        for r in rijen:
+            groepen.setdefault((r["bron"], r["mid"]), []).append(r)
+        samengevoegd = 0
+        for groep in groepen.values():
+            if len(groep) < 2:
+                continue
+            houd = groep[0]
+            for ander in groep[1:]:
+                self.db.execute("UPDATE taken SET item_id=? WHERE item_id=?", (houd["id"], ander["id"]))
+                self.db.execute("UPDATE voorlopig SET item_id=? WHERE item_id=?", (houd["id"], ander["id"]))
+                if ander["status"] in OPEN_STATUSSEN and houd["status"] not in OPEN_STATUSSEN:
+                    self.db.execute(
+                        "UPDATE items SET (status, concept, taken, vragen, open_punten, context) = "
+                        "(SELECT status, concept, taken, vragen, open_punten, context FROM items WHERE id=?), "
+                        "opgeruimd=NULL, terug_in_inbox=? WHERE id=?", (ander["id"], nu(), houd["id"]))
+                # het oude item wijst voortaan naar waar de mail nu staat; het nummer van het nieuwe blijft bekend
+                self.db.execute("UPDATE mails SET bron_id=? WHERE sleutel=?", (ander["bron_id"], houd["sleutel"]))
+                self.db.execute("DELETE FROM items WHERE id=?", (ander["id"],))
+                self.log(houd["id"], f"dubbel item {ander['id']} samengevoegd (zelfde Message-ID)")
+                samengevoegd += 1
+        if samengevoegd:
+            self.db.commit()
+        return samengevoegd
+
+    def zet_terug_in_inbox(self, item_id: int, status: str, wis_concept: bool) -> None:
+        self.db.execute("UPDATE items SET status=?, opgeruimd=NULL, lijkt_beantwoord=NULL, terug_in_inbox=?, "
+                        "afgehandeld=? WHERE id=?", (status, nu(), nu(), item_id))
+        if wis_concept:
+            self.db.execute("UPDATE items SET concept='', open_punten=NULL WHERE id=?", (item_id,))
+        self.db.commit()
+        self.log(item_id, f"zelf teruggezet in de inbox -> {status}")
 
     # --- bronnen -------------------------------------------------------------
     def laatst_opgehaald(self, bron: str) -> Optional[datetime]:
@@ -592,8 +653,10 @@ class Store:
     def nieuw_bron_id(self, sleutel: str, bron: str, nieuw_id: str) -> None:
         """Na terugzetten geeft Apple Mail de mail een nieuw id: bijwerken, en het nieuwe id als bekend registreren."""
         self.db.execute("UPDATE mails SET bron_id=? WHERE sleutel=?", (nieuw_id, sleutel))
-        self.db.execute("INSERT OR IGNORE INTO mails SELECT ?, bron, ?, van, aan, onderwerp, datum, thread_id, tekst, opgehaald "
-                        "FROM mails WHERE sleutel=?", (f"{bron}:{nieuw_id}", nieuw_id, sleutel))
+        # kolommen bij naam: de tabel kreeg er later een bij (verwijzingen), en zonder namen faalt dit dan
+        self.db.execute("INSERT OR IGNORE INTO mails(sleutel, bron, bron_id, van, aan, onderwerp, datum, thread_id, tekst, "
+                        "opgehaald, verwijzingen) SELECT ?, bron, ?, van, aan, onderwerp, datum, thread_id, tekst, opgehaald, "
+                        "verwijzingen FROM mails WHERE sleutel=?", (f"{bron}:{nieuw_id}", nieuw_id, sleutel))
         self.db.commit()
 
     def taak(self, taak_id: int) -> Optional[sqlite3.Row]:

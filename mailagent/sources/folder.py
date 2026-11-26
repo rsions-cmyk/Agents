@@ -31,7 +31,7 @@ class MapBron:
                 datum = datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc)
             if sinds and datum <= sinds:
                 continue
-            if overslaan and overslaan(f.name):
+            if overslaan and overslaan(f.name, str(msg["Message-ID"] or "")):
                 continue
             deel = msg.get_body(preferencelist=("plain", "html"))
             tekst = deel.get_content() if deel else ""

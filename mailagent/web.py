@@ -59,6 +59,8 @@ def item_dict(rij, volledig: bool = False) -> dict:
             "vragen": rij["vragen"], "opmerking": rij["opmerking"], "context": json.loads(rij["context"] or "[]"),
             "taken": json.loads(rij["taken"] or "[]"), "tekst": (rij["tekst"] or "")[:8000],
             "open_punten": json.loads(rij["open_punten"] or "[]") if "open_punten" in rij.keys() else [],
+            "terug_in_inbox": rij["terug_in_inbox"] if "terug_in_inbox" in rij.keys() else None,
+            "eigen_antwoord": rij["eigen_antwoord"] if "eigen_antwoord" in rij.keys() else None,
         })
     return d
 

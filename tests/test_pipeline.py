@@ -1663,3 +1663,81 @@ def test_open_punten_bewaard_en_herschrijven_met_keuzes(omgeving):
         assert store.item(a)["open_punten"] is None                                   # niets meer open
     finally:
         server.shutdown()
+
+
+def test_zelfde_mail_met_nieuw_nummer_wordt_herkend(omgeving):
+    """Fout 5: Apple Mail geeft een mail een nieuw nummer als hij verplaatst wordt of Mail de inbox opnieuw
+    opbouwt. attaché herkent hem aan het Message-ID: geen nieuw item, geen Claude, de stand blijft."""
+    cfg, store, bronnen = omgeving
+    llm = NepLLM()
+    run(cfg, store, bronnen, llm)
+    items_voor = len(store.items())
+    a = store.items(status="wacht")[0]["id"]
+    oud = store.item(a)["bron_id"]
+    inbox = cfg.data_dir.parent / "mail"
+    (inbox / oud).rename(inbox / f"nieuw-{oud}")             # Mail bouwde de inbox opnieuw op
+    gezien = len(llm.gezien)
+    run(cfg, store, bronnen, llm)
+    assert len(store.items()) == items_voor and len(llm.gezien) == gezien
+    it = store.item(a)
+    assert it["bron_id"] == f"nieuw-{oud}" and it["status"] == "wacht" and it["terug_in_inbox"] is None
+
+
+def test_zelf_teruggezette_mail_komt_terug(omgeving):
+    """Fout 5, keuze B: zet je een mail die attaché had weggezet zelf terug in je inbox, dan komt het bestaande
+    item terug, zonder nieuw concept van Claude. Na een verstuurd antwoord begin je met een leeg concept."""
+    from mailagent.pipeline import ruim_beantwoord_op, verplaats_items
+    cfg, store, bronnen = omgeving
+    llm = NepLLM()
+    run(cfg, store, bronnen, llm)
+    a, b = [r["id"] for r in store.items(status="wacht")][:2]
+    inbox = cfg.data_dir.parent / "mail"
+    verplaats_items(store, bronnen, [a], "archief")
+    keur_goed(store, bronnen, b, "Dank, akkoord.", verzenden=True)
+    ruim_beantwoord_op(cfg, store, bronnen)
+    assert store.item(a)["status"] == "gearchiveerd" and store.item(b)["opgeruimd"]
+    store.db.execute("UPDATE taken SET klaar=1 WHERE item_id=?", (b,)); store.db.commit()   # met een open taak blijft hij in Planning
+    for i in (a, b):                                          # in Mail terug naar de inbox: nieuw nummer
+        naam = store.item(i)["bron_id"]
+        (inbox / "_archief" / naam).rename(inbox / f"terug-{naam}")
+    gezien, items_voor = len(llm.gezien), len(store.items())
+    run(cfg, store, bronnen, llm)
+    assert len(llm.gezien) == gezien and len(store.items()) == items_voor
+    ia, ib = store.item(a), store.item(b)
+    assert ia["status"] == "wacht" and ia["terug_in_inbox"] and ia["concept"]          # het oude concept blijft
+    assert ib["status"] == "wacht" and ib["terug_in_inbox"] and ib["concept"] == ""    # al beantwoord: leeg
+    assert ib["opgeruimd"] is None and ia["bron_id"].startswith("terug-")
+
+
+def test_oude_dubbele_mail_samengevoegd(omgeving):
+    """Mail die attaché vóór deze versie dubbel verwerkte: het oudste item blijft, met de stand van het nieuwe."""
+    from datetime import datetime
+    from mailagent.models import Email
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    a = store.items(status="wacht")[0]["id"]
+    it = store.item(a)
+    store.zet_status(a, "gearchiveerd")
+    store.voeg_taken_toe(a, it["project"], [{"omschrijving": "Nakijken", "deadline": None, "minuten": 30}])
+    store.db.execute("UPDATE taken SET klaar=1 WHERE item_id=?", (a,)); store.db.commit()
+    dubbel = Email(bron="test", bron_id="dubbel.eml", van=it["van"], aan=it["aan"] or "", onderwerp=it["onderwerp"],
+                   datum=datetime.fromisoformat(it["datum"]), tekst=it["tekst"], thread_id=f" <{it['thread_id'].strip('<> ').upper()}> ")
+    from mailagent.models import Sortering
+    d = store.nieuw_item(dubbel, Sortering(project=it["project"], actie="antwoorden", prioriteit="normaal", deadline=None,
+                                           samenvatting="nieuw", reden="test"), None, "wacht")
+    store.zet_concept(d, "Nieuw concept")
+    opnieuw = Store(cfg.db_pad)                                # bij het starten: samenvoegen
+    assert opnieuw.item(d) is None
+    houd = opnieuw.item(a)
+    assert houd["status"] == "wacht" and houd["concept"] == "Nieuw concept" and houd["bron_id"] == "dubbel.eml"
+    assert houd["terug_in_inbox"] and [t["item_id"] for t in opnieuw.db.execute("SELECT item_id FROM taken")] == [a]
+    assert opnieuw.voeg_dubbele_samen() == 0
+
+
+def test_nieuw_nummer_vastleggen_met_alle_kolommen(omgeving):
+    """Undo en Back to To do leggen het nieuwe nummer van Apple Mail vast; dat faalde sinds de kolom verwijzingen."""
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    it = store.item(store.items(status="wacht")[0]["id"])
+    store.nieuw_bron_id(it["sleutel"], "test", "99999")
+    assert store.is_bekend_sleutel("test:99999") and store.item(it["id"])["bron_id"] == "99999"

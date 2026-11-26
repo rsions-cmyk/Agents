@@ -14,7 +14,7 @@ from pathlib import Path
 from .config import Config, anonimiseer, mag_naar_claude, sorteer_met_regels
 from .llm import LLM, LLMFout
 from .models import UITWERK_ACTIES, Email, OpenPunt, Sortering
-from .store import Store
+from .store import OPEN_STATUSSEN, Store
 
 log = logging.getLogger("mailagent")
 
@@ -481,6 +481,35 @@ class RondeBezig(RuntimeError):
     """Er loopt al een mailronde (gepland of vanuit de app)."""
 
 
+WEGGEZET = ("gearchiveerd", "opgeborgen", "verwijderd")
+
+
+def herken_mail(store: Store, bron: str, bron_id: str, message_id: str | None) -> bool:
+    """Is deze mail al verwerkt? Eerst op het nummer van Apple Mail, dan op het Message-ID. Dat nummer verandert
+    als een mail verplaatst wordt of Mail de inbox opnieuw opbouwt; het Message-ID nooit (fout 5).
+
+    Een bekende mail met een nieuw nummer krijgt dat nummer, zonder Claude. Had attaché hem weggezet (archief,
+    een map, de prullenbak, of na je antwoord gearchiveerd) en staat hij nu weer in je inbox, dan heb je hem
+    zelf teruggezet: het item komt terug in To do of Tidy up. Stond hij al die tijd in je inbox (Mail bouwde
+    hem opnieuw op), dan verandert er niets."""
+    if store.is_bekend_sleutel(f"{bron}:{bron_id}"):
+        return True
+    it = store.item_bij_message_id(bron, message_id) if message_id else None
+    if it is None:
+        return False
+    store.nieuw_bron_id(it["sleutel"], bron, bron_id)
+    if it["status"] in WEGGEZET or it["opgeruimd"]:
+        if store.open_taken_bij_mail(it["id"]) > 0:
+            store.log(it["id"], "zelf teruggezet in de inbox; staat al in Planning bij een taak")
+        else:
+            vorige = it["vorige_status"] if it["status"] in WEGGEZET else None
+            status = vorige if vorige in OPEN_STATUSSEN else "wacht"
+            store.zet_terug_in_inbox(it["id"], status, wis_concept=bool(it["eigen_antwoord"]) and status == "wacht")
+    else:
+        store.log(it["id"], f"nieuw nummer in Mail ({bron_id}), zelfde mail")
+    return True
+
+
 @contextmanager
 def ronde_slot(store: Store):
     """Eén mailronde tegelijk, ook tussen de geplande ronde en de knop Mail ophalen."""
@@ -525,7 +554,8 @@ def run(cfg: Config, store: Store, bronnen: dict, llm: LLM, dagen: int | None = 
         for naam, bron in bronnen.items():
             log.info("%s: mail van de afgelopen %d dagen doorzoeken…", naam, dagen or cfg.terugkijken_dagen)
             try:
-                mails = bron.haal_op(sinds, maximum, overslaan=lambda bid, n=naam: store.is_bekend_sleutel(f"{n}:{bid}"))
+                mails = bron.haal_op(sinds, maximum,
+                                     overslaan=lambda bid, mid=None, n=naam: herken_mail(store, n, bid, mid))
             except Exception as e:  # een kapotte bron mag de andere niet tegenhouden
                 log.error("Ophalen uit %s mislukt: %s", naam, e)
                 store.log(None, f"ophalen {naam} mislukt: {e}")
