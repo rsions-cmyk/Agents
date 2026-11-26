@@ -95,14 +95,14 @@ def omgeving(tmp_path):
     cfg_tekst = cfg_tekst.replace(
         """  - type: applemail
     naam: buas
-    account: "Exchange"          # naam van het account zoals Apple Mail het toont
+    account: "Exchange"          # the account name as Apple Mail shows it
     mailbox: "Inbox"
-    archief: "Archive"           # waar 'Archiveren' de mail heen verplaatst
-    prullenbak: "Deleted Items"  # waar 'Naar prullenbak' de mail heen verplaatst\n""",
+    archief: "Archive"           # where Archive moves the email
+    prullenbak: "Deleted Items"  # where Move to Bin moves the email\n""",
         """  - type: map
     naam: test
     pad: mail\n""")
-    begin = cfg_tekst.index("  # Google-account in Apple Mail")
+    begin = cfg_tekst.index("  # Google account in Apple Mail")
     eind = cfg_tekst.index("  # - type: outlook")
     cfg_tekst = cfg_tekst[:begin] + cfg_tekst[eind:]
     cfg_tekst = cfg_tekst.replace('    # - "@mijnbank.nl"', '    - "@mijnbank.example"')

@@ -1,74 +1,75 @@
-# Kopieer dit bestand naar config.yaml en pas het aan.
-# config.yaml staat in .gitignore, zodat je adressen en regels niet in git belanden.
+# Copy this file to config.yaml and adjust it.
+# config.yaml is in .gitignore, so your addresses and rules never end up in git.
+# The setting names stay in Dutch, because the app reads them by these names.
 
-# Map voor de database, logbestanden en concepten (relatief aan dit bestand).
+# Folder for the database, log files and drafts (relative to this file).
 data_dir: data
 
-# Welke mailbron(nen) gebruik je? Je kunt er meerdere tegelijk aanzetten.
-#   outlook    Microsoft 365 via Microsoft Graph (BUas-account). Maakt concepten
-#              als antwoord in je map Concepten. Vereist een app-registratie, zie README.
-#   applemail  Elk account dat in Apple Mail staat (bijvoorbeeld een ISTTE-adres).
-#   map        Leest .eml-bestanden uit een map. Handig om te testen.
+# Which mail source(s) do you use? You can switch on several at once.
+#   outlook    Microsoft 365 through Microsoft Graph (BUas account). Creates drafts
+#              as replies in your Drafts folder. Needs an app registration, see the README.
+#   applemail  Any account that is in Apple Mail (an ISTTE address, for example).
+#   map        Reads .eml files from a folder. Useful for testing.
 bronnen:
-  # BUas-mail via het Exchange-account in Apple Mail. Controleer de namen met:
+  # BUas email through the Exchange account in Apple Mail. Check the names with:
   #   osascript -e 'tell application "Mail" to get name of every account'
   #   osascript -e 'tell application "Mail" to get name of every mailbox of account "Exchange"'
   - type: applemail
     naam: buas
-    account: "Exchange"          # naam van het account zoals Apple Mail het toont
+    account: "Exchange"          # the account name as Apple Mail shows it
     mailbox: "Inbox"
-    archief: "Archive"           # waar 'Archiveren' de mail heen verplaatst
-    prullenbak: "Deleted Items"  # waar 'Naar prullenbak' de mail heen verplaatst
-    allen_beantwoorden: false    # true: antwoord gaat ook naar iedereen in Aan en CC
-  # Google-account in Apple Mail. Gmail noemt het postvak meestal "INBOX" (hoofdletters).
+    archief: "Archive"           # where Archive moves the email
+    prullenbak: "Deleted Items"  # where Move to Bin moves the email
+    allen_beantwoorden: false    # true: replies also go to everyone in To and CC
+  # Google account in Apple Mail. Gmail usually calls the inbox "INBOX" (capitals).
   - type: applemail
     naam: google
-    account: "Google"            # naam van het account zoals Apple Mail het toont
+    account: "Google"            # the account name as Apple Mail shows it
     mailbox: "INBOX"
-    archief: "[Gmail]/All Mail"  # Gmail: archiveren = uit de inbox, blijft in All Mail
-    prullenbak: "[Gmail]/Trash"  # de echte Gmail-prullenbak, niet een label dat "Trash" heet
-  # - type: outlook               # alleen als je een app-registratie in Entra hebt
+    archief: "[Gmail]/All Mail"  # Gmail: archiving takes it out of the inbox, it stays in All Mail
+    prullenbak: "[Gmail]/Trash"  # the real Gmail bin, not a label called "Trash"
+  # - type: outlook               # only if you have an app registration in Entra
   #   naam: buas-graph
-  #   client_id: "VUL-IN"
+  #   client_id: "FILL-IN"
   #   tenant: organizations
   #   map: inbox
-  # - type: map                   # .eml-bestanden uit een map, om te testen
+  # - type: map                   # .eml files from a folder, for testing
   #   naam: test
   #   pad: tests/fixtures
 
-# Elke ronde kijkt zoveel dagen terug naar mail in je inbox die nog niet verwerkt is,
-# oudste eerst, hoogstens max_mails_per_run per account. Al verwerkte mail wordt overgeslagen.
+# Each round looks back this many days for unprocessed email in your inbox,
+# oldest first, at most max_mails_per_run per account. Email already processed is skipped.
 terugkijken_dagen: 14
 max_mails_per_run: 30
 
-# Vaste mailrondes op werkdagen. Tussen de rondes komt er geen nieuwe mail binnen, zodat je
-# niet steeds onderbroken wordt. Na een wijziging: scripts/mailagent.sh rondes-installeren
+# Fixed mail rounds on working days. No new email comes in between rounds, so you are
+# not interrupted all the time. After a change, run: scripts/mailagent.sh rondes-installeren
 rondes: ["07:45", "12:45", "16:15"]
 
-# Nieuwsbrieven en reclame (mail met een afmeldlink of de markering 'bulk') niet naar Claude
-# sturen, maar meteen bij Overgeslagen zetten. Afzenders met een eigen regel gaan wel door.
+# Don't send newsletters and advertising (email with an unsubscribe link or marked 'bulk')
+# to Claude; put them straight in Skipped. Senders with a rule of their own still go through.
 nieuwsbrieven_overslaan: true
 
-# Claude-instellingen. effort: low | medium | high
-#   backend: claude-code  gebruikt Claude Code op je Mac met je gewone Claude-login (geen API-sleutel)
-#   backend: api          gebruikt de Claude API met een sleutel uit de macOS-sleutelhanger
+# Claude settings. effort: low | medium | high
+#   backend: claude-code  uses Claude Code on your Mac with your usual Claude sign-in (no API key)
+#   backend: api          uses the Claude API with a key from the macOS keychain
 claude:
   backend: claude-code
-  pad: claude                    # of het volledige pad, zie: which claude
+  pad: claude                    # or the full path, see: which claude
   claude_code_model: opus
-  model: claude-opus-5-5         # alleen voor backend: api
+  model: claude-opus-5-5         # only for backend: api
   sorteren_effort: low
   uitwerken_effort: medium
 
-# Projecten. De naam moet overeenkomen met een bestand in projecten/<naam>.md.
+# Projects. Each name must match a file in projecten/<name>.md.
 projecten:
   - onderwijs
   - onderzoek
   - istte
   - overig
 
-# Vaste regels, lokaal toegepast vóór Claude. De eerste regel die past, wint.
-# 'van' en 'onderwerp' zijn tekstfragmenten (hoofdletters maken niet uit).
+# Fixed rules, applied locally before Claude. The first rule that matches wins.
+# 'van' (from) and 'onderwerp' (subject) are text fragments (case doesn't matter).
 regels:
   - van: "@istte.org"
     project: istte
@@ -80,7 +81,7 @@ regels:
   #   project: overig
   #   actie: ter_info
 
-# Deze mails gaan nooit naar Claude. Ze komen alleen als 'handmatig' in je overzicht.
+# This email never goes to Claude. It only appears under "Check it yourself".
 nooit_naar_claude:
   van:
     # - "@mijnbank.nl"
@@ -89,63 +90,63 @@ nooit_naar_claude:
     # - "vertrouwelijk"
     # - "medisch"
 
-# Tekst die vervangen wordt vóór iets naar Claude gaat (reguliere expressies).
-# Standaard: studentnummers van 6 of 7 cijfers en IBAN-nummers.
+# Text replaced before anything goes to Claude (regular expressions).
+# By default: student numbers of 6 or 7 digits, and IBANs.
 anonimiseren:
   - patroon: '\b\d{6,7}\b'
     vervang: '[NUMMER]'
   - patroon: '\b[A-Z]{2}\d{2}[A-Z0-9]{4}\d{7,16}\b'
     vervang: '[IBAN]'
 
-# Agenda voor 'Taak maken en inplannen'. Je Exchange-agenda moet in de app Agenda staan;
-# afspraken die de app daar maakt, verschijnen ook in Outlook. Namen opzoeken met:
+# Calendar for 'Create and schedule task'. Your Exchange calendar must be in the Calendar app;
+# events the app creates there also appear in Outlook. Look up the names with:
 #   scripts/mailagent.sh agendas
 agenda:
-  kalender: "Calendar"           # naam van de agenda
-  account: "Exchange"            # nodig als meerdere agenda's dezelfde naam hebben
-  bezet:                         # welke agenda's tellen als bezet bij vrije momenten (leeg = alle)
+  kalender: "Calendar"           # the calendar's name
+  account: "Exchange"            # needed when several calendars have the same name
+  bezet:                         # which calendars count as busy when finding free times (empty = all)
     - "Exchange/Calendar"
-  werkdagen: [1, 2, 3, 4, 5]     # 1 = maandag
+  werkdagen: [1, 2, 3, 4, 5]     # 1 = Monday
   werktijd: "09:00-17:00"
   dagen_vooruit: 10
-  herinnering_minuten: 15        # herinnering vooraf bij elke ingeplande taak (0 = geen)
-  prive: true                    # met slotje: collega's zien alleen dat je bezet bent
-  # Lessen krijgen in Planning hun eigen kleur. Standaard herkent de app ze aan woorden als
-  # college, werkcollege, lecture, tutorial en les. Staan je lessen in een eigen (rooster)agenda
-  # of komen ze van een vaste organisator, zet die dan hier:
+  herinnering_minuten: 15        # reminder before every scheduled task (0 = none)
+  prive: true                    # with a lock: colleagues only see that you are busy
+  # Classes get their own colour in Planning. By default the app recognises them by words such as
+  # college, werkcollege, lecture, tutorial and les. If your classes are in a calendar of their own
+  # (a timetable) or come from one organiser, add that here:
   # lessen:
   #   kalenders: ["Rooster"]
   #   organisatoren: ["rooster@buas.nl"]
   #   trefwoorden: ["college", "werkcollege", "TMO", "DDE"]
 
-# Mail met een taak krijgt in Apple Mail een gekleurde vlag (in Outlook een opvolgvlag,
-# in Gmail een ster). Afvinken haalt de vlag weg. Hernoem die vlagkleur in Apple Mail naar
-# "Ingepland": rechtsklik op de vlag in de zijbalk onder Gemarkeerd.
-# Kleuren: rood, oranje, geel, groen, blauw, paars, grijs.
+# Email with a task gets a coloured flag in Apple Mail (a follow-up flag in Outlook,
+# a star in Gmail). Ticking the task off removes the flag. Rename that flag colour in Apple Mail
+# to "Scheduled": right-click the flag in the sidebar under Flagged.
+# Colours (use the Dutch word): rood, oranje, geel, groen, blauw, paars, grijs.
 markeren:
   aan: true
   kleur: blauw
 
-# Lokale goedkeuringspagina
+# The local app page
 web:
   host: 127.0.0.1
   poort: 8765
 
-# Afzenders die je nooit wilt missen: hun mail komt altijd in Te doen (hoge prioriteit, nooit
-# overgeslagen) en je krijgt een melding op je Mac zodra hij binnenkomt. Een adres of een domein.
-# Je kunt ook in de app op het sterretje bij een afzender klikken.
+# Senders you never want to miss: their email always goes to To do (high priority, never
+# skipped) and you get a notification on your Mac as soon as it arrives. An address or a domain.
+# You can also click the star next to a sender in the app.
 belangrijk:
   # - "voorzitter@istte.org"
   # - "@istte.org"
 
-# Wacht op antwoord: stuur je een mail met een vraag en komt er na zoveel werkdagen geen
-# antwoord, dan staat hij weer bovenaan Te doen.
+# Awaiting reply: if you send an email with a question and no reply has come after this many
+# working days, it goes back to the top of To do.
 opvolgen:
   aan: true
   werkdagen: 3
 
-# Meldingen op je Mac voor mail van belangrijke afzenders (alleen tussen 07:00 en 22:00).
+# Notifications on your Mac for email from important senders (only between 07:00 and 22:00).
 meldingen:
   aan: true
   elke_minuten: 15
-  ochtend: true          # na de eerste ronde op een werkdag één melding met je dag
+  ochtend: true          # after the first round of a working day, one notification about your day

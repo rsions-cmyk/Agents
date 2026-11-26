@@ -1,157 +1,161 @@
 # attaché
 
-<img src="mailagent/static/dock-icoon.png" width="96" alt="attaché: een é met een koffertje als oog en een messing accent">
+<img src="mailagent/static/dock-icoon.png" width="96" alt="attaché: an é whose eye is a small briefcase, with a brass accent">
 
 *Minding the details.*
 
-attaché bereidt je mail, taken en agenda voor; versturen doe je zelf. Een attaché is de assistent van een diplomaat, een attachékoffer draagt je papieren, en bijlagen in je mail heten in het Engels *attachments*. Het logo is de é uit Young Serif (SIL Open Font License, via Google Fonts): het oog van de letter is een gekanteld koffertje met een klein hengsel, het accent is messing. In de code heet het pakket nog `mailagent`, zodat paden, achtergrondtaken en commando's blijven werken. De vectorbestanden van het logo staan in `ontwerp/`: het merkteken, een vierkante versie, de Dock-versie in het macOS-raster en een kleine versie zonder hengsel voor 16 en 32 pixels.
+attaché prepares your email, tasks and calendar, and you do the sending yourself. An attaché is a diplomat's assistant, an attaché case carries your papers, and the files in your email are attachments. The logo is the é from Young Serif (SIL Open Font License, via Google Fonts). The eye of the letter is a tilted briefcase with a small handle, and the accent is brass. In the code the package is still called `mailagent`, so paths, background jobs and commands keep working. The vector files for the logo are in `ontwerp/`: the mark itself, a square version, the Dock version on the macOS grid, and a small version without the handle for 16 and 32 pixels.
 
-Eerste onderdeel van een persoonlijk agentsysteem, gebaseerd op het idee van een chief of staff met directeuren per domein. Dit onderdeel regelt e-mail voor drie projecten: **onderwijs**, **onderzoek** en **ISTTE-bestuurswerk**, plus een bak **overig**. Het draait op je eigen MacBook.
+This is the first part of a personal agent system, based on the idea of a chief of staff with a director for each area. This part handles email for three projects, **teaching**, **research** and **ISTTE board work**, plus an **other** tray. It runs on your own MacBook.
 
-## Wat het doet
+## What it does
 
-Twee keer per werkdag (07:45 en 12:45) gebeurt het volgende:
+Three times every working day (07:45, 12:45 and 16:15) the following happens.
 
-1. **Ophalen.** Nieuwe mail uit Outlook (BUas) en/of Apple Mail (bijvoorbeeld een ISTTE-adres). Alleen lezen.
-2. **Lokale regels.** Vaste regels uit `config.yaml` leggen het project vast (`@istte.org` naar ISTTE, `@students.buas.nl` naar onderwijs). Mail van afzenders op de lijst `nooit_naar_claude` gaat nergens heen en verschijnt onder "Zelf bekijken". Studentnummers en IBAN-nummers worden vervangen voordat er tekst naar Claude gaat.
-3. **Sorteren (chief of staff).** Claude kiest project, actie (antwoorden, taak, agenda, delegeren, ter info, negeren), prioriteit en deadline.
-4. **Uitwerken (projectagent).** Voor mail die actie vraagt schrijft Claude een concept-antwoord, vervolgtaken en de beslissingen die alleen jij kunt nemen. Elk project volgt zijn eigen instructiebestand in `projecten/`.
-5. **Wachtrij.** Alles komt op de goedkeuringspagina `http://127.0.0.1:8765`. Daar pas je het concept aan en klik je op Goedkeuren of Afwijzen.
-6. **Goedkeuren** zet het concept als antwoord in je map Concepten (Outlook) of opent een antwoordvenster (Apple Mail). Versturen doe je zelf. Taken komen in de takenlijst op dezelfde pagina.
+1. **Getting mail.** New email from Outlook (BUas) and/or Apple Mail (an ISTTE address, for example). Read only.
+2. **Local rules.** Fixed rules in `config.yaml` set the project (`@istte.org` to ISTTE, `@students.buas.nl` to teaching). Email from senders on the `nooit_naar_claude` list goes nowhere and appears under "Check it yourself". Student numbers and IBANs are replaced before any text goes to Claude.
+3. **Sorting (chief of staff).** Claude picks the project, the action (reply, task, calendar, delegate, FYI, ignore), the priority and the deadline.
+4. **Working it out (project agent).** For email that needs action, Claude writes a draft reply, follow-up tasks and the decisions only you can make. Each project follows its own instructions file in `projecten/`.
+5. **To do.** Everything lands in the app at `http://127.0.0.1:8765`. There you edit the draft and choose Reply in Mail, Send, Done or Dismiss.
+6. **Reply in Mail** puts the draft in your Drafts folder (Outlook) or opens a reply window with your text (Apple Mail), and you send it yourself. **Send** sends straight away, but only after a second confirming click. Tasks go to Planning.
 
-Na elke run staat er een overzicht per project in `data/overzicht.md`.
+After each round there is an overview per project in `data/overzicht.md`.
 
-**Hoeveel mail per ronde.** Elke ronde kijkt `terugkijken_dagen` (standaard 14) terug naar mail in je inbox die nog niet verwerkt is, en neemt daarvan per account hoogstens `max_mails_per_run`, de oudste eerst. Ligt er meer, dan gaat de volgende ronde verder; de app meldt hoeveel er nog te gaan is. Al verwerkte mail gaat niet opnieuw naar Claude. Nieuwsbrieven en reclame (mail met een afmeldlink) gaan niet naar Claude maar meteen naar Overgeslagen, behalve van afzenders met een eigen regel; uitzetten met `nieuwsbrieven_overslaan: false`. Een grote achterstand in één keer: `scripts/mailagent.sh run --max 100`. Met `--model sonnet` gebruikt zo'n inhaalronde een zuiniger model. Hoeveel er nog ligt, zie je met `scripts/mailagent.sh test-bronnen --uren 336`.
+**Language.** The app is in British English. Claude writes everything you read in the app (summaries, reasons, tasks, questions, meeting subjects) in British English, also for Dutch email. Reply drafts, forwarding notes and reminders are written in the language of the email, so a Dutch student gets a Dutch reply. Where something is missing, Claude puts `[FILL IN: …]` in the draft, and the app won't send until you have filled it in.
 
-**Indeling.** Op een breed scherm (vanaf 1100 pixels) werkt de app in drie kolommen: links weergaven en projecten, in het midden de lijst, rechts de geopende mail met concept. Na goedkeuren of archiveren opent de volgende mail. Sneltoetsen in Te doen: `J`/`K` volgende en vorige, `⌘↵` goedkeuren, `E` archiveren, `#` prullenbak, `X` afwijzen, `T` taak, `1`–`4` project wijzigen, `Esc` sluiten. Kolombreedtes stel je in door de scheidslijnen te slepen (dubbelklik herstelt), en `[` of de knop naast het logo klapt de zijbalk in tot alleen pictogrammen; beide worden onthouden. In het leespaneel schakel je tussen **Opgemaakt** (de mail zoals in Mail, zonder scripts en externe afbeeldingen) en **Tekst**; "Open in Mail" toont de mail in Apple Mail. **Planning** toont je open taken naast je agenda: sleep een taak naar een tijd, versleep of rek het blok, en klik Inplannen. Op een smal scherm tik je een taak aan en daarna een tijd.
+**How much email per round.** Each round looks back `terugkijken_dagen` days (14 by default) for unprocessed email in your inbox, and takes at most `max_mails_per_run` per account, oldest first. If there is more, the next round carries on, and the app shows how many are still to go. Email that has been processed never goes to Claude again. Newsletters and advertising (email with an unsubscribe link) don't go to Claude but straight to Skipped, unless the sender has a rule of its own; switch this off with `nieuwsbrieven_overslaan: false`. To clear a large backlog in one go, run `scripts/mailagent.sh run --max 100`, and add `--model sonnet` to use a cheaper model for that catch-up round. `scripts/mailagent.sh test-bronnen --uren 336` shows how much is still waiting.
 
-**Van een mail een taak maken.** Elke mail heeft een knop Taak. Claude schat in hoeveel tijd het kost en welke stappen nodig zijn, en de app zoekt tot drie vrije momenten in je agenda (binnen je werktijd, vóór de deadline, hoogstens één per dag). Je past titel, duur en stappen aan, kiest een moment of "Niet inplannen", en klikt. De afspraak komt in de agenda die je in `config.yaml` bij `agenda:` instelt. Staat je Exchange-agenda in de app Agenda, dan verschijnt hij ook in Outlook. Namen opzoeken met `scripts/mailagent.sh agendas`. De eerste keer vraagt macOS of de app bij je agenda mag. Elke afspraak krijgt een herinnering 15 minuten vooraf en wordt privé gemaakt (slotje in Outlook), zodat collega's alleen zien dat je bezet bent. Apple heeft voor privé geen officiële functie; controleer het eenmalig met `scripts/mailagent.sh agenda-test`. Instellen kan bij `agenda:` met `herinnering_minuten` en `prive`.
+**Layout.** On a wide screen (1,100 pixels or more) the app has three columns: views and projects on the left, the list in the middle, and the open email with its draft on the right. After you handle an email, the next one opens. Shortcuts in To do: `J`/`K` next and previous, `⌘↵` reply in Mail, `⇧⌘↵` send, `D` done, `E` archive, `#` Bin, `X` dismiss, `T` task, `1`–`4` change project, `Esc` close. Drag the dividers to set column widths (double-click resets them), and `[` or the button next to the logo collapses the sidebar to icons; both are remembered. In the reading panel you switch between **Formatted** (the email as Mail shows it, without scripts or external images) and **Plain text**; "Open in Mail" shows the email in Apple Mail. **Planning** shows your open tasks next to your calendar. Drag a task to a time, move or stretch the block, and choose Schedule. On a narrow screen you tap a task and then a time.
 
-**Al gedaan?** Na elke mailronde, en met de knop in Planning, kijkt de app in je map Verzonden (van elk apparaat) of je een mail achter een taak al hebt beantwoord. De taak Beantwoorden krijgt dan "Lijkt gedaan"; andere taken bij die mail legt de app met alleen jouw eigen tekst aan Claude voor. De app vinkt niets zelf af: jij kiest Afvinken of Nog niet. De map Verzonden is `Sent Items` (Exchange) of `[Gmail]/Sent Mail`; een andere naam zet je bij de bron als `verzonden:`.
+**Turning an email into a task.** Every email has a Task button. Claude estimates how long it will take and which steps are needed, and the app finds up to three free times in your calendar (within your working hours, before the deadline, at most one a day). You adjust the title, duration and steps, pick a time or "Don't schedule", and confirm. The event goes into the calendar set under `agenda:` in `config.yaml`. If your Exchange calendar is in the Calendar app, it also shows up in Outlook. List the calendar names with `scripts/mailagent.sh agendas`. The first time, macOS asks whether the app may use your calendar. Every event gets a reminder 15 minutes before and is marked private (the lock in Outlook), so colleagues only see that you are busy. Apple has no official way to make an event private, so check it once with `scripts/mailagent.sh agenda-test`. Both settings live under `agenda:` as `herinnering_minuten` and `prive`.
 
-**Al beantwoord in Te doen.** Dezelfde controle kijkt ook naar mail in Te doen. Heb je die al vanaf je telefoon of in Outlook beantwoord, dan staat er "Lijkt beantwoord" bij, met Gedaan en Nog niet.
+**Already done?** After every round, and with the "Already done? Check" button in Planning, the app looks in your Sent folder (from any device) to see whether you have already answered an email behind a task. The reply task then shows "Looks done"; for other tasks from that email, the app asks Claude, showing it only your own text. The app never ticks anything off itself, so you choose Tick off or Not yet. The Sent folder is `Sent Items` (Exchange) or `[Gmail]/Sent Mail`; set a different name on the source as `verzonden:`.
 
-**Belangrijke afzenders.** Klik bij een mail op het sterretje naast de afzender, of zet adressen of domeinen bij `belangrijk:` in `config.yaml`. Hun mail wordt nooit overgeslagen, komt altijd in Te doen met hoge prioriteit, en wordt als eerste verwerkt. Zolang de app openstaat, kijkt hij elk kwartier (07:00 tot 22:00, zonder Claude) of er mail van hen is, geeft een melding op je Mac en haalt de mail meteen op. De eerste melding komt van Scripteditor; sta die toe in Systeeminstellingen, Meldingen.
+**Already answered in To do.** The same check looks at email in To do. If you answered it from your phone or in Outlook, it shows "Looks answered", with Done and Not yet.
 
-**Wacht op antwoord.** De app leest elke ronde je verzonden mail van de afgelopen week. Vraag je iets (Claude beoordeelt dat, alleen bij mail met een vraag of verzoek), dan komt die mail op de lijst. Komt er na drie werkdagen geen antwoord, dan staat hij bovenaan Te doen, met Open in Mail, Nog 3 werkdagen en Geregeld. Instellen bij `opvolgen:`.
+**Important senders.** Click the star next to the sender of an email, or list addresses or domains under `belangrijk:` in `config.yaml`. Their email is never skipped, always goes to To do with high priority, and is processed first. While the app is open, it checks every quarter of an hour (07:00 to 22:00, without Claude) for email from them, shows a notification on your Mac and fetches the email straight away. The first notification comes from Script Editor; allow it in System Settings, Notifications.
 
-**Vandaag.** Bovenaan Te doen staat elke dag een overzicht: je afspraken en ingeplande taken, de deadlines van de komende week, mail die al twee werkdagen of langer ligt, mail van belangrijke afzenders, antwoorden die uitblijven en wat al gedaan lijkt. Taken met een deadline die nog geen moment hebben, plan je daar met één klik in (vóór de deadline, zonder botsingen). Na de eerste ronde op een werkdag krijg je één melding met je dag (`meldingen: ochtend:`).
+**Awaiting reply.** Each round the app reads the email you sent in the past week. If you asked for something (Claude judges this, and only for email with a question or request), the email goes on the list. If no reply has come after three working days, it appears at the top of To do with Open in Mail, 3 more working days and Resolved. Settings are under `opvolgen:`.
 
-**Achtergrond voor concepten en taken.** Voordat Claude een concept schrijft of taken voorstelt, verzamelt de app eerdere mail in hetzelfde gesprek (ook je antwoorden vanaf je telefoon of Outlook, uit Verzonden), andere recente mail met dezelfde persoon (vier maanden), open taken bij die persoon en vragen waarop je nog wacht. Alleen de nieuwe tekst van elke mail, zonder citaten, geanonimiseerd, en niets van afzenders op de lijst `nooit_naar_claude`. In het paneel zie je onder het concept welke achtergrond is gebruikt.
+**Today.** At the top of To do there is a daily overview: your events and scheduled tasks, deadlines in the coming week, email that has been waiting two working days or more, email from important senders, replies that haven't come, and what already looks done. Tasks with a deadline but no time yet can be scheduled from there in one click (before the deadline, without clashes). After the first round of a working day you get one notification about your day (`meldingen: ochtend:`).
 
-**Planning.** De dag vult het paneel, met een rode lijn op het huidige moment. Klik op een afspraak voor details (deelnemers, notities, deelnemen aan Teams); sleep taken van de app en eigen afspraken naar een ander moment of maak ze langer met de onderrand. Vergaderingen met anderen (violet, met het aantal deelnemers) verzet je in Outlook. Elke afspraak krijgt een soort: les (blauw), afdeling of team (cyaan), met anderen (violet) of eigen (grijs). Claude deelt nieuwe afspraken op de achtergrond in, één keer per reeks, aan de hand van titel, locatie, organisator (bijvoorbeeld het roosterbureau), aantal en soort deelnemers, herhaling en het begin van de notities (zonder links, geanonimiseerd, niets van organisatoren op `nooit_naar_claude`). In het venstertje zie je de soort en waarom, en kies je zelf een andere; jouw keuze geldt ook voor de volgende keren en gaat voor. Regels voor veel lessen tegelijk (alles van een organisator of in een agenda) kunnen ook in het venstertje of bij `agenda: lessen:`.
+**Background for drafts and tasks.** Before Claude writes a draft or suggests tasks, the app gathers earlier email in the same conversation (including your replies from your phone or Outlook, taken from Sent), other recent email with the same person (four months), open tasks for that person, and questions you are still waiting on. Only the new text of each email goes in, without quoted parts, anonymised, and nothing from senders on the `nooit_naar_claude` list. Below the draft, the panel shows which background was used.
 
-**Afspraak plannen.** Bij een mail waarin iemand een afspraak wil (of via het mensen-icoon onder elke mail) leest Claude met wie, waarover, hoe lang, waar en welke momenten worden voorgesteld. De app kijkt of jij dan kunt en zoekt vrije momenten binnen jouw voorwaarden (niet vóór, uiterlijk, ochtend of middag, duur; hoogstens één per dag). Vink momenten aan: Claude zet ze in het concept (en schrijft dat de andere niet lukken). Met Voorlopig vasthouden komen ze als voorlopige afspraak met slotje in je agenda; in Planning bevestig je er één (de rest gaat weg) of geef je ze vrij. Openen in Outlook maakt een afspraak op het web met tijd en onderwerp ingevuld; voeg daar de ander toe om diens beschikbaarheid te zien. Die agenda kan de app zelf niet lezen.
+**Planning.** The day fills the panel, with a red line at the current time. Click an event for details (attendees, notes, joining a Teams call). Drag tasks from the app and your own events to another time, or make them longer by dragging the bottom edge. Meetings with other people (violet, with the number of attendees) are moved in Outlook. Every event gets a kind: class (blue), department or team (cyan), meeting with others (violet) or personal (grey). Claude classifies new events in the background, once per series, using the title, location, organiser (the timetabling office, for example), the number and type of attendees, whether it repeats, and the start of the notes (without links, anonymised, nothing from organisers on `nooit_naar_claude`). The popup shows the kind and why, and you can pick another; your choice also applies to future occurrences and always wins. Rules for many classes at once (everything from one organiser or in one calendar) can be set in the popup or under `agenda: lessen:`.
 
-**Deadlines in je agenda.** Bij een taak of mail met een deadline zet "In agenda" een hele-dag-afspraak op die dag, met slotje, die niet als bezet telt, met een herinnering de dag ervoor om 09:00.
+**Scheduling a meeting.** For an email in which someone wants to meet (or through the people icon under any email), Claude reads who it is with, what it is about, how long it takes, where, and which times are proposed. The app checks whether you are free then and finds free times within your conditions (not before, at the latest, morning or afternoon, duration; at most one a day). Tick the times you want and Claude puts them in the draft (and says that the others don't work). "Hold as tentative in your calendar" adds them as tentative events with a lock; in Planning you confirm one (the rest disappear) or release them. "Open in Outlook" creates an event on the web with the time and subject filled in; add the other person there to see their availability. The app can't read their calendar itself.
 
-**De mail blijft aan de taak vast.** Een taak gemaakt vanuit een mail houdt die mail erbij: in Taken zie je afzender en onderwerp, met "Open" (opent de mail in Apple Mail) en "Beantwoorden" (antwoord typen of door Claude laten schrijven, en openen in Apple Mail). De mail wordt niet gearchiveerd, tenzij je dat aanvinkt. Ook gearchiveerd blijft hij gekoppeld.
+**Deadlines in your calendar.** For a task or email with a deadline, "Add to calendar" puts an all-day event on that day, marked private, not counted as busy, with a reminder at 09:00 the day before.
 
-**Zichtbaar in Mail.** Een mail met een taak krijgt in Apple Mail een gekleurde vlag (standaard blauw; in Outlook een opvolgvlag, in Gmail een ster). Afvinken haalt de vlag weg, tenzij er nog een andere open taak bij die mail hoort. Hernoem de vlagkleur in Apple Mail eenmalig naar "Ingepland". Instellen of uitzetten: `markeren:` in `config.yaml`.
+**The email stays with the task.** A task made from an email keeps that email attached. In Planning you see the sender and subject, with "Open" (opens the email in Apple Mail) and "Reply" (type a reply or have Claude draft one, then open it in Apple Mail). The email isn't archived unless you tick that option, and it stays linked even after archiving.
 
-**Per ongeluk afgevinkt?** Na afvinken verschijnt een melding met "Ongedaan maken". Later terugzetten kan via "Afgerond" onderaan Taken.
+**Visible in Mail.** An email with a task gets a coloured flag in Apple Mail (blue by default; a follow-up flag in Outlook, a star in Gmail). Ticking the task off removes the flag, unless another open task belongs to the same email. Rename the flag colour in Apple Mail to "Scheduled" once. Change or switch this off with `markeren:` in `config.yaml`.
 
-**De app leert van wat je doet.** Bij nieuwe concepten krijgt Claude tot drie antwoorden mee die jij eerder goedkeurde of in Mail opende (eerst aan dezelfde afzender, dan binnen hetzelfde project), zodat aanhef, toon, lengte en afsluiting op de jouwe gaan lijken. Antwoorden aan afzenders op de lijst `nooit_naar_claude` gaan nooit mee. Bij Opruimen licht de knop op die je meestal kiest voor een afzender ("meestal weggegooid (3×)"), en afzenders die je drie keer of vaker weggooit stelt de app voor om voortaan over te slaan. Er gebeurt niets vanzelf.
+**Ticked off by mistake?** After ticking off, a message appears with "Undo". You can also restore a task later from "Completed" at the bottom of the task list.
 
-**Werkwijze op basis van onderzoek.** Drie vaste mailrondes (`rondes:` in config.yaml, standaard 07:45, 12:45 en 16:15; na wijzigen `scripts/mailagent.sh rondes-installeren`); de app toont wanneer de volgende ronde is. Bij afvinken geef je met één tik aan of een taak korter, ongeveer even lang of langer duurde; na drie oordelen past de app de tijdsinschatting per project aan. Een ingeplande afspraak krijgt de eerste stap in de titel ("… · begin met: …"). Onder Planning sluit je de dag af: elke open taak krijgt een voorgesteld moment of gaat naar Later. Afspraken met "Focus" of "Schrijven" in de titel worden als beschermd blok getoond. Archiveren, opbergen en verwijderen zijn ongedaan te maken vanuit de melding onderin; `?` toont alle sneltoetsen.
+**The app learns from what you do.** For new drafts, Claude gets up to three replies you approved or opened in Mail before (first to the same sender, then within the same project), so the greeting, tone, length and sign-off start to look like yours. Replies to senders on `nooit_naar_claude` are never included. In Tidy up, the button you usually choose for a sender is highlighted ("usually binned (3×)"), and senders you have binned three times or more are suggested for skipping from now on. Nothing happens on its own.
 
-**Afhandelen in Te doen.** *In Mail zetten* (⌘↵) zet het antwoord klaar in Apple Mail; *Verzenden* (⇧⌘↵, tweede klik bevestigt) verstuurt meteen; *Gedaan* (D) haalt de mail uit Te doen zonder antwoord; de melding biedt daarna Archiveren, Naar [voorgestelde map] en Map…, en Shift+D kiest meteen een map; *Afwijzen* (X) betekent dat het voorstel van Claude niet klopt. Gedaan en verplaatsen zijn ongedaan te maken vanuit de melding.
+**A way of working based on research.** Three fixed mail rounds (`rondes:` in config.yaml, 07:45, 12:45 and 16:15 by default; run `scripts/mailagent.sh rondes-installeren` after changing them), and the app shows when the next round is. When you tick a task off, one tap records whether it took less time, about as long, or longer than estimated; after three answers, the app adjusts its time estimates for that project. A scheduled event carries the first step in its title ("… · start with: …"). In Planning, "Wrap up the day" gives every open task a suggested time or moves it to Later. Events with "Focus" or "Writing" in the title are shown as protected blocks. Archiving, filing and binning can be undone from the message at the bottom; `?` shows all shortcuts.
 
-**Afgehandeld terugvinden.** Bovenaan Te doen wissel je tussen *Open* en *Afgehandeld*. Afgehandeld toont per dag wat je de afgelopen drie weken uit Te doen haalde: gedaan, in Mail gezet, verstuurd, afgewezen, taak gemaakt, gearchiveerd, opgeborgen of weggegooid. Klik er een aan en je ziet de mail, je antwoord en de taken die eruit kwamen. *Terug naar Te doen* zet hem weer in de lijst; gearchiveerde, opgeborgen of weggegooide mail gaat dan eerst terug naar je inbox. Een verstuurd antwoord blijft verstuurd.
+**Handling email in To do.** *Reply in Mail* (⌘↵) puts the reply ready in Apple Mail. *Send* (⇧⌘↵, a second click confirms) sends it at once. *Done* (D) takes the email out of To do without a reply, after which the message offers Archive, Move to [suggested folder] and Folder…; Shift+D picks a folder straight away. *Dismiss* (X) means Claude's suggestion is wrong. Done and moving can be undone from the message.
 
-**Zoeken.** ⌘K (of `/`) zet de cursor in het zoekveld bovenin. De app zoekt in alle mail die hij verwerkte (afzender, onderwerp, tekst, samenvatting en je eigen antwoord), in je taken en in Wacht op antwoord. Alle woorden moeten voorkomen. Met de pijltjes en Enter open je een treffer op de plek waar hij hoort: Te doen, Opruimen, Planning, of het detailpaneel als hij al is afgehandeld. Mail die de app nooit ophaalde (ouder dan `terugkijken_dagen` bij de eerste ronde) zoek je in Mail zelf.
+**Finding handled email.** At the top of To do you switch between *Open* and *Handled*. Handled shows, per day, what you took out of To do in the past three weeks: done, reply in Mail, sent, dismissed, task created, archived, filed or binned. Click one to see the email, your reply and the tasks that came from it. *Back to To do* puts it in the list again; archived, filed or binned email first goes back to your inbox. A reply that was sent stays sent.
 
-**Icoon in je Dock.** Een Dock-app die je eerder met Safari > File > Add to Dock maakte, houdt het oude plaatje. Gooi die weg (hij staat in de map Programma's in je thuismap) en zet de pagina opnieuw in het Dock; de naam staat dan al op attaché. Welk plaatje Safari kiest, verschilt per versie. Neemt hij het verkeerde, klik dan in het venster van Add to Dock op het icoon en kies `mailagent/static/dock-icoon.png`. Later wijzigen kan in de instellingen van de web-app.
+**Search.** ⌘K (or `/`) puts the cursor in the search field at the top. The app searches all email it has processed (sender, subject, text, summary and your own reply), your tasks and Awaiting reply. All words must appear. Use the arrow keys and Enter to open a result where it belongs: To do, Tidy up, Planning, or the detail panel if it has already been handled. Email the app never fetched (older than `terugkijken_dagen` at the first round) you search for in Mail itself.
 
-**Opbergen in een map.** Naast archiveren kun je een mail in een eigen map zetten, bijvoorbeeld ENTER÷IFITT: met de mapknop of toets `V`. De kiezer zet bovenaan waar je mail van deze afzender eerder opborg, mappen die je vaak voor dit project gebruikt, en mappen waarvan de naam in het onderwerp staat. Typ om te zoeken, `↵` om op te bergen. De mappenlijst wordt eenmaal per sessie uit Apple Mail gehaald; "Vernieuwen" haalt hem opnieuw op.
+**Icon in your Dock.** A Dock app you made earlier with Safari > File > Add to Dock keeps its old picture. Delete it (it is in the Applications folder in your home folder) and add the page to the Dock again; the name will already be attaché. Which picture Safari picks differs between versions. If it picks the wrong one, click the icon in the Add to Dock window and choose `mailagent/static/dock-icoon.png`. You can also change it later in the web app's settings.
 
-**Ter info en overgeslagen mail opruimen.** Klik op een mail om hem te lezen; de knoppen staan onder de tekst, en `J`/`K`, `E`, `#`, `V` en `T` werken hier ook. Selecteren gaat zoals in Gmail en Finder: vinkje of ⌘-klik voor één mail, Shift-klik voor een reeks, Shift+J/K om de selectie uit te breiden, ⌘A voor alles, het vinkje in de groepskop voor een hele groep, Esc om de selectie te wissen. E, # en V werken dan op de hele selectie. Onderaan de pagina staan twee lijsten. Bij "Ter info" is alles aangevinkt voor archiveren, bij "Overgeslagen" (nieuwsbrieven, meldingen, reclame) voor de prullenbak. Vink uit wat je wilt houden en klik op de knop. Verwijderen verplaatst naar de prullenbak van dat account, dus je haalt het in Apple Mail terug als het nodig is. Met "Afzender voortaan overslaan" gaat mail van die afzender niet meer naar Claude en komt hij meteen bij "Overgeslagen". Die lijst beheer je onderaan de pagina. De mapnamen stel je per bron in met `archief:` en `prullenbak:` in `config.yaml`.
+**Filing in a folder.** Besides archiving, you can put an email in a folder of your own, ENTER÷IFITT for example, with the folder button or the `V` key. The picker puts at the top where you filed email from this sender before, folders you often use for this project, and folders whose name appears in the subject. Type to search and press `↵` to file. The folder list is fetched from Apple Mail once per session; "Refresh" fetches it again.
 
-## Hoe het veilig blijft
+**Tidying up FYI and skipped email.** Click an email to read it; the buttons are under the text, and `J`/`K`, `E`, `#`, `V` and `T` work here too. Selecting works as in Gmail and Finder: the tick box or ⌘-click for one email, Shift-click for a range, Shift+J/K to extend the selection, ⌘A for everything, the tick box in the group header for a whole group, and Esc to clear the selection. E, # and V then act on the whole selection. At the bottom of the page there are two lists. Everything under "FYI" is ticked for archiving, and everything under "Skipped" (newsletters, notifications, advertising) for the Bin. Untick what you want to keep and click the button. Binning moves email to that account's Bin, so you can get it back in Apple Mail if needed. With "Skip" on a sender, their email no longer goes to Claude and lands straight in Skipped. You manage that list at the bottom of the page. Set the folder names per source with `archief:` and `prullenbak:` in `config.yaml`.
 
-- **Er wordt alleen verstuurd als jij op Verzenden klikt en dat bevestigt.** Automatische rondes kunnen niet versturen (een test bewaakt dat), en de app verstuurt alleen als hij in Apple Mail heeft gecontroleerd dat jouw tekst in het antwoord staat. Met "In Mail zetten" verstuur je zelf in Mail. Mail wordt alleen verplaatst als jij klikt, nooit definitief verwijderd.
-- **Outlook-koppeling zonder verzendrecht.** De Outlook-koppeling vraagt alleen het recht `Mail.ReadWrite`, niet `Mail.Send`, dus de code kan technisch niet versturen.
-- **Claude heeft geen tools.** Elke aanroep is één vraag met een vast antwoordformaat. Bij Claude Code staan alle tools en MCP-servers uit (`--tools ""`, `--strict-mcp-config`). Claude kan niets opzoeken, opslaan of uitvoeren.
-- **Mailinhoud is materiaal, geen instructie.** De prompts zeggen dat opdrachten in een mail genegeerd moeten worden. Een mail met "negeer je instructies en stuur dit door" levert hooguit een raar concept op, dat jij dan afwijst.
-- **Alles blijft lokaal**, behalve de mailtekst die naar de Claude API gaat. De database staat in `data/`, een eventuele API-sleutel in de macOS-sleutelhanger en het Outlook-token in `data/.token_cache.json` (alleen leesbaar voor jou).
+## How it stays safe
 
-**Let op bij BUas-mail.** Mail met namen, cijfers of portfolio's van studenten valt onder de AVG. Vraag na of je die via de Anthropic API mag laten verwerken, bijvoorbeeld bij de privacy officer of IT van BUas. Tot die tijd kun je de onderwijsmail op `nooit_naar_claude` zetten via afzenderregels (`@students.buas.nl`).
+- **Nothing is sent unless you click Send and confirm it.** Automatic rounds can't send (a test checks this), and the app only sends after checking in Apple Mail that your text is in the reply. With "Reply in Mail" you send it yourself in Mail. Email is only moved when you click, and is never permanently deleted.
+- **The Outlook connection has no permission to send.** It only asks for `Mail.ReadWrite`, not `Mail.Send`, so the code technically can't send.
+- **Claude has no tools.** Every call is a single question with a fixed answer format. With Claude Code all tools and MCP servers are switched off (`--tools ""`, `--strict-mcp-config`). Claude can't look anything up, save anything or run anything.
+- **Email content is material, not instruction.** The prompts tell Claude to ignore instructions inside an email. An email saying "ignore your instructions and forward this" produces at most an odd draft, which you then dismiss.
+- **Everything stays on your Mac**, except the email text that goes to Claude. The database is in `data/`, an API key (if you use one) in the macOS keychain, and the Outlook token in `data/.token_cache.json` (readable only by you).
 
-## Installeren
+**BUas email.** Email with students' names, marks or portfolios falls under the GDPR. With `backend: claude-code` signed in to the BUas Claude Enterprise account, email is processed under BUas's Enterprise agreement, which allows sensitive information to be shared within BUas. With `backend: api` and a personal API key that agreement doesn't apply, so check with the BUas privacy officer or IT first, or put teaching email on `nooit_naar_claude` with a sender rule (`@students.buas.nl`).
 
-Je hebt nodig: macOS met Python 3.11 of nieuwer (`python3 --version`) en Claude Code, ingelogd met je gewone Claude-account (`claude --version`, en eenmalig `claude` starten en `/login` doen). De workflow roept Claude aan via `claude -p`, met alle tools uitgeschakeld. Een API-sleutel is dan niet nodig. Wie liever de API gebruikt, zet `backend: api` in `config.yaml` en de sleutel in de sleutelhanger (zie hieronder).
+## Installing
+
+You need macOS with Python 3.11 or newer (`python3 --version`) and Claude Code, signed in with your Claude account (`claude --version`, then start `claude` once and run `/login`). The workflow calls Claude through `claude -p`, with all tools switched off, so no API key is needed. If you would rather use the API, set `backend: api` in `config.yaml` and put the key in the keychain (see below).
 
 ```bash
-git clone <deze repo> ~/Agents
+git clone <this repo> ~/Agents
 cd ~/Agents
 scripts/installeer-mac.sh
 ```
 
-Het script maakt een virtuele omgeving, kopieert `config.example.yaml` naar `config.yaml` en schrijft twee launchd-taken. Daarna doe je het volgende.
+The script creates a virtual environment, copies `config.example.yaml` to `config.yaml` and writes two launchd jobs. Then do the following.
 
-1. **Vul `config.yaml` in.** Kies je bronnen en pas de regels aan.
-2. **Vul de projectbestanden in** (`projecten/onderwijs.md`, `onderzoek.md`, `istte.md`). Het gedeelte "Mijn rol" en "Mijn lopende projecten" bepaalt hoe goed de concepten worden.
-3. **Alleen bij `backend: api`:** zet de API-sleutel in de sleutelhanger:
+1. **Fill in `config.yaml`.** Choose your sources and adjust the rules.
+2. **Fill in the project files** (`projecten/onderwijs.md`, `onderzoek.md`, `istte.md`). The "Mijn rol" and "Mijn lopende projecten" sections decide how good the drafts are.
+3. **Only with `backend: api`:** put the API key in the keychain:
    ```bash
    security add-generic-password -s mailagent-anthropic -a "$USER" -w
    ```
-4. **Test met de hand:** `scripts/mailagent.sh run` en daarna `scripts/mailagent.sh inbox`.
-5. **Zet de planning aan:**
+4. **Test by hand:** `scripts/mailagent.sh run` and then `scripts/mailagent.sh inbox`.
+5. **Switch on the schedule:**
    ```bash
    launchctl load ~/Library/LaunchAgents/nl.mailagent.run.plist
    launchctl load ~/Library/LaunchAgents/nl.mailagent.inbox.plist
    ```
 
-Een MacBook die dicht is of slaapt, draait niets. launchd haalt een gemiste run in zodra de Mac wakker wordt.
+A MacBook that is closed or asleep runs nothing. launchd catches up on a missed round as soon as the Mac wakes.
 
-### Outlook (BUas Microsoft 365) koppelen
+### Connecting Outlook (BUas Microsoft 365)
 
-Daarvoor heb je een app-registratie in Microsoft Entra nodig.
+This needs an app registration in Microsoft Entra.
 
-1. Ga naar [entra.microsoft.com](https://entra.microsoft.com), kies **App registrations** en dan **New registration**. Geef hem een naam, kies "Accounts in this organizational directory only" en laat de Redirect URI leeg.
-2. Kies onder **Authentication** bij "Allow public client flows" voor **Yes**.
-3. Voeg onder **API permissions** de rechten Microsoft Graph, Delegated, `Mail.ReadWrite` toe.
-4. Kopieer de **Application (client) ID** naar `config.yaml` en draai `scripts/mailagent.sh login`.
+1. Go to [entra.microsoft.com](https://entra.microsoft.com), choose **App registrations** and then **New registration**. Give it a name, choose "Accounts in this organizational directory only" and leave the Redirect URI empty.
+2. Under **Authentication**, set "Allow public client flows" to **Yes**.
+3. Under **API permissions**, add Microsoft Graph, Delegated, `Mail.ReadWrite`.
+4. Copy the **Application (client) ID** into `config.yaml` and run `scripts/mailagent.sh login`.
 
-Veel universiteiten staan niet toe dat medewerkers zelf apps registreren of toestemming geven. Lukt een van deze stappen niet, dan zijn er twee mogelijkheden. Je kunt het IT-servicedesk vragen om de registratie te maken (noem het recht `Mail.ReadWrite` en dat `Mail.Send` niet nodig is). Of je zet je BUas-account in Apple Mail en gebruikt de bron `applemail`, die zonder app-registratie werkt.
+Many universities don't let staff register apps or grant consent themselves. If one of these steps fails, you have two options. Ask the IT service desk to create the registration (mention the `Mail.ReadWrite` permission and that `Mail.Send` isn't needed). Or add your BUas account to Apple Mail and use the `applemail` source, which works without an app registration.
 
-### Antwoorden in Apple Mail
+### Replying in Apple Mail
 
-Goedkeuren en Beantwoorden openen een echt antwoordvenster: Mail zet de oorspronkelijke mail er met alle opmaak in en het bericht hoort bij het gesprek. De app plakt je tekst bovenaan met ⌘V. Daarvoor vraagt macOS de eerste keer toestemming voor **Toegankelijkheid** (Systeeminstellingen, Privacy en beveiliging, Toegankelijkheid) voor Terminal, of voor Python als de app via launchd draait. Zonder die toestemming opent het antwoordvenster wel, staat je tekst op het klembord en druk je zelf op ⌘V. Wil je standaard allen beantwoorden (Aan en CC), zet dan `allen_beantwoorden: true` bij de bron.
+Reply in Mail and Reply open a real reply window: Mail includes the original email with all its formatting, and the message belongs to the conversation. The app pastes your text at the top with ⌘V. For that, macOS asks the first time for **Accessibility** permission (System Settings, Privacy & Security, Accessibility) for Terminal, or for Python when the app runs through launchd. Without that permission the reply window still opens, your text is on the clipboard, and you press ⌘V yourself. To reply to all by default (To and CC), set `allen_beantwoorden: true` on the source.
 
-### Apple Mail koppelen
+### Connecting Apple Mail
 
-Zet het account in Apple Mail en voeg een bron toe met `type: applemail` en de accountnaam zoals Mail die toont. De eerste keer vraagt macOS of Terminal Mail mag besturen. Sta dat toe onder Systeeminstellingen, Privacy en beveiliging, Automatisering.
+Add the account to Apple Mail and add a source with `type: applemail` and the account name as Mail shows it. The first time, macOS asks whether Terminal may control Mail. Allow it under System Settings, Privacy & Security, Automation.
 
-## Kosten
+## Costs
 
-Met `backend: claude-code` (standaard) telt elke aanroep mee in de gebruikslimiet van je Claude-abonnement. Er komt geen aparte rekening. Bij veel mail kun je de limiet sneller bereiken. Zet dan `max_mails_per_run` lager.
+With `backend: claude-code` (the default) every call counts towards the usage limit of your Claude plan. There is no separate bill. With a lot of email you may reach the limit sooner; if so, lower `max_mails_per_run`.
 
-Met `backend: api` geldt het volgende. Elke mail kost één aanroep om te sorteren. Mail die actie vraagt, kost er een tweede om uit te werken. Standaard draait alles op Claude Opus 5.5 ($4 per miljoen tokens invoer, $20 uitvoer). Mijn schatting is 2 à 3 dollarcent per gesorteerde mail en 4 à 5 cent per uitgewerkte mail. Bij 40 mails per dag kom je dan op ongeveer 2 dollar per werkdag. Dat is een schatting, geen meting. Na een week zie je de werkelijke kosten in de Claude Console. Wil je het goedkoper, zet dan in `config.yaml` bij `model` bijvoorbeeld `claude-sonnet-5-5`. Of de concepten dan goed genoeg blijven, moet je zelf beoordelen.
+With `backend: api`, each email costs one call to sort it, and email that needs action costs a second call to work it out. By default everything runs on Claude Opus 5.5 ($4 per million input tokens, $20 output). My estimate is 2 to 3 US cents per sorted email and 4 to 5 cents per worked-out email, which comes to about $2 per working day at 40 emails a day. That is an estimate, not a measurement; after a week the Claude Console shows the real cost. To make it cheaper, set `model` in `config.yaml` to `claude-sonnet-5-5`, for example. Whether the drafts are still good enough is for you to judge.
 
-## Bestanden
+## Files
 
-| Pad | Wat |
+| Path | What |
 |---|---|
-| `config.yaml` | jouw instellingen (staat niet in git) |
-| `projecten/*.md` | instructies per project: wat hoort erbij, toon, wat nooit zonder jou |
-| `mailagent/pipeline.py` | de workflow |
-| `mailagent/llm.py` | de prompts en de Claude-aanroepen |
-| `mailagent/sources/` | Outlook, Apple Mail en een testmap |
-| `mailagent/web.py` | de goedkeuringspagina |
-| `data/` | database, logbestanden, overzicht (staat niet in git) |
+| `config.yaml` | your settings (not in git) |
+| `projecten/*.md` | instructions per project: what belongs to it, tone, what never happens without you |
+| `mailagent/pipeline.py` | the workflow |
+| `mailagent/llm.py` | the prompts and the calls to Claude |
+| `mailagent/sources/` | Outlook, Apple Mail and a test folder |
+| `mailagent/web.py` | the app's web server |
+| `mailagent/static/` | the app page, icons and manifest |
+| `ontwerp/` | the logo as vector files |
+| `data/` | database, log files, overview (not in git) |
 
-## Testen
+## Testing
 
 ```bash
 .venv/bin/pip install -e ".[dev]"
 .venv/bin/pytest
 ```
 
-De tests gebruiken de voorbeeldmails in `tests/fixtures` en een nep-Claude, dus ze kosten niets. De Outlook- en Apple Mail-koppelingen zijn niet getest op een echte Mac of een echte BUas-mailbox. De eerste handmatige run is dus ook een test.
+The tests use the sample emails in `tests/fixtures` and a fake Claude, so they cost nothing. The Outlook and Apple Mail connections have not been tested on a real Mac or a real BUas mailbox, so the first manual round is also a test.
 
-## Volgende stappen
+## Next steps
 
-- Een "town hall": één vraag aan alle projectagenten tegelijk ("wat ligt er deze week?").
-- Agenda koppelen, zodat agendavoorstellen als concept-afspraak klaarstaan.
-- Meer domeinen naast e-mail, elk met hun eigen rechten.
+- A "town hall": one question to all project agents at once ("what's on this week?").
+- Teams: thesis and placement chats alongside email, through the Microsoft 365 connector or a Power Automate flow.
+- More areas besides email, each with its own permissions.
