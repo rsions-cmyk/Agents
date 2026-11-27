@@ -553,7 +553,8 @@ textarea#concept::placeholder,#a-tekst::placeholder{color:#8a929b}
 .p-voet{padding:12px 22px;background:var(--vlak2)}
 .knop{border-radius:var(--r1);font-weight:600;transition:background var(--snel),border-color var(--snel)}
 .knop.goed{background:var(--ok);border-color:var(--ok)}
-.knop.goed:hover{filter:brightness(1.06)}
+.knop.goed:hover,.p-voet .knop.hoofd:hover{filter:brightness(1.06)}
+.p-voet .knop.hoofd{background:var(--ok);border-color:var(--ok);color:var(--vlak)}
 .knop kbd{border:0;background:color-mix(in srgb,currentColor 14%,transparent);opacity:1;padding:1px 5px;border-radius:4px}
 .projectkies{border-radius:6px}
 
@@ -656,10 +657,10 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
 .p-voet .knop{white-space:nowrap}
 .p-voet .knop.bevestig{white-space:normal;text-align:left}
 @container paneel (max-width: 660px){
-  .p-voet .knop:not(.goed) .lbl, .p-voet .knop kbd{display:none}   /* smal: alleen iconen, uitleg via de tooltip */
+  .p-voet .knop:not(.hoofd) .lbl, .p-voet .knop kbd{display:none}   /* smal: alleen iconen, uitleg via de tooltip */
 }
 @container paneel (max-width: 380px){
-  .p-voet .knop.goed .lbl{display:none}
+  .p-voet .knop.hoofd .lbl{display:none}
 }
 .voet-acties .groepje{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .voet-acties .groepje:last-child{margin-left:auto}
@@ -774,11 +775,11 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
 :root[data-theme] .knop{background:transparent;border-color:var(--line2);color:var(--t1)}
 :root[data-theme] .knop:hover{border-color:var(--t3)}
 :root[data-theme] .knop.primair{background:transparent;border-color:var(--line2);color:var(--t1)}
-:root[data-theme] .knop.goed,:root[data-theme] #goedkeuren{background:var(--fill);border-color:var(--fill-b);color:var(--on)}
+:root[data-theme] .knop.goed,:root[data-theme] .p-voet .knop.hoofd{background:var(--fill);border-color:var(--fill-b);color:var(--on)}
 :root[data-theme] .knop.klein.goed:not(#pl-bevestig):not(#afsluit-start){background:transparent;border-color:var(--line2);color:var(--t1)}
 :root[data-theme] #verzenden:not(.bevestig){background:transparent;border-color:var(--line2);color:var(--t1)}
 :root[data-theme] .knop.bevestig{background:var(--fill)!important;border-color:var(--fill-b)!important;color:var(--on)!important;animation:none}
-:root[data-theme] .p-voet:has(#verzenden.bevestig) #goedkeuren{background:transparent;border-color:var(--line2);color:var(--t1)}
+:root[data-theme] .p-voet:has(#verzenden.bevestig) .knop.hoofd:not(#verzenden){background:transparent;border-color:var(--line2);color:var(--t1)}
 :root[data-theme] .knop kbd{background:color-mix(in srgb,currentColor 12%,transparent)}
 /* knoppen op een donkere balk of melding houden de lichte tekst van die balk */
 :root[data-theme] .balk .knop,:root[data-theme] .toast .knop{background:transparent;color:inherit;border-color:color-mix(in srgb,currentColor 35%,transparent)}
@@ -2544,6 +2545,12 @@ function tekenBalk(){
     <button class="knop klein" data-bulk="leeg" title="Clear selection">${ik("x")}</button>`;
 }
 
+// Eén messing hoofdknop per soort mail: wat je hier meestal doet
+function hoofdActie(it){
+  if (it.lijkt_beantwoord || it.actie === "ter_info" || it.actie === "negeren") return "gedaan";
+  if (it.actie === "taak") return "taak";                       // review-uitnodigingen en ander werk: inplannen
+  return "antwoord";
+}
 function tekenPaneel(it){
   const p = document.getElementById("paneel");
   zetGelezen(it.id);
@@ -2559,6 +2566,7 @@ function tekenPaneel(it){
   const concept = bestaand && zelfdeMail ? bestaand.value : (concepten[it.id] ?? it.concept);
   const scroll = zelfdeMail ? (p.querySelector(".p-inhoud")?.scrollTop || 0) : 0;
   const beantwoord = !!it.lijkt_beantwoord;
+  const hoofd = hoofdActie(it);
   const origOpen = zelfdeMail && p.querySelector("details.origineel")?.open;
   const focusId = zelfdeMail && p.contains(document.activeElement) ? document.activeElement.id : null;
   p.dataset.id = it.id; p.dataset.sleutel = ""; p.dataset.lees = "";
@@ -2607,16 +2615,16 @@ function tekenPaneel(it){
     </div>
     <div class="p-voet voet-acties">
       <div class="groepje">
-        <button class="knop ikoonknop" data-maaktaak="${it.id}" title="Create and schedule task (T)">${ik("calendar")}<kbd>T</kbd></button>
+        <button class="knop${hoofd === "taak" ? " hoofd" : " ikoonknop"}" data-maaktaak="${it.id}" title="Create and schedule task (T)">${ik("calendar")}${hoofd === "taak" ? `<span class="lbl">Create task</span>` : ""}<kbd>T</kbd></button>
         ${it.actie === "agenda" ? "" : `<button class="knop ikoonknop" data-afsprladen="${it.id}" title="Schedule a meeting with the sender">${ik("mensen")}</button>`}
         <button class="knop ikoonknop" data-opbergen="${it.id}" title="File in a folder (V)">${ik("folder")}<kbd>V</kbd></button>
         <button class="knop ikoonknop" data-een="archief" data-id="${it.id}" title="Archive without replying (E)">${ik("archive")}<kbd>E</kbd></button>
         <button class="knop ikoonknop" id="afwijzen" title="Dismiss: the suggestion is wrong (X)">${ik("x")}<kbd>X</kbd></button>
-        <button class="knop${beantwoord ? " goed" : ""}" id="gedaan" title="Done: no reply needed. You can then archive or file the email (D; Shift+D picks a folder straight away)">${ik("check")}<span class="lbl">Done</span><kbd>D</kbd></button>
+        <button class="knop${hoofd === "gedaan" ? " hoofd" : ""}" id="gedaan" title="Done: no reply needed. You can then archive or file the email (D; Shift+D picks a folder straight away)">${ik("check")}<span class="lbl">Done</span><kbd>D</kbd></button>
       </div>
       <div class="groepje">
-        <button class="knop" id="goedkeuren" title="Prepare a reply with this text in Apple Mail; you send it from there (⌘↵)">${ik("reply")}<span class="lbl">Reply in Mail</span><kbd>⌘↵</kbd></button>
-        <button class="knop${beantwoord ? "" : " goed"}" id="verzenden" title="Send straight away; a second click confirms (⇧⌘↵)">${ik("forward")}<span class="lbl">Send</span><kbd>⇧⌘↵</kbd></button>
+        <button class="knop${hoofd === "antwoord" ? " hoofd" : ""}" id="goedkeuren" title="Prepare a reply with this text in Apple Mail; you send it from there (⌘↵)">${ik("reply")}<span class="lbl">Reply in Mail</span><kbd>⌘↵</kbd></button>
+        <button class="knop" id="verzenden" title="Send straight away; a second click confirms (⇧⌘↵)">${ik("forward")}<span class="lbl">Send</span><kbd>⇧⌘↵</kbd></button>
       </div>
     </div>`;
   p.classList.add("open"); p.setAttribute("aria-hidden","false");
