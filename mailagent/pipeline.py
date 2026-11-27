@@ -11,7 +11,7 @@ from email.utils import parseaddr
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from .config import Config, anonimiseer, mag_naar_claude, sorteer_met_regels
+from .config import Config, anonimiseer, mag_naar_claude, pas_instellingen_toe, sorteer_met_regels
 from .llm import LLM, LLMFout
 from .models import UITWERK_ACTIES, Email, OpenPunt, Sortering
 from .store import OPEN_STATUSSEN, Store, normaal_message_id
@@ -137,6 +137,15 @@ def verwerk_mail(cfg: Config, store: Store, llm: LLM, mail: Email, agenda=None) 
     if not mag_naar_claude(cfg, mail):
         s = Sortering(project=vast_project or "overig", actie="antwoorden", prioriteit="hoog" if belangrijk else "normaal",
                       deadline=None, samenvatting=mail.onderwerp, reden="on the list of senders never sent to Claude")
+        lokaal = getattr(llm, "lokaal", None)
+        if lokaal is not None:   # menu Settings: een model op je Mac vat hem samen; er gaat niets naar Claude
+            try:
+                l = lokaal.sorteer(mail, mail.tekst, vast_project)
+                s = s.model_copy(update={"project": vast_project or l.project, "samenvatting": l.samenvatting,
+                                         "deadline": l.deadline,
+                                         "reden": "never sent to Claude; summarised by the local model on your Mac"})
+            except Exception as e:
+                log.warning("lokaal model: %s", e)
         return store.nieuw_item(mail, s, None, "handmatig")
 
     if cfg.bulk_overslaan and mail.extra.get("bulk") and vast_project is None and sortering is None and not belangrijk:
@@ -829,6 +838,7 @@ def run(cfg: Config, store: Store, bronnen: dict, llm: LLM, dagen: int | None = 
                 cache["ag"] = maak_agenda(cfg)[0] if (cfg.agenda or {}).get("kalender") else None
             return cache["ag"]
     with ronde_slot(store):
+        pas_instellingen_toe(cfg, store)
         resultaat: dict[str, int] = {}
         uitgaand: dict[str, list] = {}   # per bron: je verstuurde mail van de laatste 30 dagen
         maximum = maximum or cfg.max_mails_per_run

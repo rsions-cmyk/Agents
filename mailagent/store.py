@@ -121,6 +121,10 @@ CREATE TABLE IF NOT EXISTS voorlopig (
     titel TEXT, start TEXT, eind TEXT,
     aangemaakt TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS instellingen (   -- keuzes uit het menu Settings; config.yaml geeft de standaard
+    sleutel TEXT PRIMARY KEY,
+    waarde TEXT
+);
 CREATE TABLE IF NOT EXISTS gemeld (
     sleutel TEXT PRIMARY KEY,
     tijd TEXT NOT NULL
@@ -198,6 +202,16 @@ class Store:
             self.db.execute("CREATE UNIQUE INDEX IF NOT EXISTS items_sleutel_uniek ON items(sleutel)")
         except sqlite3.IntegrityError:
             pass
+        self.db.commit()
+
+    # --- instellingen uit het menu ------------------------------------------------
+    def instelling(self, sleutel: str) -> Optional[str]:
+        r = self.db.execute("SELECT waarde FROM instellingen WHERE sleutel=?", (sleutel,)).fetchone()
+        return r["waarde"] if r else None
+
+    def zet_instelling(self, sleutel: str, waarde: Optional[str]) -> None:
+        self.db.execute("INSERT INTO instellingen(sleutel, waarde) VALUES(?, ?) ON CONFLICT(sleutel) DO UPDATE SET "
+                        "waarde=excluded.waarde", (sleutel, waarde))
         self.db.commit()
 
     # --- herkennen op Message-ID (fout 5) ----------------------------------------

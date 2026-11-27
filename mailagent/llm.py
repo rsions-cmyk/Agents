@@ -405,7 +405,64 @@ class ClaudeCodeLLM(ClaudeLLM):
         return data
 
 
+class OllamaLLM(ClaudeLLM):
+    """Dezelfde vragen aan een model op je eigen Mac, via Ollama (http://localhost:11434). Niets verlaat je Mac.
+    Alleen voor eenvoudige taken: zie GemengdLLM."""
+
+    def __init__(self, cfg: Config, verstuur=None):
+        super().__init__(cfg, client=None)
+        self.verstuur = verstuur or self._post
+
+    def _post(self, pad: str, data: dict | None, timeout: int = 120) -> dict:
+        import urllib.request
+        req = urllib.request.Request(self.cfg.lokaal_url.rstrip("/") + pad, method="POST" if data is not None else "GET",
+                                     data=json.dumps(data).encode() if data is not None else None,
+                                     headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read())
+
+    def modellen(self) -> list[str]:
+        return [m.get("name", "") for m in self.verstuur("/api/tags", None, 5).get("models", []) if m.get("name")]
+
+    def _stuur(self, system: str, gebruiker: str, schema: dict, effort: str) -> dict:
+        model = self.cfg.lokaal_model or (self.modellen() or [None])[0]
+        if not model:
+            raise LLMFout("no local model installed; run: ollama pull <model>")
+        try:
+            uit = self.verstuur("/api/chat", {
+                "model": model, "stream": False, "format": schema, "options": {"temperature": 0},
+                "messages": [{"role": "system", "content": system}, {"role": "user", "content": gebruiker}]})
+        except Exception as e:
+            raise LLMFout(f"local model not reachable ({e})") from e
+        try:
+            return json.loads(uit["message"]["content"])
+        except (KeyError, TypeError, json.JSONDecodeError) as e:
+            raise LLMFout(f"local model gave no usable answer: {str(uit)[:200]}") from e
+
+
+class GemengdLLM:
+    """Claude voor alles waar de kwaliteit telt (sorteren, concepten, taken); het lokale model voor eenvoudige taken:
+    agenda-afspraken indelen, nagaan of je op een verstuurde mail een antwoord verwacht, en mail van afzenders op
+    'nooit naar Claude' een samenvatting en project geven. Lukt het lokaal niet, dan valt alleen die taak uit
+    (agenda en verwacht antwoord gaan dan toch naar Claude)."""
+    LOKALE_TAKEN = ("deel_afspraken_in", "verwacht_antwoord")
+
+    def __init__(self, claude, lokaal):
+        self.claude, self.lokaal = claude, lokaal
+
+    def __getattr__(self, naam):
+        if naam in self.LOKALE_TAKEN:
+            def lokaal_eerst(*a, **k):
+                try:
+                    return getattr(self.lokaal, naam)(*a, **k)
+                except LLMFout:
+                    return getattr(self.claude, naam)(*a, **k)
+            return lokaal_eerst
+        return getattr(self.claude, naam)
+
+
 def maak_llm(cfg: Config) -> LLM:
-    if cfg.backend == "api":
-        return ClaudeLLM(cfg)
-    return ClaudeCodeLLM(cfg)
+    claude = ClaudeLLM(cfg) if cfg.backend == "api" else ClaudeCodeLLM(cfg)
+    if getattr(cfg, "lokaal_aan", False):
+        return GemengdLLM(claude, OllamaLLM(cfg))
+    return claude

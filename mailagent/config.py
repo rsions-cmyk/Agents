@@ -47,6 +47,10 @@ class Config:
     opvolgen_werkdagen: int = 3
     opruimen_na_antwoord: bool = True
     opbergen_na_afhandelen: bool = True
+    anonimiseren_aan: bool = True           # menu Settings; uit: alles gaat zonder vervangen naar Claude
+    lokaal_aan: bool = False                # menu Settings; aan: eenvoudige taken door een model op je Mac
+    lokaal_model: str | None = None
+    lokaal_url: str = "http://localhost:11434"
     meldingen_aan: bool = True
     meldingen_minuten: int = 15
     ochtend_aan: bool = True
@@ -113,6 +117,8 @@ def laad(pad: str | Path = "config.yaml") -> Config:
         opvolgen_werkdagen=int((ruw.get("opvolgen") or {}).get("werkdagen", 3)),
         opruimen_na_antwoord=bool(ruw.get("archiveren_na_antwoord", True)),
         opbergen_na_afhandelen=bool(ruw.get("opbergen_na_afhandelen", True)),
+        lokaal_model=(ruw.get("lokaal") or {}).get("model"),
+        lokaal_url=str((ruw.get("lokaal") or {}).get("url", "http://localhost:11434")),
         meldingen_aan=bool((ruw.get("meldingen") or {}).get("aan", True)),
         meldingen_minuten=max(5, int((ruw.get("meldingen") or {}).get("elke_minuten", 15))),
         ochtend_aan=bool((ruw.get("meldingen") or {}).get("ochtend", True)),
@@ -137,7 +143,20 @@ _ANONIEM: dict[str, str] = {}
 ANON_CODE = re.compile(r"\[([A-Z][A-Z_]*)-([0-9a-fA-F]{6})\]")
 
 
+def pas_instellingen_toe(cfg: Config, store) -> None:
+    """De keuzes uit het menu Settings (in de database) over de standaard van config.yaml heen."""
+    a, l, m = store.instelling("anonimiseren"), store.instelling("lokaal"), store.instelling("lokaal_model")
+    if a is not None:
+        cfg.anonimiseren_aan = a == "aan"
+    if l is not None:
+        cfg.lokaal_aan = l == "aan"
+    if m:
+        cfg.lokaal_model = m
+
+
 def anonimiseer(cfg: Config, tekst: str) -> str:
+    if not getattr(cfg, "anonimiseren_aan", True):
+        return tekst
     for patroon, vervang in cfg.anonimiseren:
         label = re.sub(r"[^A-Z_]", "", str(vervang).upper()) or "ANON"
 

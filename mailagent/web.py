@@ -22,7 +22,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from .config import Config
+from .config import pas_instellingen_toe, Config
 from datetime import date, datetime, timedelta
 
 from .agenda import SOORTEN, afspraak_sleutel, mag_agenda_naar_claude, les_regel_bij, lees_werktijd, maak_agenda, soort_bepalen, vrije_momenten
@@ -189,6 +189,7 @@ def verzamel(cfg: Config, store: Store, ophalen: dict, oud_ophalen: dict | None 
         "oud_aantal": len(store.items(status="oud")),
         "oud_tot": oud_tot(cfg, store),
         "oud_ophalen": dict(oud_ophalen or {"bezig": False, "laatste": "", "voortgang": ""}),
+        "instellingen": {"anonimiseren": cfg.anonimiseren_aan, "lokaal": cfg.lokaal_aan, "lokaal_model": cfg.lokaal_model},
         "werktijd": {"begin": werk.begin.strftime("%H:%M"), "eind": werk.eind.strftime("%H:%M"), "dagen": sorted(werk.dagen)},
         "agenda_aan": bool((cfg.agenda or {}).get("kalender")),
         "agenda_naam": (cfg.agenda or {}).get("kalender"),
@@ -204,6 +205,7 @@ def verzamel(cfg: Config, store: Store, ophalen: dict, oud_ophalen: dict | None 
 
 def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
     token = secrets.token_urlsafe(24)
+    pas_instellingen_toe(cfg, store)   # de keuzes uit het menu Settings over config.yaml heen
     db_pad = store.pad
     ophalen = {"bezig": False, "laatste": ""}
     oud_ophalen = {"bezig": False, "laatste": "", "voortgang": ""}
@@ -984,6 +986,27 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                     for a in adressen:
                         store.zet_afzender_regel(a, "negeren", None)
                     melding = (f"{len(adressen)} senders will be skipped from now on" if len(adressen) != 1 else "1 sender will be skipped from now on")
+                elif actie == "instelling":   # menu Settings
+                    sleutel, aan = str(v.get("sleutel")), v.get("waarde")
+                    if sleutel in ("anonimiseren", "lokaal"):
+                        store.zet_instelling(sleutel, "aan" if aan else "uit")
+                    elif sleutel == "lokaal_model":
+                        store.zet_instelling("lokaal_model", str(aan or "") or None)
+                    else:
+                        return self._json({"ok": False, "melding": "Unknown setting"})
+                    pas_instellingen_toe(cfg, store)
+                    melding = {"anonimiseren": "Student numbers and IBANs are replaced again before anything goes to Claude"
+                               if cfg.anonimiseren_aan else "Anonymising is off: email goes to Claude as it is",
+                               "lokaal": f"Simple tasks now run on your Mac{(' with ' + cfg.lokaal_model) if cfg.lokaal_model else ''}"
+                               if cfg.lokaal_aan else "Everything goes to Claude again",
+                               "lokaal_model": f"Local model: {cfg.lokaal_model}" if cfg.lokaal_model else "Local model: the first one installed"}[sleutel]
+                elif actie == "lokaal-status":   # welke modellen Ollama op deze Mac heeft
+                    from .llm import OllamaLLM
+                    try:
+                        modellen = OllamaLLM(cfg).modellen()
+                        return self._json({"ok": True, "bereikbaar": True, "modellen": modellen})
+                    except Exception:
+                        return self._json({"ok": True, "bereikbaar": False, "modellen": []})
                 elif actie == "overslaan-terug":   # Undo van Skip sender
                     for adres in v.get("adressen", []):
                         store.verwijder_afzender_regel(str(adres))

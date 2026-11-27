@@ -2037,3 +2037,80 @@ def test_oudere_mail_in_de_app(omgeving):
     d = verzamel(cfg, store, {"bezig": False, "laatste": ""})
     assert d["oud_aantal"] == 1 and d["oud"][0]["plek"] == "Partners" and d["oud_tot"]
     assert d["oud_ophalen"]["bezig"] is False
+
+
+def test_instellingen_anonimiseren_en_lokaal_model(omgeving):
+    """Menu Settings: anonimiseren aan of uit, en een lokaal model voor eenvoudige taken (standaard uit)."""
+    from mailagent.config import anonimiseer, pas_instellingen_toe
+    from mailagent.llm import ClaudeLLM, GemengdLLM, LLMFout, OllamaLLM, maak_llm
+    cfg, store, bronnen = omgeving
+    assert cfg.anonimiseren_aan and not cfg.lokaal_aan and not isinstance(maak_llm(cfg), GemengdLLM)
+    assert "123456" not in anonimiseer(cfg, "nummer 123456")
+    store.zet_instelling("anonimiseren", "uit"); pas_instellingen_toe(cfg, store)
+    assert anonimiseer(cfg, "nummer 123456") == "nummer 123456"
+    store.zet_instelling("anonimiseren", "aan"); store.zet_instelling("lokaal", "aan"); store.zet_instelling("lokaal_model", "qwen3:8b")
+    pas_instellingen_toe(cfg, store)
+    assert cfg.lokaal_aan and cfg.lokaal_model == "qwen3:8b" and isinstance(maak_llm(cfg), GemengdLLM)
+
+    # de vraag aan Ollama: model, schema, systeem en mail; het antwoord als JSON
+    gestuurd = []
+    def verstuur(pad, data, timeout=120):
+        gestuurd.append((pad, data))
+        return {"message": {"content": json.dumps({"afspraken": [{"nr": 1, "soort": "les", "reden": "timetable"}]})}}
+    lokaal = OllamaLLM(cfg, verstuur=verstuur)
+    assert lokaal.deel_afspraken_in([{"nr": 1, "titel": "Werkcollege TMO 123456"}])[0]["soort"] == "les"
+    pad, data = gestuurd[0]
+    assert pad == "/api/chat" and data["model"] == "qwen3:8b" and data["format"]["type"] == "object" and not data["stream"]
+    assert "123456" not in data["messages"][1]["content"]                     # ook lokaal anonimiseert de app
+
+    # verdeling: eenvoudige taken lokaal, de rest bij Claude; lukt lokaal niet, dan Claude
+    class Claude:
+        def deel_afspraken_in(self, a): return ["claude"]
+        def werk_uit(self, *a, **k): return "claude-concept"
+    class KapotLokaal:
+        def deel_afspraken_in(self, a): raise LLMFout("not reachable")
+    g = GemengdLLM(Claude(), lokaal)
+    assert g.deel_afspraken_in([{"nr": 1}])[0]["soort"] == "les" and g.werk_uit() == "claude-concept"
+    assert GemengdLLM(Claude(), KapotLokaal()).deel_afspraken_in([]) == ["claude"]
+
+
+def test_nooit_naar_claude_lokaal_samengevat(omgeving):
+    """Met het lokale model aan krijgt mail die nooit naar Claude gaat een samenvatting op je Mac."""
+    from mailagent.models import Sortering
+    class Lokaal(NepLLM):
+        def sorteer(self, mail, tekst, vast_project):
+            self.gezien.append(tekst)
+            return Sortering(project="overig", actie="ter_info", prioriteit="laag", deadline=None,
+                             samenvatting="Je maandoverzicht staat klaar", reden="lokaal")
+    class Met(NepLLM):
+        pass
+    cfg, store, bronnen = omgeving
+    llm = Met(); llm.lokaal = Lokaal()
+    run(cfg, store, bronnen, llm)
+    bank = store.item(store.items(status="handmatig")[0]["id"])
+    assert bank["samenvatting"] == "Je maandoverzicht staat klaar" and "local model" in bank["reden"]
+    assert all("rekeningoverzicht" not in t for t in llm.gezien)              # niets van de bank naar 'Claude'
+    assert llm.lokaal.gezien                                                    # wel naar het lokale model
+
+
+def test_menu_instellingen_via_de_app(omgeving):
+    import threading
+    import urllib.request
+    from http.server import HTTPServer
+    from mailagent.web import maak_handler
+    cfg, store, bronnen = omgeving
+    server = HTTPServer(("127.0.0.1", 0), maak_handler(cfg, store, bronnen, NepLLM))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    basis = f"http://127.0.0.1:{server.server_port}"
+    try:
+        token = urllib.request.urlopen(basis + "/").read().decode().split('const TOKEN = "')[1].split('"')[0]
+        kop = {"Content-Type": "application/json", "X-Token": token}
+        post = lambda naam, data: json.loads(urllib.request.urlopen(urllib.request.Request(
+            basis + "/api/" + naam, data=json.dumps(data).encode(), method="POST", headers=kop)).read())
+        assert "Anonymising is off" in post("instelling", {"sleutel": "anonimiseren", "waarde": False})["melding"]
+        data = json.loads(urllib.request.urlopen(urllib.request.Request(basis + "/api/data", headers=kop)).read())
+        assert data["instellingen"] == {"anonimiseren": False, "lokaal": False, "lokaal_model": None}
+        assert store.instelling("anonimiseren") == "uit"                         # ook de rondes zien het
+        assert post("lokaal-status", {}) == {"ok": True, "bereikbaar": False, "modellen": []}   # hier draait geen Ollama
+    finally:
+        server.shutdown()

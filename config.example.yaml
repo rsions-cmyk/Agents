@@ -92,12 +92,22 @@ nooit_naar_claude:
 
 # Text replaced before anything goes to Claude (regular expressions), in every field. Each value gets its own
 # code with the word under 'vervang', such as [NUMMER-a3f9c1]; the app puts the real value back in drafts and tasks.
-# By default: student numbers of 6 or 7 digits, and IBANs.
+# By default: student numbers of 6 or 7 digits, and IBANs. Switch anonymising off or on in the app under Settings.
 anonimiseren:
   - patroon: '\b\d{6,7}\b'
     vervang: '[NUMMER]'
   - patroon: '\b[A-Z]{2}\d{2}[A-Z0-9]{4}\d{7,16}\b'
     vervang: '[IBAN]'
+
+# Local model through Ollama, for three simple jobs: classifying calendar events, checking whether you
+# expect a reply, and summarising email that never goes to Claude. Off by default; switch it on in the
+# app under Settings (bottom of the left rail), which also lets you pick the model. Without a model here
+# the app uses the first one Ollama has.
+#   brew install ollama && ollama serve
+#   ollama pull qwen3:8b
+# lokaal:
+#   model: qwen3:8b
+#   url: http://localhost:11434
 
 # Calendar for 'Create and schedule task'. Your Exchange calendar must be in the Calendar app;
 # events the app creates there also appear in Outlook. Look up the names with:

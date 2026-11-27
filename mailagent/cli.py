@@ -147,6 +147,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1 if fout else 0
 
     from .llm import maak_llm
+    from .config import pas_instellingen_toe
+    pas_instellingen_toe(cfg, store)   # de keuzes uit het menu Settings
 
     if args.opdracht == "run":
         from .pipeline import RondeBezig, overzicht, run

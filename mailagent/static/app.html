@@ -831,7 +831,12 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
 .thema{position:relative}
 .thema-knop{display:flex;align-items:center;gap:8px;width:100%;padding:6px 10px;border-radius:var(--r1);color:var(--t2);font-size:12.5px}
 .thema-knop:hover{background:var(--hover);color:var(--t1)}
-.thema-menu{position:absolute;bottom:calc(100% + 6px);left:0;width:232px;background:var(--s1);border:1px solid var(--line2);border-radius:10px;box-shadow:var(--pop);padding:4px;z-index:70}
+.thema-menu{position:absolute;bottom:calc(100% + 6px);left:0;width:300px;background:var(--s1);border:1px solid var(--line2);border-radius:10px;box-shadow:var(--pop);padding:4px;z-index:70}
+.thema-menu .menu-kop{font-size:11px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);padding:6px 10px 2px}
+.thema-menu .menu-streep{height:1px;background:var(--line);margin:4px 6px}
+.thema-menu .menu-noot{font-size:12px;line-height:1.45;color:var(--t2);padding:4px 10px 8px}
+.thema-menu .menu-noot code{font-size:11.5px}
+.thema-menu .menu-noot select{margin-left:6px;font:inherit;font-size:12.5px}
 .thema-menu button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:7px 10px;border-radius:7px;font-size:13px;color:var(--t1)}
 .thema-menu button:hover{background:var(--hover)}
 .thema-menu button .meta{margin-left:auto;font-size:11.5px;color:var(--t2);white-space:nowrap}
@@ -947,7 +952,7 @@ main{grid-row:2;grid-column:2 / -1;min-width:0}
 </div>
     <div id="nav" style="display:contents"></div>
     <div class="onder">
-      <div class="thema" id="thema"><button class="thema-knop" id="thema-knop" title="Theme" aria-haspopup="menu"><span data-ikoon="thema"></span><span class="navtekst" id="thema-naam">Automatic</span></button></div>
+      <div class="thema" id="thema"><button class="thema-knop" id="thema-knop" title="Settings: theme, anonymising, local model" aria-haspopup="menu"><span data-ikoon="thema"></span><span class="navtekst" id="thema-naam">Automatic</span></button></div>
     </div>
   </aside>
   <header class="topbalk" id="topbalk">
@@ -3846,15 +3851,66 @@ function pasThemaToe(){
   if (oud !== nieuw && D){ document.getElementById("paneel").dataset.sig = ""; document.getElementById("paneel").dataset.sleutel = ""; teken(); }
 }
 if (donkerSysteem) donkerSysteem.addEventListener("change", pasThemaToe);
+function tekenMenu(focusOp){
+  const doos = document.getElementById("thema");
+  doos.querySelector(".thema-menu")?.remove();
+  const k = themaKeuze(), ins = (D && D.instellingen) || {anonimiseren: true, lokaal: false};
+  const vink = (sleutel, aan, naam, uitleg) => `<button role="menuitemcheckbox" aria-checked="${aan}" class="${aan ? "aan" : ""}" data-instelling="${sleutel}" data-waarde="${aan ? 0 : 1}">${ik("check")}${naam}<span class="meta">${uitleg}</span></button>`;
+  doos.insertAdjacentHTML("beforeend", `<div class="thema-menu" role="menu" aria-label="Settings"><div class="menu-kop">Theme</div>${THEMAS.map(([w, naam, uitleg]) =>
+    `<button role="menuitemradio" aria-checked="${w === k}" class="${w === k ? "aan" : ""}" data-thema="${w}">${ik("check")}${naam}${uitleg ? `<span class="meta">${uitleg}</span>` : ""}</button>`).join("")}
+    <div class="menu-streep"></div><div class="menu-kop">Privacy and models</div>
+    ${vink("anonimiseren", ins.anonimiseren, "Anonymise numbers", "student numbers, IBANs")}
+    ${vink("lokaal", ins.lokaal, "Local model", "simple tasks on this Mac")}
+    <div class="menu-noot" id="lokaal-noot">${ins.lokaal ? "Checking the local model…" : "Off: everything goes to Claude. On: classifying events, checking whether you expect a reply, and summarising email that never goes to Claude run on this Mac."}</div></div>`);
+  const menu = doos.querySelector(".thema-menu");
+  (menu.querySelector(focusOp || "[data-thema].aan") || menu.querySelector("button")).focus();
+  if (ins.lokaal) toonLokaalStatus();
+}
+function sluitMenu(terug){
+  const m = document.querySelector(".thema-menu"); if (!m) return false;
+  m.remove(); if (terug) document.getElementById("thema-knop").focus();
+  return true;
+}
 document.getElementById("thema-knop").addEventListener("click", ev => {
   ev.stopPropagation();
-  const doos = document.getElementById("thema"), open = doos.querySelector(".thema-menu");
-  if (open) return open.remove();
-  const k = themaKeuze();
-  doos.insertAdjacentHTML("beforeend", `<div class="thema-menu" role="menu">${THEMAS.map(([w, naam, uitleg]) =>
-    `<button role="menuitemradio" aria-checked="${w === k}" class="${w === k ? "aan" : ""}" data-thema="${w}">${ik("check")}${naam}${uitleg ? `<span class="meta">${uitleg}</span>` : ""}</button>`).join("")}</div>`);
+  if (!sluitMenu()) tekenMenu();
 });
-document.addEventListener("click", ev => {
+document.addEventListener("keydown", ev => {
+  const menu = document.querySelector(".thema-menu");
+  if (!menu) return;
+  if (ev.key === "Escape"){ ev.preventDefault(); ev.stopImmediatePropagation(); return sluitMenu(true); }
+  if (!menu.contains(document.activeElement)) return;
+  if (ev.key.length === 1 && ev.key !== " " && !ev.metaKey && !ev.ctrlKey){ ev.stopImmediatePropagation(); return; }   // geen sneltoetsen achter het menu
+  if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(ev.key)) return;
+  ev.preventDefault(); ev.stopImmediatePropagation();
+  const knoppen = [...menu.querySelectorAll("button")], i = knoppen.indexOf(document.activeElement);
+  const j = ev.key === "Home" ? 0 : ev.key === "End" ? knoppen.length - 1 : (i + (ev.key === "ArrowDown" ? 1 : -1) + knoppen.length) % knoppen.length;
+  knoppen[j].focus();
+}, true);
+async function toonLokaalStatus(){
+  const j = await stil("lokaal-status", {}), noot = document.getElementById("lokaal-noot");
+  if (!noot) return;
+  const gekozen = (D.instellingen || {}).lokaal_model || "";
+  if (!j.bereikbaar) noot.innerHTML = `Ollama isn't running on this Mac. Install it with <code>brew install ollama</code>, start it, and fetch a model, for example <code>ollama pull qwen3:8b</code>. Until then these tasks go to Claude.`;
+  else if (!j.modellen.length) noot.innerHTML = `Ollama runs, but has no model yet. Fetch one, for example <code>ollama pull qwen3:8b</code>.`;
+  else noot.innerHTML = `<label>Model <select id="lokaal-model">${j.modellen.map(m => `<option${m === gekozen ? " selected" : ""}>${esc(m)}</option>`).join("")}</select></label>`;
+}
+document.addEventListener("change", async ev => {
+  if (ev.target.id !== "lokaal-model") return;
+  const j = await stil("instelling", {sleutel: "lokaal_model", waarde: ev.target.value});
+  toast(j.melding, !j.ok); laad();
+});
+document.addEventListener("click", async ev => {
+  if (ev.target.closest(".thema-menu") && !ev.target.closest("[data-thema], [data-instelling]")) return;   // in het menu zelf
+  const inst = ev.target.closest("[data-instelling]");
+  if (inst){                                                   // het menu blijft open: je ziet meteen wat er veranderde
+    const sleutel = inst.dataset.instelling;
+    const j = await stil("instelling", {sleutel, waarde: inst.dataset.waarde === "1"});
+    toast(j.melding, !j.ok);
+    await laad();
+    if (document.querySelector(".thema-menu")) tekenMenu(`[data-instelling="${sleutel}"]`);
+    return;
+  }
   const b = ev.target.closest("[data-thema]");
   document.querySelector(".thema-menu")?.remove();
   if (!b) return;
