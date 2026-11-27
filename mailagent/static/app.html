@@ -133,6 +133,11 @@ textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:
 .takenlijst div{display:flex;gap:8px;align-items:center;padding:8px 12px;border-radius:9px;background:var(--vlak2)}
 .takenlijst svg{color:var(--ok);width:16px;height:16px}
 details.origineel{scroll-margin-top:12px}
+.lees-voet{flex-wrap:wrap}
+.lees-sel{flex-basis:100%;display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.45;color:var(--t2);padding:0 2px 2px}
+.lees-sel svg{width:14px;height:14px;flex:none;margin-top:2px}
+.lees-sel .link{margin-left:auto;white-space:nowrap;font-size:12.5px;color:var(--t2);text-decoration:underline;text-underline-offset:2px}
+.lees-sel .link:hover{color:var(--t1)}
 .mail-begin{border-left:2px solid var(--line2);padding:2px 0 2px 14px}
 .mail-begin .label{margin-bottom:4px}
 .mail-begin p{margin:0;white-space:pre-line;font-size:14px;line-height:1.55;color:var(--t1);overflow-wrap:anywhere}
@@ -755,10 +760,15 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
 :root[data-theme] .lijst{box-shadow:none;border-color:var(--line);background:var(--s1)}
 :root[data-theme] .rij:hover{background:var(--hover)}
 :root[data-theme] .rij.gekozen,:root[data-theme] .rij.leest{background:var(--s2);box-shadow:none}
+/* Tidy up: geselecteerd is een lichte inktwas met vinkje, geopend het vlak met een inktstreep links */
+:root[data-theme] .rij.gekozen[data-kies]{background:color-mix(in srgb,var(--t1) 5%,transparent)}
+:root[data-theme] .rij.leest[data-kies]{background:var(--s2);box-shadow:inset 3px 0 0 var(--t1)}
 @media (min-width:1100px){
   :root[data-theme] .app.drie .lijst .rij{border-radius:0;margin-bottom:0;border-bottom:1px solid var(--line)}
   :root[data-theme] .app.drie .lijst .rij:hover{background:var(--hover)}
   :root[data-theme] .app.drie .lijst .rij.gekozen,:root[data-theme] .app.drie .lijst .rij.leest{background:var(--s2);box-shadow:none}
+  :root[data-theme] .app.drie .lijst .rij.gekozen[data-kies]{background:color-mix(in srgb,var(--t1) 5%,transparent)}
+  :root[data-theme] .app.drie .lijst .rij.leest[data-kies]{background:var(--s2);box-shadow:inset 3px 0 0 var(--t1)}
 }
 :root[data-theme] .rij.urg::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:2px;border-radius:2px;background:var(--brass)}
 :root[data-theme] .avatar{background:var(--s2)!important;color:var(--t2)}
@@ -1696,7 +1706,11 @@ function tekenLees(id){
   }
   const zelfde = p.dataset.lees === String(id);
   const sleutel = `${id}|${m ? 1 : 0}|${toonWeergave()}|${basis.status}`;
-  if (zelfde && p.dataset.sleutel === sleutel && p.classList.contains("open")) return;   // niets veranderd: iframe niet herladen
+  if (zelfde && p.dataset.sleutel === sleutel && p.classList.contains("open")){             // niets veranderd: iframe niet herladen
+    const voet = p.querySelector(".p-voet"), nieuw = leesVoetHTML(id);
+    if (voet && voet.dataset.html !== nieuw){ voet.innerHTML = nieuw; voet.dataset.html = nieuw; }
+    return;
+  }
   p.dataset.id = ""; p.dataset.lees = id; p.dataset.sleutel = sleutel;
   p.innerHTML = `
     <div class="p-kop">${avatar(basis)}
@@ -1709,16 +1723,33 @@ function tekenLees(id){
       ${m && m.reden && basis.status === "genegeerd" ? `<div class="meta">${esc(m.reden)}</div>` : ""}
       ${mailWeergave(id, m ? m.tekst : null)}
     </div>
-    <div class="p-voet">
+    <div class="p-voet lees-voet" data-html="${attr(leesVoetHTML(id))}">${leesVoetHTML(id)}</div>`;
+  p.classList.add("open"); p.setAttribute("aria-hidden","false");
+  if (!drieKolommen()) document.getElementById("dek").classList.add("open");
+  tekenBalk();
+}
+
+// De knoppen onder een mail in Tidy up. Met een selectie werken ze op de selectie, net als E, # en V,
+// en dat staat erbij; Task werkt op één mail en wacht tot de selectie leeg is.
+function leesVoetHTML(id){
+  const n = staat.gekozen.size;
+  if (!n) return `
       <button class="knop" data-maaktaak="${id}" title="Create task (T)">${ik("calendar")}<span class="lbl">Task</span><kbd>T</kbd></button>
       <button class="knop" data-opbergen="${id}" title="File in a folder (V)">${ik("folder")}<span class="lbl">File</span><kbd>V</kbd></button>
       <button class="knop" data-een="overslaan" data-id="${id}" title="Skip this sender from now on">${ik("ban")}</button>
       <span style="flex:1"></span>
       <button class="knop" data-een="prullenbak" data-id="${id}" title="Move to Bin (#)">${ik("trash")}<kbd>#</kbd></button>
-      <button class="knop goed" data-een="archief" data-id="${id}" title="Archive (E)">${ik("archive")}<span class="lbl">Archive</span><kbd>E</kbd></button>
-    </div>`;
-  p.classList.add("open"); p.setAttribute("aria-hidden","false");
-  if (!drieKolommen()) document.getElementById("dek").classList.add("open");
+      <button class="knop goed" data-een="archief" data-id="${id}" title="Archive (E)">${ik("archive")}<span class="lbl">Archive</span><kbd>E</kbd></button>`;
+  const tal = n === 1 ? "1 selected email" : `${n} selected emails`, buiten = !staat.gekozen.has(id);
+  return `
+      <div class="lees-sel">${ik("check")}<span>These buttons act on the <b>${tal}</b>${buiten ? ", not on the email you are reading" : ""}.</span>
+        <button class="link" data-bulk="leeg" title="Esc">Clear selection</button></div>
+      <button class="knop" data-bulkmap="1" title="File the selection in a folder you pick (V)">${ik("folder")}<span class="lbl">File ${n}</span><kbd>V</kbd></button>
+      <button class="knop" data-bulk="slim" title="Each email goes where it belongs: the sender's folder, the project's usual folder, or your archive">${ik("sparkle")}<span class="lbl">Put in folders</span></button>
+      <button class="knop" data-bulk="overslaan" title="Skip these senders from now on">${ik("ban")}</button>
+      <span style="flex:1"></span>
+      <button class="knop" data-bulk="prullenbak" title="Move the selection to Bin (#)">${ik("trash")}<span class="lbl">Bin ${n}</span><kbd>#</kbd></button>
+      <button class="knop goed" data-bulk="archief" title="Archive the selection (E)">${ik("archive")}<span class="lbl">Archive ${n}</span><kbd>E</kbd></button>`;
 }
 
 // ---------------- Afgehandeld: terugvinden wat je uit Te doen haalde ----------------
@@ -2535,7 +2566,9 @@ function tekenOpruimen(){
 
 function tekenBalk(){
   const b = document.getElementById("balk"), n = staat.gekozen.size;
-  b.classList.toggle("open", n > 0 && staat.tab === "opruimen");
+  // staat er een mail open, dan doen de knoppen in het paneel dit werk; anders zou de balk eroverheen vallen
+  const leest = staat.lees !== null && document.getElementById("paneel").classList.contains("open");
+  b.classList.toggle("open", n > 0 && staat.tab === "opruimen" && !leest);
   b.innerHTML = `<span>${n} selected</span>
     <button class="knop klein" data-bulkmap="1">${ik("folder")}File</button>
     <button class="knop klein" data-bulk="slim" title="Each email goes where it belongs: the sender's folder, the project's usual folder, or your archive">${ik("folder")}Put in folders</button>
@@ -2915,7 +2948,7 @@ function openPaneel(id){ staat.open = id; staat.wacht = null; staat.detail = nul
 function sluitPaneel(){
   staat.open = null; staat.wacht = null; staat.detail = null; taak = null; antwoord = null;
   staat.focusNa = true;   // na het tekenen staat de focus weer op de lijst, niet aan het begin van de pagina
-  if (staat.tab === "opruimen") staat.lees = null;
+  if (staat.tab === "opruimen"){ staat.lees = null; requestAnimationFrame(tekenBalk); }
   document.querySelectorAll(".rij.gekozen[data-open]").forEach(r => r.classList.remove("gekozen"));
   document.getElementById("dek").classList.remove("open");
   if (drieKolommen() && D){ return tekenLeegPaneel(); }
@@ -3297,7 +3330,7 @@ document.addEventListener("keydown", ev => {
     if (ev.key === "e") return verplaats(doel, "archief");
     if (ev.key === "#"){ ev.preventDefault(); return verplaats(doel, "prullenbak"); }
     if (ev.key === "v"){ ev.preventDefault(); return openKiezer(doel[0], document.querySelector('#paneel [data-opbergen]'), doel); }
-    if (ev.key === "t" && id !== null) return openTaak(id);
+    if (ev.key === "t" && id !== null) return staat.gekozen.size ? toast("A task is made from one email. Clear the selection first (Esc).") : openTaak(id);
     if (ev.key === " " && id !== null){ ev.preventDefault(); staat.gekozen.has(id) ? staat.gekozen.delete(id) : staat.gekozen.add(id); staat.anker = id; return teken(); }
     return;
   }
