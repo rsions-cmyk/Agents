@@ -2114,3 +2114,16 @@ def test_menu_instellingen_via_de_app(omgeving):
         assert post("lokaal-status", {}) == {"ok": True, "bereikbaar": False, "modellen": []}   # hier draait geen Ollama
     finally:
         server.shutdown()
+
+
+def test_begin_van_de_mail_boven_het_concept():
+    """De eerste regels van wat de afzender schreef: zonder aanhef, citaat of kopregels van een doorgestuurde mail."""
+    from mailagent.pipeline import mail_begin
+    begin, meer = mail_begin("Beste Ruud,\n\nKan ik uitstel krijgen?\nMijn begeleider is ziek.\n\nGroet,\nSanne\n\nOn 12 Nov Ruud wrote:\n> oud")
+    assert begin == "Kan ik uitstel krijgen?\nMijn begeleider is ziek.\nGroet,\nSanne" and meer      # het citaat is 'meer'
+    assert mail_begin("From: a@b.nl\nSent: today\nSubject: x\n\nHet nieuws staat online.") == ("Het nieuws staat online.", True)
+    kort, meer = mail_begin("Hi all, the agenda is attached and we meet in Breda.\nBest")
+    assert kort.startswith("Hi all") and not meer                                  # een lange eerste zin is geen aanhef
+    lang, meer = mail_begin("woord " * 200)
+    assert len(lang) <= 421 and lang.endswith("…") and meer
+    assert mail_begin("") == ("", False)

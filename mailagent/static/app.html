@@ -133,6 +133,11 @@ textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:
 .takenlijst div{display:flex;gap:8px;align-items:center;padding:8px 12px;border-radius:9px;background:var(--vlak2)}
 .takenlijst svg{color:var(--ok);width:16px;height:16px}
 details.origineel{scroll-margin-top:12px}
+.mail-begin{border-left:2px solid var(--line2);padding:2px 0 2px 14px}
+.mail-begin .label{margin-bottom:4px}
+.mail-begin p{margin:0;white-space:pre-line;font-size:14px;line-height:1.55;color:var(--t1);overflow-wrap:anywhere}
+.mail-begin .link{margin-top:4px;font-size:13px;color:var(--zacht);text-decoration:underline;text-underline-offset:2px;padding:2px 0}
+.mail-begin .link:hover{color:var(--t1)}
 /* open punten: beslissen en aanvullen met een klik; gekozen is inkt, net als een vinkje (geen messing) */
 .op{display:flex;flex-direction:column;gap:8px}
 .op .label{margin-bottom:0}
@@ -2576,6 +2581,8 @@ function tekenPaneel(it){
           ${it.eigen_antwoord ? `<details class="al-beantwoord"><summary>Your earlier reply</summary><div class="jouw-antwoord">${esc(it.eigen_antwoord)}</div></details>` : ""}</div></div>` : ""}
       ${it.samenvatting && it.samenvatting !== it.onderwerp ? `<div class="melding info">${ik("sparkle")}<div>${esc(it.samenvatting)}</div></div>` : ""}
       ${zelf ? `<div class="melding fout">${ik("alert")}<div>${esc(it.opmerking || it.reden || "Check this email yourself.")}</div></div>` : ""}
+      ${it.begin && !beantwoord ? `<div class="mail-begin"><div class="label">${ik("mail")}${esc(a.naam || a.adres)} wrote</div>
+        <p>${esc(it.begin)}</p>${it.begin_meer ? `<button class="link" data-heelmail="${it.id}">Read the whole email</button>` : ""}</div>` : ""}
       ${it.vragen && !beantwoord ? `<div class="melding">${ik("alert")}<div><b>Your decision</b><br>${esc(it.vragen)}</div></div>` : ""}
       ${!beantwoord && (it.actie === "agenda" || afspr[it.id]) ? afspraakHTML(it) : ""}
       ${beantwoord ? `<details class="al-beantwoord"${zelfdeMail && p.querySelector("details.al-beantwoord")?.open ? " open" : ""}><summary>Show draft, background and tasks anyway</summary>
@@ -3759,6 +3766,13 @@ document.addEventListener("click", ev => {
 });
 // Original email: pas bij openen de mail invoegen, en als je hem zelf opent meteen naar de mail springen
 document.addEventListener("click", ev => {
+  const heel = ev.target.closest && ev.target.closest("[data-heelmail]");
+  if (heel){
+    const d = document.querySelector(`details.origineel[data-orig="${heel.dataset.heelmail}"]`);
+    if (!d) return;
+    if (d.open){ const rustig = matchMedia("(prefers-reduced-motion: reduce)").matches; return d.scrollIntoView({block:"start", behavior: rustig ? "auto" : "smooth"}); }
+    d.dataset.springen = "1"; d.open = true; return;
+  }
   const d = ev.target.closest && ev.target.closest("details.origineel > summary")?.parentElement;
   if (d && !d.open) d.dataset.springen = "1";
 }, true);

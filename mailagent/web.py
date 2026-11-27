@@ -30,7 +30,7 @@ from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
 from .opmaak import externe_afbeeldingen, html_uit_bron, veilig
-from .pipeline import RondeBezig, berg_op, berg_slim_op, haal_oude_mail, kies_plek, plek_naam, zet_afwijzen_terug, ruim_beantwoord_op, schone_open_punten, terug_naar_te_doen, agenda_check, lijkt_afspraak, achtergrond_voor_item, afspraak_momenten, bevestig_voorlopig, geef_voorlopig_vrij, haal_uit_agenda, houd_vast, verzet_taak, afzender_adres, deadline_in_agenda, ochtend, voorstellen_voor, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
+from .pipeline import RondeBezig, mail_begin, berg_op, berg_slim_op, haal_oude_mail, kies_plek, plek_naam, zet_afwijzen_terug, ruim_beantwoord_op, schone_open_punten, terug_naar_te_doen, agenda_check, lijkt_afspraak, achtergrond_voor_item, afspraak_momenten, bevestig_voorlopig, geef_voorlopig_vrij, haal_uit_agenda, houd_vast, verzet_taak, afzender_adres, deadline_in_agenda, ochtend, voorstellen_voor, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
 from .melding import meld
 from .store import Store
 
@@ -64,6 +64,7 @@ def item_dict(rij, volledig: bool = False) -> dict:
             "terug_in_inbox": rij["terug_in_inbox"] if "terug_in_inbox" in rij.keys() else None,
             "eigen_antwoord": rij["eigen_antwoord"] if "eigen_antwoord" in rij.keys() else None,
         })
+        d["begin"], d["begin_meer"] = mail_begin(rij["tekst"] or "")
     return d
 
 

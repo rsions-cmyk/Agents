@@ -1021,6 +1021,26 @@ def _eigen_tekst(tekst: str) -> str:
     return (tekst[:m.start()] if m else tekst or "").strip()[:3000]
 
 
+AANHEF = re.compile(r"^(beste|geachte|hoi|hallo|hi|hey|dear|hello|good (morning|afternoon)|goedemorgen|goedemiddag)\b.{0,40},?$", re.IGNORECASE)
+KOPREGEL = re.compile(r"^\s*(van|from|aan|to|cc|verzonden|sent|datum|date|onderwerp|subject)\s*:", re.IGNORECASE)
+
+
+def mail_begin(tekst: str, regels: int = 4, tekens: int = 420) -> tuple[str, bool]:
+    """De eerste regels van wat de afzender schreef, voor boven het concept; met of er meer is.
+
+    Zonder citaat; bij een doorgestuurde mail zonder eigen tekst het doorgestuurde deel zonder kopregels."""
+    eigen = _eigen_tekst(tekst)
+    bron = eigen or "\n".join(r for r in (tekst or "").splitlines() if not KOPREGEL.match(r) and not CITAAT.match(r))
+    vol = [r.strip() for r in bron.splitlines() if r.strip()]
+    if len(vol) > 1 and AANHEF.match(vol[0]):
+        vol = vol[1:]                                     # 'Beste Ruud,' zegt boven het concept weinig
+    begin = "\n".join(vol[:regels])
+    meer = len(vol) > regels or len(begin) > tekens or len(eigen) < len((tekst or "").strip())
+    if len(begin) > tekens:
+        begin = begin[:tekens].rsplit(" ", 1)[0].rstrip(",.;:") + "…"
+    return begin, meer
+
+
 def zoek_antwoorden(item, verstuurd: list[dict]) -> list[dict]:
     """Door jou verstuurde mail die een antwoord (of doorgestuurde versie) is op deze mail, oudste eerst.
 
