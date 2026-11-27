@@ -439,6 +439,18 @@ kbd{font:600 11px var(--romp,inherit);font-family:inherit;padding:1px 6px;border
 .kaart{background:var(--vlak);border:1px solid var(--lijn);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:5px;cursor:grab;user-select:none;-webkit-user-select:none}
 .kaart:hover{border-color:var(--zacht)}
 .kaart.gekozen{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-zacht)}
+.kaart[data-kaart]:focus-visible{outline:2px solid var(--t1);outline-offset:2px}
+.kaart-acties{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.plaatsbalk{flex-wrap:wrap}
+.plaatsbalk .pb-tekst{flex:1 1 calc(100% - 40px);min-width:0}
+.plaatsbalk .pb-velden{margin-left:28px;margin-right:auto;flex-wrap:wrap}
+.plaatsbalk .pb-velden{display:flex;gap:6px;align-items:center}
+.plaatsbalk .pb-velden input,.plaatsbalk .pb-velden select{font:inherit;font-size:12.5px;padding:3px 6px;border:1px solid var(--line2);border-radius:7px;background:var(--s1);color:var(--t1)}
+.plaatsbalk .pb-toetsen{flex-basis:100%;font-size:11.5px;padding-left:28px}
+@media (pointer:coarse){ .plaatsbalk .pb-toetsen{display:none} }
+.plaatsbalk .pb-toetsen kbd{font-size:10.5px;padding:0 4px;border-radius:4px;background:color-mix(in srgb,currentColor 12%,transparent)}
+#pl-blok:focus-visible{outline:2px solid var(--t1);outline-offset:1px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
 .kaart .r{display:flex;gap:8px;align-items:center}
 .kaart .titel{font-weight:600;flex:1;min-width:0}
 .kaart .rondje{width:20px;height:20px;border-radius:50%;border:2px solid var(--lijn);display:grid;place-items:center;flex:none;color:transparent}
@@ -1587,11 +1599,16 @@ function teken(){
   // de rij met de focus onthouden: hertekenen vervangt de rijen, en anders raak je met het toetsenbord je plek kwijt
   const fr = document.activeElement && document.activeElement.closest && document.activeElement.closest("main .rij");
   const focusSel = fr ? (fr.dataset.open ? `[data-open="${fr.dataset.open}"]` : fr.dataset.kies ? `[data-kies="${fr.dataset.kies}"]` : null) : null;
+  // in Planning ook de kaart of knop met de focus, en het blok dat je met de pijltjes verschuift
+  const fp = document.activeElement && document.activeElement.closest && document.activeElement.closest("main [data-kaart], main [data-herplan], main [data-kaartweg], #pl-blok");
+  const focusPlan = !fp ? null : fp.id === "pl-blok" ? "#pl-blok" : fp.dataset.kaart ? `[data-kaart="${fp.dataset.kaart}"]`
+    : fp.dataset.herplan ? `[data-herplan="${fp.dataset.herplan}"]` : `[data-kaartweg="${fp.dataset.kaartweg}"]`;
   if (staat.tab === "te_doen" && staat.td === "afgehandeld") inhoud.innerHTML = tekenAfgehandeld();
   else if (staat.tab === "te_doen") inhoud.innerHTML = (wordtDrie ? "" : tekenVandaag()) + tekenVoortgang() + tekenWachtOp() + tekenBeoordelen(teDoen()) + tekenBelangrijk();
   else if (staat.tab === "planning"){ inhoud.innerHTML = tekenPlanning(); requestAnimationFrame(pasPlHoogteAan); }
   else inhoud.innerHTML = tekenOpruimen();
   if (focusSel){ const terug = document.querySelector(`main .rij${focusSel}`); if (terug) terug.focus({preventScroll: true}); else staat.focusNa = true; }
+  if (focusPlan){ const terug = document.querySelector(focusPlan); if (terug) terug.focus({preventScroll: true}); }
   if (staat.focusNa){ staat.focusNa = false; requestAnimationFrame(zetLijstFocus); }
   tekenBalk();
   const dk = document.getElementById("dagkol"), dagZichtbaar = metDag || app.classList.contains("dag-open");
@@ -2280,13 +2297,7 @@ document.addEventListener("click", async ev => {
   }
   if (d.verzet){
     sluitPop();
-    const id = Number(d.verzet), t = D.taken.find(x => x.id === id);
-    const j = await stil("afspraak-weg", {id});
-    if (!j.ok) return toast(j.melding, true);
-    if (t){ t.gepland = null; plaatsing = {id, minuten: t.minuten || 30, start: Date.parse(d.start)}; }
-    legeDagen();
-    toast("Drag the block to a new time and click Schedule");
-    teken(); return laad();
+    return startPlaatsing(Number(d.verzet), {start: Date.parse(d.start), verzet: true});
   }
   if (d.klaar || d.mailopen || d.beantwoord) setTimeout(sluitPop, 0);   // die knoppen werken zoals op de kaart
 }, true);
@@ -3305,7 +3316,9 @@ document.addEventListener("keydown", ev => {
   if (ev.key === "Escape" && kaartSleep && kaartSleep.bezig){ const k = kaartSleep; k.start = null; kaartSleep = null;
     k.spook?.remove(); document.getElementById("pl-voorbeeld")?.remove(); document.getElementById("pl-tijdlijn")?.classList.remove("doel");
     document.documentElement.classList.remove("sleept-taak"); k.kaartEl.classList.remove("opgepakt"); return; }
-  if (ev.key === "Escape"){ if (inVeld) return ev.target.blur(); if (plaatsing){ plaatsing = null; return teken(); }
+  if (ev.key === "Escape"){ if (inVeld) return ev.target.blur();
+    if (plaatsing){ const id = plaatsing.id; plaatsing = null; teken(); spreek("Cancelled");
+      return document.querySelector(`[data-kaart="${id}"], [data-gepland="${id}"] [data-herplan]`)?.focus(); }
     if (document.querySelector(".app.dag-open")){ staat.dagOpen = false; return teken(); }   // eerst de la Vandaag dicht
     if (staat.gekozen.size){ staat.gekozen.clear(); return teken(); } return (staat.geenAuto = true, sluitPaneel()); }
   if (ev.key === "Enter" && ev.target.dataset && ev.target.dataset.open) return openPaneel(Number(ev.target.dataset.open));
@@ -3391,7 +3404,7 @@ function tekenPlanning(){
         ingepland = taken.filter(t => t.gepland).sort((a, b) => a.gepland.localeCompare(b.gepland));
   const totaal = open.reduce((a, t) => a + (t.minuten || 30), 0);
   const kaart = (t, plan) => `
-    <div class="kaart${plan ? " ingepland" : ""}${gekozenKaart === t.id ? " gekozen" : ""}" ${plan ? "" : `data-kaart="${t.id}"`}>
+    <div class="kaart${plan ? " ingepland" : ""}${gekozenKaart === t.id || (plaatsing && plaatsing.id === t.id) ? " gekozen" : ""}" ${plan ? `data-gepland="${t.id}"` : `data-kaart="${t.id}" tabindex="0" role="button" aria-label="${esc(t.omschrijving)}, ${duurTekst(t.minuten || 30)}. Press Enter to pick a time" title="Drag to a time, or press Enter to pick one"`}>
       <div class="r"><button class="rondje" data-klaar="${t.id}" title="Tick off">${ik("check")}</button>
         <span class="stip" style="background:${kleur(t.project)}"></span><span class="titel">${esc(t.omschrijving)}</span></div>
       ${t.stappen && t.stappen.length ? `<ul class="stappen-klein">${t.stappen.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
@@ -3401,6 +3414,8 @@ function tekenPlanning(){
         ${t.deadline ? `<span class="chip">deadline ${esc(dagKort(t.deadline))}</span>${t.deadline_in_agenda ? `<span class="chip">${ik("calendar")}in calendar</span>` : D.agenda_aan ? `<button class="knop klein" data-deadlineagenda="${t.id}" data-soort="taak" title="All-day event, marked private, with a reminder at 09:00 the day before">Deadline in calendar</button>` : ""}` : ""}</div>
       ${lijktGedaan(t)}
       ${taakMail(t)}
+      ${plan && D.agenda_aan ? `<div class="kaart-acties"><button class="knop klein" data-herplan="${t.id}" title="Pick another time; the event stays where it is until you click Schedule">${ik("clock")}Reschedule</button>
+        <button class="knop klein" data-kaartweg="${t.id}" title="Remove the event from your calendar; the task goes back to To schedule">${ik("x")}Remove from calendar</button></div>` : ""}
     </div>`;
   const gedaan = taken.filter(t => t.lijkt_klaar);
   const links = `<div class="kaarten">
@@ -3426,9 +3441,13 @@ function tekenPlanning(){
         <b>${esc(dagLabel)}</b>
         <button class="ikoon" data-pldag="1" title="Next day">${ik("chevron")}</button>
         <button class="knop klein" data-pldag="0">Today</button>
-        <span class="meta" style="margin-left:auto">${gekozenKaart ? "Tap a time to place the task" : "Drag a task to a time"}</span></div>
-      ${t ? `<div class="plaatsbalk">${ik("calendar")}<span><b>${esc(t.omschrijving)}</b> · ${blokTijdVan(plaatsing.start, plaatsing.minuten)}${plBotsingen().length ? ` · <span style="color:var(--hoog)">overlaps with ${esc(plBotsingen().map(a => a.titel).join(", "))}</span>` : ""}</span>
-          <button class="knop klein" id="pl-annuleer">Cancel</button><button class="knop klein goed" id="pl-bevestig">${ik("check")}Schedule</button></div>` : ""}
+        <span class="meta" style="margin-left:auto">${plaatsing ? "Move the block, then Schedule" : gekozenKaart ? "Tap a time to place the task" : "Drag a task to a time, or select it and press Enter"}</span></div>
+      ${t ? `<div class="plaatsbalk">${ik("calendar")}<span class="pb-tekst"><b>${esc(t.omschrijving)}</b>${plaatsing.verzet ? " · reschedule" : ""} · ${blokTijdVan(plaatsing.start, plaatsing.minuten)}${plBotsingen().length ? ` · <span style="color:var(--hoog)">overlaps with ${esc(botsTekst(plBotsingen()))}</span>` : ""}</span>
+          <span class="pb-velden"><input type="date" id="pl-datum-in" value="${isoDag(new Date(plaatsing.start))}" aria-label="Date">
+            <input type="time" id="pl-tijd-in" step="900" value="${tijdVan(plaatsing.start)}" aria-label="Start time">
+            <select id="pl-duur-in" aria-label="Length">${[15,30,45,60,90,120,180,240].concat([plaatsing.minuten]).filter((m, i, a) => a.indexOf(m) === i).sort((a, b) => a - b).map(m => `<option value="${m}"${m === plaatsing.minuten ? " selected" : ""}>${duurTekst(m)}</option>`).join("")}</select></span>
+          <button class="knop klein" id="pl-annuleer">Cancel</button><button class="knop klein goed" id="pl-bevestig">${ik("check")}Schedule</button>
+          <span class="pb-toetsen meta"><kbd>↑</kbd><kbd>↓</kbd> 15 minutes · <kbd>⇧</kbd> with arrows: length · <kbd>←</kbd><kbd>→</kbd> day · <kbd>↵</kbd> schedule · <kbd>Esc</kbd> cancel</span></div>` : ""}
       ${plTijdlijnHTML()}`;
   }
   return `${afsluitHTML(open)}<div class="planning-grid">${links}<div class="pl-rechts">${rechts}</div></div>`;
@@ -3453,11 +3472,14 @@ function afsluitHTML(open){
 }
 
 const blokTijdVan = (start, minuten) => `${tijdVan(start)}–${tijdVan(start + minuten*60000)} · ${duurTekst(minuten)}`;
+const botsTekst = lijst => lijst.slice(0, 2).map(a => { const t = String(a.titel).split(" · ")[0]; return t.length > 40 ? t.slice(0, 38) + "…" : t; }).join(", ")
+  + (lijst.length > 2 ? ` and ${lijst.length - 2} more` : "");
+const eigenBlok = a => plaatsing && plaatsing.verzet && appTaakBij(a)?.id === plaatsing.id;
 function plBotsingen(){
   if (!plaatsing) return [];
   const lijst = Array.isArray(dagen[staat.planDag]) ? dagen[staat.planDag] : [];
   const b = plaatsing.start, e = b + plaatsing.minuten*60000;
-  return lijst.filter(a => !a.heledag && !a.vrij && Date.parse(a.start) < e && Date.parse(a.eind) > b);
+  return lijst.filter(a => !a.heledag && !a.vrij && !eigenBlok(a) && Date.parse(a.start) < e && Date.parse(a.eind) > b);
 }
 
 function plTijdlijnHTML(){
@@ -3481,10 +3503,12 @@ function plTijdlijnHTML(){
   if (uurMin(w.begin) > van) h += `<div class="buiten" style="top:0;height:${y(uurMin(w.begin))}px"></div>`;
   if (uurMin(w.eind) < tot) h += `<div class="buiten" style="top:${y(uurMin(w.eind))}px;height:${y(tot)-y(uurMin(w.eind))}px"></div>`;
   for (let m = van; m < tot; m += 30) h += `<div class="uur${m % 60 ? " half" : ""}" style="top:${y(m)}px">${m % 60 ? "" : `<span>${tweeCijfers(m/60)}:00</span>`}</div>`;
-  h += afsprakenHTML(lijst, d0, van, tot, PLPX, false, true) + nuLijn(staat.planDag, van, tot, PLPX);
+  h += afsprakenHTML(lijst.map(a => eigenBlok(a) ? {...a, eind: a.start} : a), d0, van, tot, PLPX, false, true) + nuLijn(staat.planDag, van, tot, PLPX);
   if (plaatsing && isoDag(new Date(plaatsing.start)) === staat.planDag){
     const t = D.taken.find(x => x.id === plaatsing.id);
-    h += `<div class="tb concept${plBotsingen().length ? " botst" : ""}" id="pl-blok" style="top:${y((plaatsing.start-d0)/60000)}px;height:${plaatsing.minuten*PLPX - 2}px">
+    h += `<div class="tb concept${plBotsingen().length ? " botst" : ""}" id="pl-blok" tabindex="0" role="group" aria-roledescription="draggable block"
+            aria-label="${esc(t ? t.omschrijving : "Task")}, ${blokTijdVan(plaatsing.start, plaatsing.minuten)}. Arrow keys move it by 15 minutes, Shift with arrows changes the length, Left and Right change the day, Enter schedules, Escape cancels"
+            style="top:${y((plaatsing.start-d0)/60000)}px;height:${plaatsing.minuten*PLPX - 2}px">
             <b>${esc(t ? t.omschrijving : "Task")}</b><span id="pl-tijd">${blokTijdVan(plaatsing.start, plaatsing.minuten)}</span><div class="rek"></div></div>`;
   }
   const heledag = lijst.map((a, i) => ({...a, i})).filter(a => a.heledag);
@@ -3573,6 +3597,104 @@ async function planMetSlepen(t, start, minuten){
   await laad();
   verversDag(dag);
 }
+
+// ---------------- plannen met het toetsenbord ----------------
+// Enter op een taak zet een blok op het eerstvolgende vrije kwartier; pijltjes verschuiven het, Enter plant in.
+function vrijMoment(dag, duur){
+  const w = D.werktijd || {begin:"09:00", eind:"17:00"}, d0 = dagBegin(dag);
+  const lijst = Array.isArray(dagen[dag]) ? dagen[dag] : [];
+  let m = uurMin(w.begin);
+  if (dag === isoDag(new Date())){ const nu = new Date(); m = Math.max(m, Math.ceil((nu.getHours() * 60 + nu.getMinutes() + 5) / 15) * 15); }
+  const eerste = m;
+  vrijMoment.vol = false;
+  for (; m + duur <= uurMin(w.eind); m += 15){
+    const b = d0 + m * 60000, e = b + duur * 60000;
+    if (!lijst.some(a => !a.heledag && !a.vrij && Date.parse(a.start) < e && Date.parse(a.eind) > b)) return b;
+  }
+  vrijMoment.vol = true;                     // geen gat dat past: het eerste kwartier dat nog kan, jij kiest
+  return d0 + Math.max(0, Math.min(eerste, 24 * 60 - duur)) * 60000;
+}
+function spreek(tekst){
+  let s = document.getElementById("pl-stem");
+  if (!s){ s = Object.assign(document.createElement("div"), {id: "pl-stem", className: "sr"}); s.setAttribute("aria-live", "polite"); document.body.append(s); }
+  s.textContent = tekst;
+}
+function focusBlok(){
+  requestAnimationFrame(() => { const b = document.getElementById("pl-blok"); if (!b) return; b.focus({preventScroll: true}); b.scrollIntoView({block: "nearest"}); });
+}
+function startPlaatsing(id, opties = {}){
+  const t = D.taken.find(x => x.id === id); if (!t) return;
+  const duur = t.minuten || 30, start = opties.start ?? vrijMoment(staat.planDag, duur);
+  staat.planDag = isoDag(new Date(start));
+  plaatsing = {id, minuten: duur, start, verzet: !!opties.verzet};
+  gekozenKaart = null; sluitPop(); teken(); focusBlok();
+  spreek(`${t.omschrijving}: ${blokTijdVan(start, duur)}.${!opties.start && vrijMoment.vol ? " No free time left this day that fits." : ""} Arrow keys to move, Enter to schedule.`);
+  if (!opties.start && vrijMoment.vol) toast("No free time left this day that fits. Move the block, or press → for the next day.");
+}
+function zetPlaatsing(start, minuten){
+  const t = D.taken.find(x => x.id === plaatsing.id);
+  plaatsing.start = start; plaatsing.minuten = minuten;
+  staat.planDag = isoDag(new Date(start));
+  teken(); focusBlok();
+  const botst = plBotsingen();
+  spreek(`${new Date(start).toLocaleDateString("en-GB", {weekday: "long"})} ${blokTijdVan(start, minuten)}${botst.length ? ", overlaps with " + botst[0].titel : ""}`);
+}
+async function bevestigPlaatsing(){
+  const p = plaatsing, t = D.taken.find(x => x.id === p.id);
+  plaatsing = null;
+  if (!t) return teken();
+  requestAnimationFrame(() => (document.querySelector("[data-kaart]") || document.querySelector(`[data-gepland="${p.id}"] [data-herplan]`))?.focus({preventScroll: true}));   // door met de volgende taak
+  if (!p.verzet) return planMetSlepen(t, p.start, p.minuten);
+  const oud = {start: t.gepland, minuten: t.minuten || 30}, oudDag = isoDag(new Date(Date.parse(t.gepland))), dag = isoDag(new Date(p.start));
+  t.gepland = lokaalIso(p.start); t.minuten = p.minuten; teken();
+  const j = await stil("afspraak-verplaats", {taak: t.id, start: lokaalIso(p.start), minuten: p.minuten});
+  if (!j.ok){ t.gepland = oud.start; toast(j.melding, true); await laad(); return verversDag(oudDag); }
+  toast(j.melding, false, {label: "Undo", doe: async () => {
+    const r = await stil("afspraak-verplaats", {taak: t.id, start: oud.start, minuten: oud.minuten});
+    toast(r.melding, !r.ok); await laad(); verversDag(oudDag); verversDag(dag);
+  }});
+  await laad(); verversDag(oudDag); if (dag !== oudDag) verversDag(dag);
+}
+async function haalTaakUitAgenda(id){
+  const t = D.taken.find(x => x.id === id); if (!t || !t.gepland) return;
+  const oud = {start: t.gepland, minuten: t.minuten || 30}, dag = isoDag(new Date(Date.parse(t.gepland)));
+  t.gepland = null; teken();
+  const j = await stil("afspraak-weg", {id});
+  if (!j.ok){ t.gepland = oud.start; toast(j.melding, true); return laad(); }
+  toast(j.melding, false, {label: "Undo", doe: async () => {
+    const r = await stil("taak-plannen", {id, start: oud.start, minuten: oud.minuten});
+    toast(r.melding, !r.ok); await laad(); verversDag(dag);
+  }});
+  await laad(); verversDag(dag);
+}
+document.addEventListener("keydown", ev => {
+  if (staat.tab !== "planning" || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  const inVeld = ev.target.closest && ev.target.closest("input, textarea, select, [contenteditable]");
+  const kaart = ev.target.matches && ev.target.matches("[data-kaart]") ? ev.target : null;
+  if (kaart && (ev.key === "Enter" || ev.key === " ")){ ev.preventDefault(); ev.stopImmediatePropagation(); return startPlaatsing(Number(kaart.dataset.kaart)); }
+  if (!plaatsing || inVeld) return;
+  const d0 = dagBegin(isoDag(new Date(plaatsing.start))), m = (plaatsing.start - d0) / 60000;
+  if (ev.key === "ArrowUp" || ev.key === "ArrowDown"){
+    ev.preventDefault(); ev.stopImmediatePropagation();
+    const stap = ev.key === "ArrowUp" ? -15 : 15;
+    if (ev.shiftKey) return zetPlaatsing(plaatsing.start, Math.max(15, Math.min(24 * 60 - m, plaatsing.minuten + stap)));
+    return zetPlaatsing(d0 + Math.max(0, Math.min(24 * 60 - plaatsing.minuten, m + stap)) * 60000, plaatsing.minuten);
+  }
+  if (ev.key === "ArrowLeft" || ev.key === "ArrowRight"){
+    ev.preventDefault(); ev.stopImmediatePropagation();
+    const dag = isoDag(new Date(d0 + (ev.key === "ArrowLeft" ? -1 : 1) * 86400000 + 3600000));
+    return zetPlaatsing(dagBegin(dag) + m * 60000, plaatsing.minuten);
+  }
+  if (ev.key === "Enter" && (ev.target.id === "pl-blok" || ev.target === document.body)){ ev.preventDefault(); ev.stopImmediatePropagation(); return bevestigPlaatsing(); }
+}, true);
+document.addEventListener("change", ev => {
+  if (!plaatsing || !["pl-datum-in", "pl-tijd-in", "pl-duur-in"].includes(ev.target.id)) return;
+  const datum = document.getElementById("pl-datum-in").value, tijd = document.getElementById("pl-tijd-in").value;
+  if (!datum || !tijd) return;
+  const [u, mi] = tijd.split(":").map(Number), start = dagBegin(datum) + (u * 60 + Math.round(mi / 15) * 15) * 60000;
+  zetPlaatsing(start, Number(document.getElementById("pl-duur-in").value) || plaatsing.minuten);
+  requestAnimationFrame(() => document.getElementById(ev.target.id)?.focus());
+});
 
 function minuutOp(clientY){
   const binnen = document.getElementById("pl-binnen");
@@ -3670,16 +3792,9 @@ document.addEventListener("click", async ev => {
     const taakRij = D.taken.find(x => x.id === id); if (taakRij) taakRij.later = naarLater ? 1 : 0; teken();
     const j = await stil("taak-later", {id, later: naarLater}); if (!j.ok) toast(j.melding, true); return laad();
   }
-  if (t.id === "pl-bevestig" && plaatsing){
-    const p = plaatsing, dag = isoDag(new Date(p.start));
-    plaatsing = null;
-    const taakRij = D.taken.find(x => x.id === p.id); if (taakRij){ taakRij.gepland = lokaalIso(p.start); taakRij.minuten = p.minuten; }
-    teken();
-    const j = await stil("taak-plannen", {id: p.id, start: lokaalIso(p.start), minuten: p.minuten});
-    toast(j.melding, !j.ok);
-    await laad();
-    verversDag(dag);
-  }
+  if (t.id === "pl-bevestig" && plaatsing) return bevestigPlaatsing();
+  if (t.dataset.herplan){ const x = D.taken.find(y => y.id === Number(t.dataset.herplan)); if (x && x.gepland) startPlaatsing(x.id, {start: Date.parse(x.gepland), verzet: true}); return; }
+  if (t.dataset.kaartweg) return haalTaakUitAgenda(Number(t.dataset.kaartweg));
 });
 
 // ---------------- Opbergen in een map ----------------
