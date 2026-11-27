@@ -2676,6 +2676,7 @@ function tekenBalk(){
 // Eén messing hoofdknop per soort mail: wat je hier meestal doet
 function hoofdActie(it){
   if (it.lijkt_beantwoord || it.actie === "ter_info" || it.actie === "negeren") return "gedaan";
+  if (it.status === "handmatig" && !String(concepten[it.id] ?? it.concept ?? "").trim()) return "gedaan";   // niets bij Claude, nog geen tekst
   if (it.actie === "taak") return "taak";                       // review-uitnodigingen en ander werk: inplannen
   return "antwoord";
 }
@@ -2977,7 +2978,7 @@ function tekenTaak(){
       <button class="knop" id="t-houd">Keep editing</button>
       <button class="knop" id="t-weg">Discard</button>` : `<span class="uitleg">${taak.inplannen ? "Creates an event in your calendar, which syncs to Outlook." : "Goes into your task list."}</span>
       <button class="knop" id="sluit2">Cancel</button>
-      <button class="knop goed" id="taakmaak">${ik("check")}${taak.inplannen ? "Create and schedule" : "Create task"}</button>`}</div>`;
+      <button class="knop goed" id="taakmaak" title="⌘↵">${ik("check")}${taak.inplannen ? "Create and schedule" : "Create task"}<kbd>⌘↵</kbd></button>`}</div>`;
     const inhoudNieuw = p.querySelector(".p-inhoud"), tl = document.getElementById("tijdlijn");
     if (inhoudNieuw) inhoudNieuw.scrollTop = scrollInhoud;
     if (!taak.begin) taak.begin = taakStand();       // zo zag het voorstel eruit: daarmee vergelijkt Esc
@@ -3003,6 +3004,9 @@ function sluitTaak(){
   sluitPaneel();
 }
 document.addEventListener("keydown", ev => {
+  if (taak && taak.voorstel && !taak.vraag && ev.key === "Enter" && (ev.metaKey || ev.ctrlKey) && !document.querySelector(".overlay, .kiezer, #afs-pop")){
+    ev.preventDefault(); ev.stopImmediatePropagation(); return document.getElementById("taakmaak")?.click();
+  }
   if (!taak || ev.key !== "Escape" || document.querySelector(".overlay, .kiezer, #afs-pop")) return;
   ev.preventDefault(); ev.stopImmediatePropagation();
   if (taak.vraag){ taak.vraag = false; return tekenTaak(); }      // nog een keer Esc: verder bewerken
@@ -3321,6 +3325,18 @@ document.addEventListener("click", async ev => {
   if (t.id === "goedkeuren"){
     const id = Number(document.getElementById("paneel").dataset.id);
     const goed = t.id === "goedkeuren";
+    if (!document.getElementById("concept").value.trim()){
+      toast("The draft is empty. Type your reply first, or press D if this email needs no reply.", true);
+      return document.getElementById("concept").focus();
+    }
+    const plekken = (document.getElementById("concept").value.match(/\[\s*(FILL IN|AANVULLEN)[^\]]*\]/gi) || []).length;
+    if (plekken && !(nogLeeg.id === id && Date.now() - nogLeeg.tijd < 8000)){
+      nogLeeg = {id, tijd: Date.now()};
+      document.getElementById("op")?.scrollIntoView({block: "nearest", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
+      return toast(`${plekken === 1 ? "1 open point is" : plekken + " open points are"} still empty. Press ⌘↵ again to open the draft in Mail as it is.`, false,
+                   {label: "Open in Mail anyway", doe: () => document.getElementById("goedkeuren")?.click()});
+    }
+    nogLeeg = {id: null, tijd: 0};
     const data = goed ? {id, concept: document.getElementById("concept").value,
                          taken: (bewerkt[id] || null)} : {id};
     const volgende = drieKolommen() ? volgendeNa(id) : null;
@@ -3331,6 +3347,7 @@ document.addEventListener("click", async ev => {
     if (!ok){ if (goed) bewaarTekst(id, data.concept); staat.open = id; teken(); }   // mislukt: paneel met je tekst weer openen
   }
 });
+let nogLeeg = {id: null, tijd: 0};   // Reply in Mail met lege plekken: de tweede keer gaat hij door
 // Slepen en rekken in het dagoverzicht, in stappen van een kwartier
 let sleep = null;
 document.addEventListener("pointerdown", ev => {
@@ -3402,7 +3419,7 @@ function toonSneltoetsen(){
   o.setAttribute("role", "dialog"); o.setAttribute("aria-modal", "true"); o.setAttribute("aria-label", "Keyboard shortcuts");
   o.innerHTML = `<div class="vel"><h2 class="vel-kop">Keyboard shortcuts</h2><dl>
     <dt><kbd>J</kbd> <kbd>K</kbd></dt><dd>Next and previous email</dd>
-    <dt><kbd>⌘</kbd> <kbd>↵</kbd></dt><dd>Prepare reply in Apple Mail</dd>
+    <dt><kbd>⌘</kbd> <kbd>↵</kbd></dt><dd>Prepare reply in Apple Mail (with empty open points: press twice). In the task panel: create the task</dd>
     <dt><kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>↵</kbd></dt><dd>Send straight away (press twice: the second press confirms)</dd>
     <dt><kbd>D</kbd></dt><dd>Done, no reply needed (then archive or file it if you like)</dd>
     <dt><kbd>⇧</kbd> <kbd>D</kbd></dt><dd>Done, and choose a folder straight away</dd>
@@ -3410,6 +3427,7 @@ function toonSneltoetsen(){
     <dt><kbd>E</kbd></dt><dd>Archive</dd>
     <dt><kbd>#</kbd></dt><dd>Move to Bin</dd>
     <dt><kbd>T</kbd></dt><dd>Create and schedule task</dd>
+    <dt><kbd>↵</kbd> in Planning</dt><dd>Pick a time for a task; arrows move it, ↵ schedules</dd>
     <dt><kbd>X</kbd></dt><dd>Dismiss</dd>
     <dt><kbd>1</kbd>–<kbd>${D ? D.projecten.length : 4}</kbd></dt><dd>Change project</dd>
     <dt><kbd>[</kbd></dt><dd>Collapse or expand sidebar</dd>
@@ -3443,8 +3461,9 @@ document.addEventListener("keydown", ev => {
       return document.querySelector(`[data-kaart="${id}"], [data-gepland="${id}"] [data-herplan]`)?.focus(); }
     if (document.querySelector(".app.dag-open")){ staat.dagOpen = false; return teken(); }   // eerst de la Vandaag dicht
     if (staat.gekozen.size){ staat.gekozen.clear(); return teken(); } return (staat.geenAuto = true, sluitPaneel()); }
-  if (ev.key === "Enter" && ev.target.dataset && ev.target.dataset.open) return openPaneel(Number(ev.target.dataset.open));
-  if (ev.key === "Enter" && ev.target.dataset && ev.target.dataset.kies) return openLees(Number(ev.target.dataset.kies));
+  const kaleEnter = ev.key === "Enter" && !ev.metaKey && !ev.ctrlKey && !ev.shiftKey && !ev.altKey;
+  if (kaleEnter && ev.target.dataset && ev.target.dataset.open) return openPaneel(Number(ev.target.dataset.open));
+  if (kaleEnter && ev.target.dataset && ev.target.dataset.kies) return openLees(Number(ev.target.dataset.kies));
   if (staat.tab === "opruimen" && !taak && !antwoord && !inVeld && (ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === "a"){
     ev.preventDefault(); opruimLijst().forEach(i => staat.gekozen.add(i.id)); return teken();
   }
