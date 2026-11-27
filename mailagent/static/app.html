@@ -1558,7 +1558,18 @@ function animeerWeg(ids){
   const sel = ids.map(i => `.rij[data-open="${i}"],.rij[data-kies="${i}"],.rij[data-taak="${i}"],.kaart[data-kaart="${i}"]`).join(",");
   const rijen = sel ? document.querySelectorAll(sel) : [];
   rijen.forEach(r => r.classList.add("weg"));
-  return new Promise(res => setTimeout(res, rijen.length ? 170 : 0));
+  toetsWacht++;
+  return new Promise(res => setTimeout(() => { toetsWacht--; res(); setTimeout(speelToetsenAf, 0); }, rijen.length ? 170 : 0));
+}
+// D, E, X en de andere actietoetsen die je indrukt terwijl een rij wegschuift of Done nog onderweg is, gaan niet verloren:
+// ze wachten tot het volgende paneel klaarstaat (of tot E en V weten welke mail je net afrondde)
+let toetsWacht = 0, gedaanOnderweg = 0, toetsRij = [];
+const moetWachten = k => toetsWacht > 0 || (gedaanOnderweg > 0 && (k === "e" || k === "v"));
+function speelToetsenAf(){
+  if (!toetsRij.length || moetWachten(toetsRij[0].key)) return;
+  const k = toetsRij.shift();
+  document.body.dispatchEvent(new KeyboardEvent("keydown", {key: k.key, shiftKey: k.shiftKey, bubbles: true, cancelable: true}));
+  if (toetsRij.length) setTimeout(speelToetsenAf, 0);
 }
 
 async function stil(naam, data){
@@ -3287,12 +3298,15 @@ document.addEventListener("click", async ev => {
     const volgende = drieKolommen() ? volgendeNa(id) : null;
     sluitPaneel(); if (volgende !== null) staat.open = volgende;
     await animeerWeg([id]); verborgen.add(id); teken();
-    const j = await stil("gedaan", {id, opbergen: !t.dataset.metmap}); verborgen.delete(id);
-    if (!j.ok){ toast(j.melding, true); return laad(); }
-    laad();
-    if (t.dataset.metmap){ return openKiezer(id, null, [id]); }
-    gedaanMelding(id, onderwerp, j.plek, j.plek_naam);
-    return;
+    gedaanOnderweg++;
+    try {
+      const j = await stil("gedaan", {id, opbergen: !t.dataset.metmap}); verborgen.delete(id);
+      if (!j.ok){ toast(j.melding, true); return laad(); }
+      laad();
+      if (t.dataset.metmap){ return openKiezer(id, null, [id]); }
+      gedaanMelding(id, onderwerp, j.plek, j.plek_naam);
+      return;
+    } finally { gedaanOnderweg--; setTimeout(speelToetsenAf, 0); }
   }
   if (t.id === "verzenden"){
     const id = Number(document.getElementById("paneel").dataset.id), concept = document.getElementById("concept").value;
@@ -3498,6 +3512,7 @@ document.addEventListener("keydown", ev => {
   if ((ev.metaKey || ev.ctrlKey) && ev.shiftKey && ev.key === "Enter" && id !== null){ ev.preventDefault(); return document.getElementById("verzenden")?.click(); }
   if ((ev.metaKey || ev.ctrlKey) && ev.key === "Enter" && id !== null){ ev.preventDefault(); return document.getElementById("goedkeuren")?.click(); }
   if (inVeld || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  if (["d", "D", "e", "x", "#", "v", "t"].includes(ev.key) && moetWachten(ev.key)){ ev.preventDefault(); if (toetsRij.length < 3) toetsRij.push({key: ev.key, shiftKey: ev.shiftKey}); return; }
   const lijst = teDoen().map(i => i.id), i = lijst.indexOf(id);
   if (ev.key === "j" || ev.key === "ArrowDown"){ ev.preventDefault(); if (lijst.length) openPaneel(lijst[Math.min(lijst.length-1, i+1)]); return; }
   if (ev.key === "k" || ev.key === "ArrowUp"){ ev.preventDefault(); if (lijst.length) openPaneel(lijst[Math.max(0, i-1)]); return; }
