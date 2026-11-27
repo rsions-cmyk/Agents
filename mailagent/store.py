@@ -135,7 +135,7 @@ CREATE TABLE IF NOT EXISTS log (
 PRIO_VOLGORDE = "CASE prioriteit WHEN 'hoog' THEN 0 WHEN 'normaal' THEN 1 ELSE 2 END"
 
 
-OPEN_STATUSSEN = ("wacht", "fout", "handmatig", "ter_info", "genegeerd")   # in To do of Tidy up
+OPEN_STATUSSEN = ("wacht", "fout", "handmatig", "ter_info", "genegeerd", "oud")   # in To do of Tidy up (oud: Older email)
 
 
 def normaal_message_id(mid: Optional[str]) -> str:
@@ -712,6 +712,7 @@ class Store:
                 self.db.execute(f"DELETE FROM log WHERE item_id IN ({vraag})", ids)
                 self.db.execute(f"DELETE FROM items WHERE id IN ({vraag})", ids)
             self.db.execute("DELETE FROM mails WHERE bron=?", (bron,))
+            self.db.execute("DELETE FROM bron_stand WHERE bron=?", (f"oud:{bron}",))   # hoe ver oudere mail al binnen is
             for tabel in ("wacht_op", "verstuurd", "map_keuzes", "bron_stand"):
                 self.db.execute(f"DELETE FROM {tabel} WHERE bron=?", (bron,))
             self.db.execute("DELETE FROM gemeld WHERE sleutel LIKE ?", (bron + ":%",))

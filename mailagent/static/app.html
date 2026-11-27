@@ -595,6 +595,11 @@ textarea#concept::placeholder,#a-tekst::placeholder{color:#8a929b}
 .logo{position:relative}
 .logo .inklap{margin-left:auto;width:28px;height:28px}
 .greep{position:absolute;top:0;bottom:0;width:9px;margin-left:-4px;cursor:col-resize;z-index:6;touch-action:none}
+.plek-regel{display:flex;align-items:center;gap:4px;margin-top:2px;font-size:12px;color:var(--t3)}
+.plek-regel svg{width:12px;height:12px}
+.oud-kaart{display:flex;flex-direction:column;gap:8px;align-items:flex-start;margin:18px 0 6px;padding:12px 14px;border:1px dashed var(--line2);border-radius:10px;font-size:13.5px;color:var(--t2)}
+.oud-kaart .oud-tekst{display:flex;flex-direction:column;gap:3px}
+.oud-kaart b{color:var(--t1)}
 .achterstand{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;margin:0 0 14px;border:1px solid var(--line);border-radius:10px;background:var(--s1);font-size:13.5px}
 .achterstand span{flex:1;min-width:180px}
 .greep:focus-visible{outline:none;background:linear-gradient(90deg,transparent 3px,var(--t2) 3px,var(--t2) 6px,transparent 6px)}
@@ -1099,7 +1104,7 @@ const teDoen = () => filter([...D.zelf, ...D.wacht]);
 // dringend: hoge prioriteit, belangrijke afzender, deadline voorbij, of een fout. 'Your decision' alleen telt niet.
 const isUrgent = it => it.prioriteit === "hoog" || !!it.belangrijk || it.status === "fout" || (!!it.deadline && it.deadline < isoDag(new Date()));
 const heeftUrgent = () => teDoen().some(isUrgent) || (D.wacht_op || []).some(w => w.herinner_op <= isoDag(new Date()));
-const opruimLijst = () => [...filter(D.info), ...filter(D.overgeslagen)];
+const opruimLijst = () => [...filter(D.info), ...filter(D.overgeslagen), ...filter(D.oud || [])];
 const bewaar = () => { try { localStorage.setItem("mailagent-ui", JSON.stringify({project:staat.project, tab:staat.tab})); } catch(e){} };
 // Items waarvoor een actie onderweg is: meteen van het scherm, terug als de actie mislukt.
 const verborgen = new Set(), takenVerborgen = new Set();
@@ -1124,7 +1129,7 @@ async function laad(){
   }
   teken();
   opstartWeg();
-  if (D.ophalen.bezig) peilTimer = setTimeout(laad, 4000);
+  if (D.ophalen.bezig || (D.oud_ophalen && D.oud_ophalen.bezig)) peilTimer = setTimeout(laad, 3000);
 }
 
 async function actie(naam, data){
@@ -2469,7 +2474,9 @@ function gewoonte(it){
 function opruimGroep(titel, items, hoofd){
   if (!items.length) return "";
   const ids = items.map(i => i.id).join(",");
-  const groot = hoofd === "archief"
+  const groot = hoofd === "slim"
+    ? `<button class="knop klein" data-groep="slim" data-ids="${ids}" title="Each email goes where you filed earlier email from that sender, otherwise to your usual folder for the project, otherwise to your archive">${ik("folder")}File all</button>`
+    : hoofd === "archief"
     ? `<button class="knop klein" data-groep="archief" data-ids="${ids}">${ik("archive")}Archive all</button>`
     : `<button class="knop klein" data-groep="prullenbak" data-ids="${ids}">${ik("trash")}Move all to Bin</button>`;
   const nGekozen = items.filter(i => staat.gekozen.has(i.id)).length;
@@ -2481,26 +2488,34 @@ function opruimGroep(titel, items, hoofd){
         <div class="midden">
           <div class="regel1"><span class="van">${esc(a.naam)}</span><span class="datum">${datum(it.datum)}</span></div>
           <div class="samenvatting">${esc(it.samenvatting || it.onderwerp)}</div>
+          ${it.plek ? `<div class="plek-regel" title="File all and Put in folders send it here">${ik("folder")}${esc(it.plek === "your archive" ? "Archive" : it.plek)}</div>` : ""}
         </div>
-        ${gw ? `<span class="gewoonte">${esc(gw.tekst)}</span>` : ""}
-        <div class="snel"${gw ? ' style="opacity:1"' : ""}>
-          <button class="ikoon${gw && gw.actie==="taak" ? " voorkeur" : ""}" data-maaktaak="${it.id}" title="Create and schedule task">${ik("task")}</button>
-          <button class="ikoon" data-opbergen="${it.id}" title="File in a folder">${ik("folder")}</button>
-          <button class="ikoon${gw && gw.actie==="archief" ? " voorkeur" : ""}" data-een="archief" data-id="${it.id}" title="Archive">${ik("archive")}</button>
-          <button class="ikoon rood${gw && gw.actie==="prullenbak" ? " voorkeur" : ""}" data-een="prullenbak" data-id="${it.id}" title="Move to Bin">${ik("trash")}</button>
-          <button class="ikoon" data-een="overslaan" data-id="${it.id}" title="Skip this sender from now on">${ik("ban")}</button>
-        </div>
+        ${gw && !it.plek ? `<span class="gewoonte">${esc(gw.tekst)}</span>` : ""}
       </div>`; }).join("")}</div></div>`;
 }
 
+// Oudere mail binnenhalen om op te ruimen: in partijen, standaard zonder Claude
+function oudKaart(){
+  const o = D.oud_ophalen || {}, tot = D.oud_tot ? new Date(D.oud_tot) : new Date(Date.now() - 14 * 864e5);
+  const totTekst = tot.toLocaleDateString("en-GB", {day: "numeric", month: "short", year: tot.getFullYear() === new Date().getFullYear() ? undefined : "numeric"});
+  return `<div class="oud-kaart"><div class="oud-tekst"><b>Older email</b>
+      <span>${D.oud_tot ? `attaché has your email from ${esc(totTekst)} onwards.` : `attaché has the email of the last two weeks.`}
+        Bring in the 30 days before that to tidy it up: it lands here, without drafts.</span>
+      ${o.bezig ? `<span class="meta">Bringing in older email${o.voortgang ? `: ${esc(o.voortgang)}` : "…"}</span>` : o.laatste ? `<span class="meta">${esc(o.laatste)}</span>` : ""}</div>
+    <label class="vinkregel"><input type="checkbox" id="oud-claude"${staat.oudClaude ? " checked" : ""}> Let Claude choose the project (no drafts; takes longer)</label>
+    <button class="knop klein" id="oud-ophalen"${o.bezig ? " disabled" : ""}>${ik("inbox")}${o.bezig ? "Bringing in…" : `Bring in the 30 days before ${esc(totTekst)}`}</button></div>`;
+}
 function tekenOpruimen(){
   const info = filter(D.info), over = filter(D.overgeslagen);
   const vs = D.voorstellen || [];
   let html = vs.length ? `<div class="voorstel">${ik("sparkle")}<div class="namen"><b>You keep binning email from these senders.</b> Skip them from now on, without Claude?<br>
       <span class="meta">${vs.map(v => `${esc(afzender(v.van).naam)} (${v.weg}×)`).join(" · ")}</span></div>
       <button class="knop klein" data-overslaanalle="${esc(vs.map(v => v.adres).join(","))}">${ik("ban")}Skip all</button></div>` : "";
-  html += opruimGroep("FYI", info, "archief") + opruimGroep("Skipped", over, "prullenbak");
-  if (!info.length && !over.length) html = (vs.length ? html : "") + leeg("Nothing to tidy up", "FYI email and newsletters appear here.");
+  const oud = filter(D.oud || []);
+  html += opruimGroep("FYI", info, "archief") + opruimGroep("Skipped", over, "prullenbak")
+        + opruimGroep(D.oud_aantal > oud.length ? `Older email (first ${oud.length} of ${D.oud_aantal})` : "Older email", oud, "slim");
+  if (!info.length && !over.length && !oud.length) html = (vs.length ? html : "") + leeg("Nothing to tidy up", "FYI email and newsletters appear here.");
+  html += oudKaart();
   if (D.regels.length) html += `<details class="regels"><summary>${D.regels.length === 1 ? "1 sender is" : D.regels.length + " senders are"} skipped from now on</summary>
     <div class="lijst">${D.regels.map(r => `<div class="rij" style="cursor:default"><span class="ikoon">${ik("ban")}</span>
       <div class="midden">${esc(r.adres)}</div><button class="knop klein" data-regelweg="${esc(r.adres)}">Stop skipping</button></div>`).join("")}</div></details>`;
@@ -2512,9 +2527,10 @@ function tekenBalk(){
   b.classList.toggle("open", n > 0 && staat.tab === "opruimen");
   b.innerHTML = `<span>${n} selected</span>
     <button class="knop klein" data-bulkmap="1">${ik("folder")}File</button>
+    <button class="knop klein" data-bulk="slim" title="Each email goes where it belongs: the sender's folder, the project's usual folder, or your archive">${ik("folder")}Put in folders</button>
     <button class="knop klein" data-bulk="archief">${ik("archive")}Archive</button>
     <button class="knop klein" data-bulk="prullenbak">${ik("trash")}Bin</button>
-    <button class="knop klein" data-bulk="overslaan">${ik("ban")}Skip</button>
+    <button class="knop klein" data-bulk="overslaan" title="Skip these senders from now on: their email goes to Skipped, without Claude">${ik("ban")}Skip sender</button>
     <button class="knop klein" data-bulk="leeg" title="Clear selection">${ik("x")}</button>`;
 }
 
@@ -2896,7 +2912,13 @@ function verplaats(ids, doel){
     const v = l.slice(k + 1).find(i => !ids.includes(i)) ?? l.slice(0, k).reverse().find(i => !ids.includes(i)) ?? null;
     staat.lees = v; staat.geenAuto = v === null;
   }
-  if (doel === "overslaan") return actie("verplaats", {ids, doel}).then(laad);
+  if (doel === "overslaan") return (async () => {
+    const j = await stil("verplaats", {ids, doel});
+    if (!j.ok){ toast(j.melding, true); return laad(); }
+    toast(j.melding, false, {label: "Undo", doe: async () => {
+      const r = await stil("overslaan-terug", {adressen: j.adressen, items: j.items}); toast(r.melding, !r.ok); laad(); }});
+    laad();
+  })();
   return verplaatsMetUndo(ids, doel);
 }
 
@@ -2922,6 +2944,13 @@ document.addEventListener("click", async ev => {
     return velden[velden.length - 1]?.focus();
   }
   if (t.id === "c-claude") return schrijfConcept(Number(document.getElementById("paneel").dataset.id));
+  if (t.id === "oud-ophalen"){
+    staat.oudClaude = !!document.getElementById("oud-claude")?.checked;
+    D.oud_ophalen = {bezig: true, laatste: "", voortgang: ""}; teken();
+    const j = await stil("oude-mail", {dagen: 30, claude: staat.oudClaude});
+    if (!j.ok) toast(j.melding, true);
+    return laad();
+  }
   if (t.id === "achterstand"){
     achterstandBezig = true; teken();
     const j = await stil("achterstand", {});

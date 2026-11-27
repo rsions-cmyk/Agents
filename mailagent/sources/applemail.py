@@ -21,18 +21,28 @@ on run argv
     set accountNaam to item 1 of argv
     set mailboxNaam to item 2 of argv
     set secondenTerug to (item 3 of argv) as integer
+    set secondenTot to 0
+    if (count of argv) > 3 then set secondenTot to (item 4 of argv) as integer
     set RS to character id 30
     set US to character id 31
     set nu to current date
     set grens to nu - secondenTerug
+    set grensTot to nu - secondenTot
     tell application "Mail"
         set mb to mailbox mailboxNaam of account accountNaam
         -- drie vragen voor alle berichten tegelijk; veel sneller dan per bericht. Het Message-ID verandert nooit,
         -- het nummer (id) wel als een mail verplaatst wordt of Mail de inbox opnieuw opbouwt.
         repeat 3 times
-            set ids to id of (every message of mb whose date received > grens)
-            set datums to date received of (every message of mb whose date received > grens)
-            set mids to message id of (every message of mb whose date received > grens)
+            if secondenTot > 0 then
+                -- oudere mail: alleen het venster tussen grens en grensTot
+                set ids to id of (every message of mb whose date received > grens and date received < grensTot)
+                set datums to date received of (every message of mb whose date received > grens and date received < grensTot)
+                set mids to message id of (every message of mb whose date received > grens and date received < grensTot)
+            else
+                set ids to id of (every message of mb whose date received > grens)
+                set datums to date received of (every message of mb whose date received > grens)
+                set mids to message id of (every message of mb whose date received > grens)
+            end if
             if (count of ids) = (count of datums) and (count of ids) = (count of mids) then exit repeat
         end repeat
     end tell
@@ -49,8 +59,9 @@ on run argv
     set accountNaam to item 1 of argv
     set mailboxNaam to item 2 of argv
     set secondenTerug to (item 3 of argv) as integer
+    set secondenTot to (item 4 of argv) as integer
     set gezocht to {}
-    repeat with i from 4 to count of argv
+    repeat with i from 5 to count of argv
         set end of gezocht to ((item i of argv) as integer)
     end repeat
     set RS to character id 30
@@ -59,7 +70,11 @@ on run argv
     tell application "Mail"
         set mb to mailbox mailboxNaam of account accountNaam
         -- alleen binnen de berichten van de gekozen periode zoeken, niet in de hele inbox
-        set berichten to (every message of mb whose date received > ((current date) - secondenTerug))
+        if secondenTot > 0 then
+            set berichten to (every message of mb whose date received > ((current date) - secondenTerug) and date received < ((current date) - secondenTot))
+        else
+            set berichten to (every message of mb whose date received > ((current date) - secondenTerug))
+        end if
         repeat with m in berichten
             set mid to id of m
             if gezocht contains mid then
@@ -671,11 +686,13 @@ class AppleMailBron:
                               "tekst": US.join(velden[6:]).strip()})
         return berichten
 
-    def lijst(self, sinds) -> list[tuple[str, datetime, str]]:
-        """Alle berichten sinds `sinds` als (id, datum, Message-ID), oudste eerst. Snel: zonder inhoud."""
+    def lijst(self, sinds, tot=None) -> list[tuple[str, datetime, str]]:
+        """Alle berichten sinds `sinds` (en vóór `tot`, voor oudere mail) als (id, datum, Message-ID), oudste eerst.
+        Snel: zonder inhoud."""
         nu = datetime.now().astimezone()
         seconden = int((nu - sinds).total_seconds()) if sinds else 2 * 86400
-        uit = _osascript(SCRIPT_LIJST, self.account, self.mailbox, str(seconden))
+        tot_s = max(1, int((nu - tot).total_seconds())) if tot else 0
+        uit = _osascript(SCRIPT_LIJST, self.account, self.mailbox, str(seconden), str(tot_s))
         rijen = []
         for rec in uit.split(RS):
             velden = rec.split(US)
@@ -684,10 +701,13 @@ class AppleMailBron:
                               velden[2].strip() if len(velden) > 2 else ""))
         return sorted(rijen, key=lambda r: r[1])
 
-    def haal_op(self, sinds, maximum: int, overslaan=None) -> list[Email]:
-        """De oudste `maximum` nog niet verwerkte berichten sinds `sinds`."""
-        self.laatste_rijen = self.lijst(sinds)
-        rijen = [r for r in self.laatste_rijen if not (overslaan and overslaan(r[0], r[2]))]
+    def haal_op(self, sinds, maximum: int, overslaan=None, tot=None) -> list[Email]:
+        """De oudste `maximum` nog niet verwerkte berichten sinds `sinds` (en vóór `tot`: oudere mail)."""
+        rijen_alle = self.lijst(sinds, tot)
+        if tot is None:
+            self.laatste_rijen = rijen_alle   # alleen de gewone ronde: die lijst is je inbox van nu (fout 9)
+        self.laatste_rijen_venster = rijen_alle
+        rijen = [r for r in rijen_alle if not (overslaan and overslaan(r[0], r[2]))]
         self.laatste_totaal = len(rijen)
         kies = [bid for bid, _, _ in rijen[:maximum]]
         if not kies:
@@ -695,12 +715,13 @@ class AppleMailBron:
         nu = datetime.now().astimezone()
         oudste = min(d for _, d, _ in rijen[:maximum])
         seconden = int((nu - oudste).total_seconds()) + 120
+        tot_s = max(1, int((nu - tot).total_seconds()) - 120) if tot else 0
         mails = []
         stuk = 20   # in stukken, zodat je voortgang ziet en een trage mail niet alles ophoudt
         for i in range(0, len(kies), stuk):
             deel = kies[i:i + stuk]
             log.info("%s: inhoud ophalen %d-%d van %d…", self.naam, i + 1, i + len(deel), len(kies))
-            uit = _osascript(SCRIPT_DETAILS, self.account, self.mailbox, str(seconden), *deel)
+            uit = _osascript(SCRIPT_DETAILS, self.account, self.mailbox, str(seconden), str(tot_s), *deel)
             for rec in uit.split(RS):
                 velden = rec.split(US)
                 if len(velden) < 9:

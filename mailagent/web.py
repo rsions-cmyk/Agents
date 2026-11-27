@@ -30,7 +30,7 @@ from .config import anonimiseer, mag_naar_claude
 from .models import Email
 from .models import Sortering
 from .opmaak import externe_afbeeldingen, html_uit_bron, veilig
-from .pipeline import RondeBezig, berg_op, plek_naam, zet_afwijzen_terug, ruim_beantwoord_op, schone_open_punten, terug_naar_te_doen, agenda_check, lijkt_afspraak, achtergrond_voor_item, afspraak_momenten, bevestig_voorlopig, geef_voorlopig_vrij, haal_uit_agenda, houd_vast, verzet_taak, afzender_adres, deadline_in_agenda, ochtend, voorstellen_voor, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
+from .pipeline import RondeBezig, berg_op, berg_slim_op, haal_oude_mail, kies_plek, plek_naam, zet_afwijzen_terug, ruim_beantwoord_op, schone_open_punten, terug_naar_te_doen, agenda_check, lijkt_afspraak, achtergrond_voor_item, afspraak_momenten, bevestig_voorlopig, geef_voorlopig_vrij, haal_uit_agenda, houd_vast, verzet_taak, afzender_adres, deadline_in_agenda, ochtend, voorstellen_voor, controleer_taken, controleer_uitgaand, is_belangrijk, plus_werkdagen, zet_taken_klaar, zet_taken_klaar_terug, map_voorstellen, markeer_gedaan, zet_gedaan_terug, zet_terug, plan_bestaande_taak, stijlvoorbeelden, keur_goed, maak_taak, markeer_mail, open_antwoord, overzicht, run, verplaats_items, wijs_af
 from .melding import meld
 from .store import Store
 
@@ -144,7 +144,32 @@ def wacht_dict(store: Store, w) -> dict:
     return d
 
 
-def verzamel(cfg: Config, store: Store, ophalen: dict) -> dict:
+def oud_dict(store: Store, items: list) -> list[dict]:
+    """Older email in Tidy up, met de plek waar 'Put in their folders' hem neerzet."""
+    keuzes: dict = {}
+    uit = []
+    for r in items:
+        d = item_dict(r)
+        it = store.item(r["id"])
+        if it is not None:
+            k = keuzes.setdefault(it["bron"], store.map_keuzes(it["bron"]))
+            d["plek"] = plek_naam(kies_plek(store, it, k)[0])
+        uit.append(d)
+    return uit
+
+
+def oud_tot(cfg: Config, store: Store) -> str | None:
+    """Tot hoe ver terug attaché oudere mail al binnenhaalde (de vroegste over alle bronnen); None: nog niet."""
+    standen = [store.laatst_opgehaald(f"oud:{b}") for b in cfg_bronnen(cfg)]
+    vroegst = min((d for d in standen if d), default=None)
+    return vroegst.isoformat(timespec="minutes") if vroegst else None
+
+
+def cfg_bronnen(cfg: Config) -> list[str]:
+    return [b.get("naam") for b in (cfg.bronnen or []) if b.get("naam")]
+
+
+def verzamel(cfg: Config, store: Store, ophalen: dict, oud_ophalen: dict | None = None) -> dict:
     werk = lees_werktijd(cfg.agenda)
     tellingen = {p: len(store.items(status="wacht", project=p)) for p in cfg.projecten}
     zelf = store.items(status="fout") + store.items(status="handmatig")
@@ -160,6 +185,10 @@ def verzamel(cfg: Config, store: Store, ophalen: dict) -> dict:
         **afzender_voorstellen(store),
         "ophalen": {"bezig": ophalen["bezig"], "laatste": ophalen["laatste"]},
         "achterstand": len(store.achterstand()) if cfg.opbergen_na_afhandelen else 0,
+        "oud": oud_dict(store, store.items(status="oud")[:400]),
+        "oud_aantal": len(store.items(status="oud")),
+        "oud_tot": oud_tot(cfg, store),
+        "oud_ophalen": dict(oud_ophalen or {"bezig": False, "laatste": "", "voortgang": ""}),
         "werktijd": {"begin": werk.begin.strftime("%H:%M"), "eind": werk.eind.strftime("%H:%M"), "dagen": sorted(werk.dagen)},
         "agenda_aan": bool((cfg.agenda or {}).get("kalender")),
         "agenda_naam": (cfg.agenda or {}).get("kalender"),
@@ -177,6 +206,7 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
     token = secrets.token_urlsafe(24)
     db_pad = store.pad
     ophalen = {"bezig": False, "laatste": ""}
+    oud_ophalen = {"bezig": False, "laatste": "", "voortgang": ""}
     mail_slot = threading.Lock()  # Apple Mail krijgt één opdracht tegelijk
     agenda_cache: dict = {}
     mappen_cache: dict = {}   # bron -> lijst mappen; eenmaal per sessie opgehaald
@@ -241,6 +271,32 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
             ophalen["laatste"] = f"getting mail failed: {ex}"
         finally:
             ophalen["bezig"] = False
+
+    def oude_mail_op_achtergrond(dagen: int, met_claude: bool):
+        voortgang: dict = {}
+        try:
+            def toon():   # voortgang voor de pagina, terwijl hij bezig is
+                while oud_ophalen["bezig"]:
+                    oud_ophalen["voortgang"] = ", ".join(voortgang.values())
+                    time.sleep(1)
+            threading.Thread(target=toon, daemon=True).start()
+            res = haal_oude_mail(cfg, Store(db_pad), bronnen, dagen=dagen, llm=llm_factory() if met_claude else None,
+                                 voortgang=voortgang)
+            delen = []
+            for naam, r in res.items():
+                if r["nieuw"] < 0:
+                    delen.append(f"{naam}: failed")
+                else:
+                    delen.append(f"{r['nieuw']} older " + ("email" if r["nieuw"] == 1 else "emails")
+                                 + (f", {r['rest']} more in this period" if r["rest"] else ""))
+            oud_ophalen["laatste"] = "; ".join(delen) or "No older email found"
+        except RondeBezig as ex:
+            oud_ophalen["laatste"] = str(ex)
+        except Exception as ex:
+            oud_ophalen["laatste"] = f"bringing in older email failed: {ex}"
+        finally:
+            oud_ophalen["bezig"] = False
+            oud_ophalen["voortgang"] = ""
 
     indelen = {"bezig": False}
     indelen_slot = threading.Lock()
@@ -407,7 +463,7 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                 return self._weiger()
             store = Store(db_pad)  # eigen verbinding per verzoek: verzoeken lopen naast elkaar
             if pad == "/api/data":
-                return self._json(verzamel(cfg, store, ophalen))
+                return self._json(verzamel(cfg, store, ophalen, oud_ophalen))
             if pad == "/api/overzicht.md":
                 return self._stuur(overzicht(cfg, store), soort="text/markdown; charset=utf-8")
             self._stuur("Not found", 404, "text/plain; charset=utf-8")
@@ -627,14 +683,24 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                     if not ids:
                         return self._json({"ok": False, "melding": "Nothing selected"})
                     if v.get("doel") == "overslaan":
-                        adressen = set()
+                        # Skip sender: voortaan zonder Claude in Skipped; hun mail die er nu staat gaat daar ook heen
+                        adressen, verplaatst = set(), []
                         for i in ids:
                             it = store.item(i)
                             if it:
                                 adres = afzender_adres(it["van"])
                                 adressen.add(adres)
                                 store.zet_afzender_regel(adres, "negeren", it["project"])
-                        melding = (f"{len(adressen)} senders will be skipped from now on" if len(adressen) != 1 else "1 sender will be skipped from now on")
+                                if it["status"] in ("ter_info", "oud", "wacht", "handmatig"):
+                                    store.bewaar_vorige_status(i, it["status"])
+                                    store.zet_status(i, "genegeerd")
+                                    verplaatst.append(i)
+                        melding = ((f"{len(adressen)} senders are" if len(adressen) != 1 else "This sender is")
+                                   + " skipped from now on: their email goes to Skipped, without Claude")
+                        return self._json({"ok": True, "melding": melding, "adressen": sorted(adressen), "items": verplaatst})
+                    elif v.get("doel") == "slim":   # Put in their folders: elke mail naar zijn eigen plek
+                        with mail_slot:
+                            melding = berg_slim_op(store, bronnen, ids)
                     else:
                         with mail_slot:
                             melding = verplaats_items(store, bronnen, ids, v.get("doel", ""))
@@ -918,9 +984,25 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                     for a in adressen:
                         store.zet_afzender_regel(a, "negeren", None)
                     melding = (f"{len(adressen)} senders will be skipped from now on" if len(adressen) != 1 else "1 sender will be skipped from now on")
+                elif actie == "overslaan-terug":   # Undo van Skip sender
+                    for adres in v.get("adressen", []):
+                        store.verwijder_afzender_regel(str(adres))
+                    for i in v.get("items", []):
+                        it = store.item(int(i))
+                        if it is not None and it["status"] == "genegeerd":
+                            store.zet_status(int(i), it["vorige_status"] or "ter_info")
+                    melding = "No longer skipped"
                 elif actie == "regel-weg":
                     store.verwijder_afzender_regel(v["adres"])
                     melding = f"{v['adres']} is no longer skipped"
+                elif actie == "oude-mail":
+                    if oud_ophalen["bezig"]:
+                        melding = "Already bringing in older email"
+                    else:
+                        oud_ophalen.update(bezig=True, laatste="", voortgang="")
+                        threading.Thread(target=oude_mail_op_achtergrond, daemon=True,
+                                         args=(max(7, min(90, int(v.get("dagen") or 30))), bool(v.get("claude")))).start()
+                        melding = "Bringing in older email"
                 elif actie == "ophalen":
                     if ophalen["bezig"]:
                         melding = "Already getting mail"

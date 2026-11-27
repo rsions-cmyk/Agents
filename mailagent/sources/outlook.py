@@ -68,11 +68,14 @@ class OutlookBron:
                                      "Prefer": 'outlook.body-content-type="text"'})
 
     # --- mail ----------------------------------------------------------------
-    def haal_op(self, sinds, maximum: int, overslaan=None) -> list[Email]:
+    def haal_op(self, sinds, maximum: int, overslaan=None, tot=None) -> list[Email]:
         sinds = sinds or datetime.now(timezone.utc)
         iso = sinds.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        filter_ = f"receivedDateTime gt {iso}"
+        if tot is not None:   # oudere mail: een venster
+            filter_ += f" and receivedDateTime lt {tot.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}"
         params = {
-            "$filter": f"receivedDateTime gt {iso}",
+            "$filter": filter_,
             "$orderby": "receivedDateTime desc",
             "$top": str(min(maximum, 100)),
             "$select": "id,conversationId,subject,from,toRecipients,receivedDateTime,body",

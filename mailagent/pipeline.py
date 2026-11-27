@@ -291,13 +291,13 @@ def map_voorstellen(store: Store, item, mappen: list[str], aantal: int = 3) -> l
 AFGEHANDELD = ("gedaan", "taak", "goedgekeurd", "verzonden")   # uit To do, de stand blijft als de mail verhuist
 
 
-def kies_plek(store: Store, item) -> tuple[str, str]:
+def kies_plek(store: Store, item, keuzes: list | None = None) -> tuple[str, str]:
     """Waar afgehandelde mail heen gaat: de map waar je eerdere mail van deze afzender opborg, anders de map die je
     voor dit project bijna altijd kiest (minstens drie keer, en in 60% of meer), anders het archief. De app leert
     alleen van mappen die jij kiest, niet van wat hij zelf opbergt."""
     from collections import Counter
     adres = afzender_adres(item["van"] or "")
-    keuzes = store.map_keuzes(item["bron"])
+    keuzes = store.map_keuzes(item["bron"]) if keuzes is None else keuzes
     van_afzender = sorted((r for r in keuzes if r["adres"] == adres), key=lambda r: -r["aantal"])
     if van_afzender:
         return "map:" + van_afzender[0]["map"], "where you filed email from this sender before"
@@ -413,8 +413,89 @@ def haal_terug_in_inbox(store: Store, bronnen: dict, it) -> None:
     store.zet_opgeruimd(it["id"], None)
 
 
-def verplaats_items(store: Store, bronnen: dict, item_ids: list[int], doel: str) -> str:
-    """Archiveren of naar de prullenbak, na een klik van de gebruiker. Niets wordt definitief verwijderd."""
+def berg_slim_op(store: Store, bronnen: dict, item_ids: list[int]) -> str:
+    """'Put in their folders' in Tidy up: elke mail naar de plek die kies_plek kiest, na een klik van jou. De app
+    leert hier niet van, want het is zijn eigen keuze."""
+    from collections import defaultdict
+    per_doel = defaultdict(list)
+    for i in item_ids:
+        it = store.item(i)
+        if it is not None:
+            per_doel[kies_plek(store, it)[0]].append(i)
+    if not per_doel:
+        return "Nothing to file"
+    meldingen, n_map, n_archief, mislukt = [], 0, 0, []
+    for doel, ids in per_doel.items():
+        m = verplaats_items(store, bronnen, ids, doel, leer=False)
+        gelukt = int(m.split(" ", 1)[0]) if m[:1].isdigit() else 0
+        if doel == "archief":
+            n_archief += gelukt
+        else:
+            n_map += gelukt
+        if "failed:" in m:
+            mislukt.append(m.split("failed:", 1)[1].strip())
+    delen = ([f"{n_map} in {'its folder' if n_map == 1 else 'their folders'}"] if n_map else []) + \
+            ([f"{n_archief} in your archive"] if n_archief else [])
+    melding = (f"{n_map + n_archief} " + ("email" if n_map + n_archief == 1 else "emails") + " filed: " + " and ".join(delen)
+               if delen else "Nothing filed")
+    return melding + (f"; failed: {'; '.join(mislukt)[:300]}" if mislukt else "")
+
+
+def verwerk_oude_mail(cfg: Config, store: Store, llm, mail: Email) -> int:
+    """Oudere mail, binnengehaald om op te ruimen: geen concept en geen taken, en hij komt in Tidy up onder Older
+    email. Het project komt uit je vaste regels en eerdere keuzes; met llm laat je Claude het project kiezen."""
+    vast_project, sortering = sorteer_met_regels(cfg, mail)
+    geleerd = store.afzender_regel(afzender_adres(mail.van))
+    if sortering is None and llm is not None and mag_naar_claude(cfg, mail) and not mail.extra.get("bulk"):
+        try:
+            sortering = llm.sorteer(mail, anonimiseer(cfg, mail.tekst), vast_project)
+        except Exception as e:   # Claude kan even niet: dan zonder, de mail is er wel
+            log.warning("oudere mail %s zonder Claude: %s", mail.sleutel, e)
+    if sortering is None:
+        project = vast_project or (geleerd["project"] if geleerd is not None else None) or "overig"
+        sortering = Sortering(project=project, actie="ter_info", prioriteit="laag", deadline=None,
+                              samenvatting=mail.onderwerp, reden="older email, brought in to tidy up")
+    return store.nieuw_item(mail, sortering, None, "oud")
+
+
+def haal_oude_mail(cfg: Config, store: Store, bronnen: dict, dagen: int = 30, maximum: int = 150,
+                   llm=None, voortgang: dict | None = None) -> dict:
+    """Oudere mail binnenhalen om op te ruimen, in partijen: elke keer de `dagen` vóór wat er al is, hoogstens
+    `maximum` mails per keer. Past een venster niet in één keer, dan gaat de volgende keer daar verder. Zonder
+    Claude, tenzij je llm meegeeft (alleen het project, geen concepten). Alleen na een klik."""
+    with ronde_slot(store):
+        nu_ = datetime.now().astimezone()
+        uit = {}
+        for naam, bron in bronnen.items():
+            tot = store.laatst_opgehaald(f"oud:{naam}") or (nu_ - timedelta(days=cfg.terugkijken_dagen))
+            van = tot - timedelta(days=dagen)
+            try:
+                mails = bron.haal_op(van, maximum, tot=tot,
+                                     overslaan=lambda bid, mid=None, n=naam: herken_mail(store, n, bid, mid))
+            except Exception as e:
+                log.error("oudere mail uit %s ophalen mislukt: %s", naam, e)
+                uit[naam] = {"nieuw": -1, "rest": 0, "tot": tot}
+                continue
+            totaal = getattr(bron, "laatste_totaal", len(mails))
+            nieuw = 0
+            for i, mail in enumerate(mails, 1):
+                if store.is_bekend(mail):
+                    continue
+                verwerk_oude_mail(cfg, store, llm, mail)
+                nieuw += 1
+                if voortgang is not None:
+                    voortgang[naam] = f"{i} of {len(mails)}"
+            rest = max(0, totaal - len(mails))
+            if rest == 0:
+                store.zet_laatst_opgehaald(f"oud:{naam}", van)   # dit venster is binnen: de volgende keer verder terug
+            store.log(None, f"oudere mail {naam}: {nieuw} nieuw van {van:%d-%m-%Y} tot {tot:%d-%m-%Y}, nog {rest}")
+            uit[naam] = {"nieuw": nieuw, "rest": rest, "tot": van if rest == 0 else tot}
+        return uit
+
+
+def verplaats_items(store: Store, bronnen: dict, item_ids: list[int], doel: str, leer: bool = True) -> str:
+    """Archiveren of naar de prullenbak, na een klik van de gebruiker. Niets wordt definitief verwijderd.
+    leer: een gekozen map onthouden voor de volgende keer (niet als de app zelf de map koos)."""
     if doel not in ("archief", "prullenbak") and not (doel.startswith("map:") and len(doel) > 4):
         raise ValueError(f"onbekend doel: {doel}")
     per_bron: dict[str, list] = {}
@@ -447,13 +528,13 @@ def verplaats_items(store: Store, bronnen: dict, item_ids: list[int], doel: str)
             fout = res.get(it["bron_id"], "no result")
             if fout is None and it["status"] in AFGEHANDELD:   # Done blijft Done; alleen de plek verandert
                 store.zet_opgeborgen(it["id"], doel)
-                if doel.startswith("map:"):
+                if doel.startswith("map:") and leer:
                     store.onthoud_map(bron_naam, doel[4:], afzender_adres(it["van"] or ""), it["project"])
                 gelukt += 1
             elif fout is None:
                 store.bewaar_vorige_status(it["id"], it["status"])
                 store.zet_status(it["id"], nieuwe_status, opmerking=doel[4:] if doel.startswith("map:") else None)
-                if doel.startswith("map:"):
+                if doel.startswith("map:") and leer:
                     store.onthoud_map(bron_naam, doel[4:], afzender_adres(it["van"] or ""), it["project"])
                 gelukt += 1
             else:

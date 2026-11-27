@@ -1980,3 +1980,60 @@ def test_done_via_de_app_en_op_gelezen(omgeving):
         assert j["plek"] is None and (cfg.data_dir.parent / "mail" / bid).exists()
     finally:
         server.shutdown()
+
+
+def _oude_mail(map_, naam, dagen_geleden, van="Oud Contact <oud@partner.example>", onderwerp="Oude vraag"):
+    from datetime import datetime, timedelta
+    from email.utils import format_datetime
+    d = datetime.now().astimezone() - timedelta(days=dagen_geleden)
+    (map_ / naam).write_text(f"From: {van}\nTo: docent@buas.nl\nSubject: {onderwerp}\nDate: {format_datetime(d)}\n"
+                             f"Message-ID: <{naam}@partner.example>\n\nTekst van {naam}.\n")
+
+
+def test_oudere_mail_in_partijen_binnenhalen(omgeving):
+    """Oudere mail om op te ruimen: in vensters van 30 dagen terug, zonder concept of taken, onder Older email."""
+    from mailagent.pipeline import berg_slim_op, haal_oude_mail, zet_terug
+    cfg, store, bronnen = omgeving
+    cfg.terugkijken_dagen = 14
+    inbox = cfg.data_dir.parent / "mail"
+    _oude_mail(inbox, "oud-40a.eml", 40); _oude_mail(inbox, "oud-41b.eml", 41, van="Ander <ander@partner.example>")
+    _oude_mail(inbox, "oud-80.eml", 80)
+    llm = NepLLM()
+    run(cfg, store, bronnen, llm)
+    assert not [r for r in store.items() if r["onderwerp"] == "Oude vraag"]          # de gewone ronde laat ze staan
+
+    r1 = haal_oude_mail(cfg, store, bronnen, dagen=30, maximum=1)                    # venster 44 tot 14 dagen, één per keer
+    assert r1["test"]["nieuw"] == 1 and r1["test"]["rest"] == 1
+    r2 = haal_oude_mail(cfg, store, bronnen, dagen=30, maximum=1)                    # zelfde venster, de tweede
+    assert r2["test"]["nieuw"] == 1 and r2["test"]["rest"] == 0
+    r3 = haal_oude_mail(cfg, store, bronnen, dagen=30)                               # 74 tot 44 dagen: niets
+    assert r3["test"]["nieuw"] == 0
+    gezien = len(llm.gezien)
+    r4 = haal_oude_mail(cfg, store, bronnen, dagen=30, llm=llm)                      # 104 tot 74: met Claude, alleen sorteren
+    assert r4["test"]["nieuw"] == 1 and len(llm.gezien) == gezien + 1
+    oud = store.items(status="oud")
+    assert len(oud) == 3 and all(store.item(r["id"])["concept"] is None for r in oud)
+
+    # Put in their folders: de map van de afzender, anders het archief; Undo zet ze terug onder Older email
+    from mailagent.pipeline import afzender_adres
+    store.onthoud_map("test", "Partners", "oud@partner.example", oud[0]["project"])
+    melding = berg_slim_op(store, bronnen, [r["id"] for r in oud])
+    assert "3 emails filed" in melding and "2 in their folders" in melding and "1 in your archive" in melding
+    assert (inbox / "_map_Partners" / "oud-40a.eml").exists() and (inbox / "_archief" / "oud-41b.eml").exists()
+    assert store.map_keuzes("test")[0]["aantal"] == 1                              # de app leert niet van zichzelf
+    zet_terug(store, bronnen, [r["id"] for r in oud])
+    assert len(store.items(status="oud")) == 3 and (inbox / "oud-40a.eml").exists()
+
+
+def test_oudere_mail_in_de_app(omgeving):
+    from mailagent.pipeline import haal_oude_mail
+    from mailagent.web import verzamel
+    cfg, store, bronnen = omgeving
+    cfg.terugkijken_dagen = 14
+    _oude_mail(cfg.data_dir.parent / "mail", "oud-30.eml", 30)
+    run(cfg, store, bronnen, NepLLM())
+    haal_oude_mail(cfg, store, bronnen, dagen=30)
+    store.onthoud_map("test", "Partners", "oud@partner.example", "overig")
+    d = verzamel(cfg, store, {"bezig": False, "laatste": ""})
+    assert d["oud_aantal"] == 1 and d["oud"][0]["plek"] == "Partners" and d["oud_tot"]
+    assert d["oud_ophalen"]["bezig"] is False
