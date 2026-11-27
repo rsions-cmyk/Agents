@@ -2150,3 +2150,53 @@ def test_beslissing_met_taak_bij_een_keuze():
     assert wanneer.opties[0].taak is None                                                     # alleen een beslissing brengt werk mee
     optie = SCHEMA_UITWERKING["properties"]["open_punten"]["items"]["properties"]["opties"]["items"]
     assert "taak" in optie["required"] and optie["properties"]["taak"]["anyOf"][0] == {"type": "null"}
+
+
+def test_zelftest_verslag_zonder_inhoud(omgeving, monkeypatch):
+    """De zelftest loopt alles na zonder iets te veranderen, en het verslag noemt aantallen, geen afzenders of onderwerpen."""
+    from datetime import datetime, timedelta
+    from mailagent.models import Email, KeuzeTaak, OpenPunt, Optie, Uitwerking
+    from mailagent.sources import applemail
+    from mailagent.zelftest import zelftest
+    cfg, store, bronnen = omgeving
+    run(cfg, store, bronnen, NepLLM())
+    nu = datetime.now().astimezone()
+    veranderd = []
+
+    class NepApple:                                   # zoals AppleMailBron, maar zonder Mail
+        account, mappen = "Exchange", {"archief": "Archive", "prullenbak": "Deleted Items", "verzonden": "Sent Items"}
+        def lijst(self, sinds, tot=None):
+            return [("101", nu - timedelta(hours=3), "<a@x>"), ("102", nu - timedelta(hours=1), "<b@x>")] if tot is None else [("90", nu - timedelta(days=40), "<c@x>")]
+        def haal_op(self, sinds, maximum, overslaan=None, tot=None):
+            return [Email("apple", "102", "Geheime Afzender <geheim@example.org>", "ik", "Vertrouwelijk onderwerp", nu, "tekst", "<b@x>")]
+        def beantwoord(self, mails):
+            return {bid: ("nee", bid) for bid, _ in mails}
+        def mappenlijst(self):
+            return ["Inbox/Studenten/Jan Jansen", "Inbox/ISTTE"]
+        def verzonden_sinds(self, sinds):
+            return [{"message_id": "<s@x>"}]
+        def bron(self, bron_id, message_id):
+            raise RuntimeError("email no longer found")
+        def verplaats(self, *a):
+            veranderd.append(a)
+        def markeer_gelezen(self, *a):
+            veranderd.append(a)
+
+    monkeypatch.setattr(applemail, "_osascript", lambda script, *a: "Inbox\nArchive\nDeleted Items\nSent Items\nInbox/Studenten/Jan Jansen\n")
+
+    class Claude(NepLLM):
+        def werk_uit(self, mail, *a, **k):
+            return Uitwerking(concept_antwoord="Dear Editor, happy to review.", taken=[], agenda_voorstel=None, vragen_aan_jou=None,
+                              open_punten=[OpenPunt(vraag="Accept?", soort="hele_mail", suggestie=0, opties=[
+                                  Optie(label="Accept", taak=KeuzeTaak(omschrijving="Review TT-0000", minuten=180)), Optie(label="Decline")])])
+
+    regels = []
+    v = zelftest(cfg, store, {"test": bronnen["test"], "apple": NepApple()}, llm=Claude(), uit=regels.append,
+                 app_url="http://127.0.0.1:9/")
+    tekst = v.tekst()
+    assert "✓ inbox, last two days: 2 emails, 2 with a Message-ID" in tekst
+    assert "✓ archive folder: 'Archive' found" in tekst and "✓ bin folder: 'Deleted Items' found" in tekst
+    assert "✓ decision: 2 choices: Accept, Decline" in tekst and "✓ task with a choice: yes" in tekst
+    assert "– source: a test folder" in tekst and "✗ page:" in tekst                 # de app draait hier niet
+    assert "Geheim" not in tekst and "Vertrouwelijk" not in tekst and "Jan Jansen" not in tekst   # geen inhoud of mapnamen
+    assert not veranderd and v.tel()["fout"] >= 1 and regels                          # niets verplaatst, regels meteen getoond

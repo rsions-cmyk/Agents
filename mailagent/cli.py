@@ -28,6 +28,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("agenda-test", help="create a test event to check the reminder and lock in Outlook")
     tb = sub.add_parser("test-bronnen", help="show email from the last 24 hours, without Claude and without saving anything")
     tb.add_argument("--uren", type=int, default=24)
+    zt = sub.add_parser("zelftest", help="check everything that can only be checked on this Mac; moves and sends nothing")
+    zt.add_argument("--zonder-claude", action="store_true", help="skip the test question to Claude")
     vb = sub.add_parser("vergeet-bron", help="remove everything attaché stored from an account that is no longer in config.yaml")
     vb.add_argument("naam", help="the account's naam: from config.yaml, for example google")
     vb.add_argument("--ja", action="store_true", help="don't ask for confirmation")
@@ -149,6 +151,19 @@ def main(argv: list[str] | None = None) -> int:
     from .llm import maak_llm
     from .config import pas_instellingen_toe
     pas_instellingen_toe(cfg, store)   # de keuzes uit het menu Settings
+
+    if args.opdracht == "zelftest":
+        from datetime import datetime
+        from .zelftest import zelftest
+        logging.getLogger().setLevel(logging.WARNING)       # alleen het verslag, geen ruis
+        print("attaché self-test. It moves and sends nothing; the test question to Claude is about an invented email.", flush=True)
+        verslag = zelftest(cfg, store, bronnen, met_claude=not args.zonder_claude, uit=lambda r: print(r, flush=True))
+        pad = cfg.data_dir / f"zelftest-{datetime.now():%Y%m%d-%H%M}.txt"
+        pad.write_text(verslag.tekst(), encoding="utf-8")
+        t = verslag.tel()
+        print(f"\n{t['ok']} fine, {t['let']} to look at, {t['fout']} failed, {t['over']} skipped.")
+        print(f"The report is in {pad}. It holds counts and times, no senders, subjects or text, so you can send it on.")
+        return 1 if t["fout"] else 0
 
     if args.opdracht == "run":
         from .pipeline import RondeBezig, overzicht, run

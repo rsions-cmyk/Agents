@@ -1557,9 +1557,10 @@ document.addEventListener("click", ev => {
     if (JSON.stringify(keuzeTaken(it).map(t => t.omschrijving)) !== voor){   // de taken onder het concept veranderen mee
       const s = document.querySelector("#paneel .tk-samen"); if (s) s.innerHTML = takenSamen(it);
       document.getElementById("paneel").dataset.sig = "";
-      if (takenOpen.has(id)) return tekenPaneel(it);                         // de open lijst opnieuw, met de nieuwe taak
+      if (takenOpen.has(id)) { tekenPaneel(it); return schrijfNaKeuze(id, i); }   // de open lijst opnieuw, met de nieuwe taak
     }
-    return tekenOpenPunten();
+    tekenOpenPunten();
+    return schrijfNaKeuze(id, i);
   }
   if (optie === "eigen"){
     if (!(oud && oud.optie === "eigen")) kz[i] = {optie: "eigen", tekst: stand === "gekozen" && oud ? oud.tekst : null, pos: oud ? oud.pos : -1};
@@ -1589,6 +1590,13 @@ document.addEventListener("input", ev => {
   kz[i] = {optie: "eigen", tekst: waarde.trim() ? waarde : null, pos};
   tekenOpenPunten();
 });
+// Nog geen concept (Claude wachtte op jouw keuze, bijvoorbeeld omdat je projectinstructies dat vragen):
+// een antwoord kiezen schrijft het concept meteen, zonder eerst op Rewrite te klikken
+function schrijfNaKeuze(id, i){
+  const it = vindItem(id), veld = document.getElementById("concept"), k = (keuzes[id] || {})[i];
+  if (!it || !k || !veld || veld.value.trim() || schrijft.has(id) || it.status === "handmatig") return;
+  herschrijfMetKeuzes(id);
+}
 async function herschrijfMetKeuzes(id){
   const it = vindItem(id), kz = keuzes[id] || {}, veld = document.getElementById("concept");
   if (!it || schrijft.has(id)) return;

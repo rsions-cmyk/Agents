@@ -168,6 +168,8 @@ With `backend: api`, each email costs one call to sort it, and email that needs 
 
 The tests use the sample emails in `tests/fixtures` and a fake Claude, so they cost nothing. The Outlook and Apple Mail connections have not been tested on a real Mac or a real BUas mailbox, so the first manual round is also a test.
 
+**Self-test on your Mac.** After an update, run `scripts/mailagent.sh zelftest`. It checks what can only be checked on the Mac itself: whether Apple Mail answers and returns Message-IDs, the window for older email, whether replied-to email is recognised, your folders, archive, bin and Sent, how long a full search of the archive takes, today's calendar and whether your calendar is writable, the `claude` command with one test question about an invented review invitation (the new answer format with choices and their task), Ollama if you switched it on, and whether the app page and the launchd jobs run. It moves, marks and sends nothing. The report lands in `data/zelftest-<date>.txt` and holds counts and times, no senders, subjects, text or folder names, so you can send it on. Add `--zonder-claude` to skip the test question.
+
 ## Next steps
 
 - A "town hall": one question to all project agents at once ("what's on this week?").

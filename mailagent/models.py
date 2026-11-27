@@ -165,7 +165,7 @@ SCHEMA_UITWERKING = {
                                         "type": "object",
                                         "description": "Alleen bij hele_mail: het werk dat volgt als de eigenaar deze optie kiest",
                                         "properties": {
-                                            "omschrijving": {"type": "string", "description": "Wat er moet gebeuren, Brits Engels"},
+                                            "omschrijving": {"type": "string", "description": "Wat er moet gebeuren, hoogstens acht woorden, Brits Engels"},
                                             "minuten": {"type": ["integer", "null"], "description": "Geschat eigen werk in minuten"},
                                             "deadline": {"type": ["string", "null"], "description": "YYYY-MM-DD of null"},
                                         },
