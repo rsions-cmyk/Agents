@@ -141,6 +141,33 @@ details.origineel{scroll-margin-top:12px}
 .lees-sel .link:hover{color:var(--t1)}
 .chips .projectkies{min-height:28px}
 main .rij[data-open]{box-shadow:inset 3px 0 0 var(--pk,transparent)}
+/* groepen in To do */
+.tdgroep{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 8px;margin:16px 2px 6px;font-size:14px;font-weight:600;color:var(--t1,var(--tekst))}
+.tdgroep:first-of-type{margin-top:4px}
+.tdgroep .n{font-weight:500;color:var(--t3,var(--zacht))}
+.tdgroep .uitleg{margin-left:auto;font-weight:400;font-size:12.5px;color:var(--t3,var(--zacht))}
+.chip.vraag,:root[data-theme] .chip.vraag{background:var(--s2,var(--vlak3));color:var(--t1,var(--tekst));font-weight:600;border-color:transparent;padding:3px 10px;border-radius:999px}
+/* Next up */
+.nextup{display:grid;grid-template-columns:auto minmax(0,1fr) auto;column-gap:10px;row-gap:2px;align-items:center;padding:10px 12px;margin:0 0 12px;border:1px solid var(--line,var(--lijn));border-radius:10px;background:var(--s1,var(--vlak));font-size:13.5px}
+.nextup > svg{grid-row:1 / 3;color:var(--t2,var(--zacht))}
+.nextup .r1{color:var(--t1,var(--tekst));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nextup .nu-wanneer{font-variant-numeric:tabular-nums;font-weight:600;margin-right:6px}
+.nextup .nu-tot{color:var(--t3,var(--zacht))}
+.nextup .r2{grid-column:2;font-size:12.5px;color:var(--t3,var(--zacht))}
+.nextup > .knop{grid-row:1 / 3;grid-column:3}
+.nextup .link,.taken-uit .link{font:inherit;color:inherit;text-decoration:underline;text-underline-offset:2px;padding:0;background:none;border:0;cursor:pointer}
+.nextup .link:hover,.taken-uit .link:hover{color:var(--t1,var(--tekst))}
+.app.next-up.drie.tab-todo:not(.met-dag) .dag-knop,.app.next-up .dag-knop{display:none!important}
+/* taken als één regel */
+.taken-uit > summary{list-style:none;display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;padding:10px 12px;border:1px dashed var(--line2,var(--lijn));border-radius:10px;cursor:pointer;font-size:13.5px}
+.taken-uit > summary::-webkit-details-marker{display:none}
+.taken-uit > summary > svg{color:var(--t2,var(--zacht))}
+.taken-uit > summary .tk-samen{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;flex:1;min-width:0}
+.taken-uit > summary .link{font-size:12.5px;color:var(--t2,var(--zacht))}
+.taken-uit[open] > summary{border-style:solid;border-bottom-left-radius:0;border-bottom-right-radius:0}
+.taken-uit[open] > summary .link{visibility:hidden}
+.taken-uit > .takenlijst{border:1px solid var(--line2,var(--lijn));border-top:0;border-radius:0 0 10px 10px;padding:10px 12px}
+.tk-chip{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:999px;background:var(--s2,var(--vlak3));color:var(--t1,var(--tekst));font-size:13px}
 :root[data-theme] main .rij[data-open],:root[data-theme] main .rij[data-open].gekozen{box-shadow:inset 3px 0 0 var(--pk,transparent)}
 .melding.prive{border-left-color:var(--t2,var(--zacht))}
 .melding.prive svg{color:var(--t2,var(--zacht))}
@@ -1196,7 +1223,19 @@ try { const o = JSON.parse(localStorage.getItem("mailagent-ui")||"{}"); Object.a
 if (!["te_doen","planning","opruimen"].includes(staat.tab)) staat.tab = "te_doen";
 const breed = () => window.matchMedia("(min-width:1100px)").matches;
 const drieKolommen = () => breed() && staat.tab !== "planning";
-const teDoen = () => filter([...D.zelf, ...D.wacht]);
+// Eén vraag per mail. De groepen bepalen ook de volgorde van J en K.
+const GROEPEN = [["reply", "Reply", "a draft is ready"], ["decide", "Decide", "your answer goes into the draft"],
+                 ["do", "Do", "becomes a task"], ["check", "Check yourself", "read these yourself"]];
+const GROEP_NR = {reply: 0, decide: 1, do: 2, check: 3};
+const isReview = it => /\b(review|reviewer|referee|beoordel)/i.test(`${it.onderwerp || ""} ${it.samenvatting || ""}`);
+function groepVan(it){
+  if (it.status === "fout" || it.status === "handmatig" || it.actie === "ter_info" || it.actie === "negeren") return "check";
+  if (it.vragen || (it.actie === "taak" && isReview(it))) return "decide";     // review-uitnodigingen: eerst ja of nee
+  if (it.actie === "taak") return "do";
+  return "reply";
+}
+const teDoen = () => filter([...D.zelf, ...D.wacht]).map((it, i) => [it, i])
+  .sort((a, b) => GROEP_NR[groepVan(a[0])] - GROEP_NR[groepVan(b[0])] || a[1] - b[1]).map(x => x[0]);
 // dringend: hoge prioriteit, belangrijke afzender, deadline voorbij, of een fout. 'Your decision' alleen telt niet.
 const isUrgent = it => it.prioriteit === "hoog" || !!it.belangrijk || it.status === "fout" || (!!it.deadline && it.deadline < isoDag(new Date()));
 const heeftUrgent = () => teDoen().some(isUrgent) || (D.wacht_op || []).some(w => w.herinner_op <= isoDag(new Date()));
@@ -1629,7 +1668,8 @@ function teken(){
   const app = document.getElementById("app"), wordtDrie = drieKolommen();
   app.classList.toggle("tab-planning", staat.tab === "planning");
   app.classList.toggle("tab-todo", staat.tab === "te_doen");
-  const metDag = wordtDrie && staat.tab === "te_doen" && breedDag() && !taak;   // het taakpaneel heeft zijn eigen dag
+  const metDag = wordtDrie && staat.tab === "te_doen" && breedDag() && !taak && vandaagKolom();   // het taakpaneel heeft zijn eigen dag
+  app.classList.toggle("next-up", !vandaagKolom());
   app.classList.toggle("met-dag", metDag);
   app.classList.toggle("dag-open", !metDag && wordtDrie && staat.tab === "te_doen" && !!staat.dagOpen);
   if (app.classList.contains("drie") !== wordtDrie){
@@ -1679,7 +1719,7 @@ function teken(){
   const focusPlan = !fp ? null : fp.id === "pl-blok" ? "#pl-blok" : fp.dataset.kaart ? `[data-kaart="${fp.dataset.kaart}"]`
     : fp.dataset.herplan ? `[data-herplan="${fp.dataset.herplan}"]` : `[data-kaartweg="${fp.dataset.kaartweg}"]`;
   if (staat.tab === "te_doen" && staat.td === "afgehandeld") inhoud.innerHTML = tekenAfgehandeld();
-  else if (staat.tab === "te_doen") inhoud.innerHTML = (wordtDrie ? "" : tekenVandaag()) + tekenVoortgang() + tekenWachtOp() + tekenBeoordelen(teDoen()) + tekenBelangrijk();
+  else if (staat.tab === "te_doen") inhoud.innerHTML = (vandaagKolom() ? (wordtDrie ? "" : tekenVandaag()) : tekenNextUp()) + tekenVoortgang() + tekenWachtOp() + tekenBeoordelen(teDoen()) + tekenBelangrijk();
   else if (staat.tab === "planning"){ inhoud.innerHTML = tekenPlanning(); requestAnimationFrame(pasPlHoogteAan); }
   else inhoud.innerHTML = tekenOpruimen();
   if (focusSel){ const terug = document.querySelector(`main .rij${focusSel}`); if (terug) terug.focus({preventScroll: true}); else staat.focusNa = true; }
@@ -2199,6 +2239,25 @@ function tekenVandaag(inKolom){
 
 // ---------------- kolom Vandaag: de dag in een tijdlijn, daaronder deadlines en wat blijft liggen ----------------
 const breedDag = () => window.matchMedia("(min-width:1440px)").matches;
+// Today als kolom (en als kaart op een smal scherm) of als één regel Next up boven de lijst: een keuze in Settings
+const vandaagKolom = () => { try { return localStorage.getItem("attache-vandaag") === "kolom"; } catch(e){ return false; } };
+function tekenNextUp(){
+  if (staat.project !== "alles") return "";
+  const o = D.ochtend || {deadlines: [], blijft_liggen_n: 0, blijft_liggen: []}, vandaag = isoDag(new Date());
+  if (D.agenda_aan && dagen[vandaag] === undefined) laadDag(vandaag);
+  const lijst = Array.isArray(dagen[vandaag]) ? dagen[vandaag].filter(a => !a.heledag && !a.vrij) : [];
+  const nu = Date.now(), komend = lijst.filter(a => Date.parse(a.eind) > nu).sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
+  const v = komend[0], loopt = v && Date.parse(v.start) <= nu;
+  const r1 = !D.agenda_aan ? "Today" : !Array.isArray(dagen[vandaag]) ? "Loading your day…"
+    : v ? `<span class="nu-wanneer">${loopt ? "Now" : tijdVan(Date.parse(v.start))}</span>${esc(kortTitel(v.titel))}${loopt ? ` <span class="nu-tot">until ${tijdVan(Date.parse(v.eind))}</span>` : ""}`
+    : "No more events today";
+  const delen = [];
+  if (komend.length > 1) delen.push(`${komend.length - 1} more today`);
+  if (o.deadlines.length) delen.push(`<button class="link" data-dagopen="1">${o.deadlines.length === 1 ? "1 deadline" : o.deadlines.length + " deadlines"} this week</button>`);
+  if (o.blijft_liggen_n) delen.push(`<button class="link" data-openmail="${o.blijft_liggen[0].id}" title="${o.blijft_liggen_n === 1 ? "1 email has" : o.blijft_liggen_n + " emails have"} waited two working days or more. Opens the oldest">${o.blijft_liggen_n} waiting 2+ days</button>`);
+  return `<div class="nextup">${ik("calendar")}<div class="r1">${r1}</div><div class="r2">${delen.join(" · ") || "Nothing urgent this week"}</div>
+    <button class="knop klein" data-dagopen="1" title="Your day, deadlines and what is waiting ( ] )">Day</button></div>`;
+}
 let projectMenu = () => "";
 function tekenDagkol(){
   const vandaag = isoDag(new Date());
@@ -2533,24 +2592,28 @@ function tekenBelangrijk(){
 
 function tekenBeoordelen(items){
   if (!items.length) return leeg("All caught up", "Nothing is waiting for your review.", true);
-  return `<div class="lijst">${items.map(it => { const a = afzender(it.van), [ai, al] = ACTIES[it.actie] || ["mail", it.actie];
+  const tel = {}; items.forEach(it => { const g = groepVan(it); tel[g] = (tel[g] || 0) + 1; });
+  let vorige = null;
+  return items.map(it => { const a = afzender(it.van), [ai, al] = ACTIES[it.actie] || ["mail", it.actie];
+    const g = groepVan(it), kop = g !== vorige ? (() => { const [, naam, uitleg] = GROEPEN[GROEP_NR[g]];
+      return `${vorige ? "</div>" : ""}<div class="tdgroep" role="heading" aria-level="2">${naam}<span class="n">${tel[g]}</span><span class="uitleg">${uitleg}</span></div><div class="lijst">`; })() : "";
+    vorige = g;
     // één label: wat er van jou nodig is; deadline erbij als die er is
     const dl = it.deadline ? ` · ${new Date(it.deadline + "T12:00").toLocaleDateString("en-GB",{day:"numeric",month:"short"})}` : "";
     const chips = [];
     if (it.lijkt_beantwoord) chips.push(`<span class="chip ok">${ik("check")}Looks answered</span>`);
     if (it.status === "handmatig") chips.push(`<span class="chip">${ik("slot")}Private sender</span>`);
-    else if (it.status === "fout") chips.push(`<span class="chip let">${ik("alert")}Check it yourself</span>`);
-    else if (it.vragen) chips.push(`<span class="chip let">Decision${dl}</span>`);
-    else chips.push(`<span class="chip">${ik(ai)}${al}${dl}</span>`);
-    return `<div class="rij${staat.open===it.id?" gekozen":""}" data-open="${it.id}" tabindex="0" style="--pk:${kleur(it.project)}">
+    else if (it.status === "fout") chips.push(`<span class="chip let">${ik("alert")}Claude could not handle this</span>`);
+    if (it.deadline) chips.push(`<span class="chip${it.deadline < isoDag(new Date()) ? " let" : ""}">${ik("clock")}${dl.replace(" · ", "")}</span>`);
+    return kop + `<div class="rij${staat.open===it.id?" gekozen":""}" data-open="${it.id}" tabindex="0" style="--pk:${kleur(it.project)}">
       ${avatar(it)}
       <div class="midden">
         <div class="regel1"><span class="van">${it.belangrijk ? `<span class="vip" title="Important sender">${ik("ster")}</span>` : ""}${esc(a.naam)}${it.prioriteit === "hoog" || isUrgent(it) ? `<span class="prio" title="${it.prioriteit === "hoog" ? "High priority" : "Needs you soon"}" role="img" aria-label="${it.prioriteit === "hoog" ? "High priority" : "Needs you soon"}"></span>` : ""}</span><span class="datum">${datum(it.datum)}</span></div>
         <div class="onderwerp">${esc(it.onderwerp)}</div>
         <div class="samenvatting">${esc(it.samenvatting && it.samenvatting !== it.onderwerp ? it.samenvatting : (it.opmerking || ""))}</div>
-        <div class="chips">${chips.join("")}</div>
+        ${chips.length ? `<div class="chips">${chips.join("")}</div>` : ""}
       </div>
-    </div>`; }).join("")}</div>`;
+    </div>`; }).join("") + "</div>";
 }
 
 function taakMail(t){
@@ -2713,11 +2776,20 @@ function tekenBalk(){
     <button class="knop klein" data-bulk="leeg" title="Clear selection">${ik("x")}</button>`;
 }
 
+// de vraag van deze mail, in dezelfde woorden als de groep in de lijst
+function vraagChip(it){
+  const g = groepVan(it);
+  const [i, t] = it.status === "handmatig" ? ["slot", "Private sender"] : it.status === "fout" ? ["alert", "Check yourself"]
+    : it.actie === "ter_info" || it.actie === "negeren" ? ["eye", "For your information"]
+    : g === "decide" ? ["potlood", "Your decision"] : g === "do" ? ["task", "Make it a task"] : ["reply", "Reply needed"];
+  return `<span class="chip vraag">${ik(i)}${t}</span>`;
+}
 // Eén messing hoofdknop per soort mail: wat je hier meestal doet
 function hoofdActie(it){
   if (it.lijkt_beantwoord || it.actie === "ter_info" || it.actie === "negeren") return "gedaan";
   if (it.status === "handmatig" && !String(concepten[it.id] ?? it.concept ?? "").trim()) return "gedaan";   // niets bij Claude, nog geen tekst
-  if (it.actie === "taak") return "taak";                       // review-uitnodigingen en ander werk: inplannen
+  if (groepVan(it) === "decide") return "antwoord";             // je beslissing gaat in het antwoord
+  if (it.actie === "taak") return "taak";                       // werk: inplannen
   return "antwoord";
 }
 function tekenPaneel(it){
@@ -2746,7 +2818,7 @@ function tekenPaneel(it){
             title="${it.belangrijk ? "Important sender: click to remove" : "Mark as important sender: always in To do, with a notification on your Mac"}">${ik("ster")}</button></div>
         <div class="chips"><select class="projectkies" data-projectkies="${it.id}" style="background-color:${kleur(it.project)}" aria-label="Project">
             ${D.projecten.map((pr, i) => `<option value="${esc(pr.naam)}"${pr.naam===it.project?" selected":""}>${esc(naamProject(pr.naam))} (${i+1})</option>`).join("")}</select>
-          <span class="chip">${ik(ai)}${al}</span>${it.prioriteit==="hoog"?`<span class="chip hoog"><span class="prio" aria-hidden="true"></span>High priority</span>`:""}
+          ${vraagChip(it)}${it.prioriteit==="hoog"?`<span class="chip hoog"><span class="prio" aria-hidden="true"></span>High priority</span>`:""}
           ${it.deadline?`<span class="chip">${ik("clock")}${esc(dagKort(it.deadline))}</span>${it.deadline_in_agenda ? `<span class="chip">${ik("calendar")}in calendar</span>` : D.agenda_aan ? `<button class="knop klein" data-deadlineagenda="${it.id}" data-soort="mail" title="All-day event, marked private, with a reminder at 09:00 the day before">Add to calendar</button>` : ""}`:""}</div></div>
       <button class="ikoon sluit-mail" id="sluit" title="Close (Esc)">${ik("x")}</button></div>
     <div class="p-inhoud lees">
@@ -2770,7 +2842,7 @@ function tekenPaneel(it){
         <textarea id="concept" placeholder="${it.status === "handmatig" ? "This sender is not sent to Claude. Type your reply here." : "No draft yet. Have Claude write one, or type your own."}">${esc(concept)}</textarea>
         ${it.status === "handmatig" ? "" : `<div class="c-schrijf"${concept.trim() && !schrijft.has(it.id) ? " hidden" : ""}><button class="knop" id="c-claude"${schrijft.has(it.id) ? " disabled" : ""}>${ik("sparkle")}${schrijft.has(it.id) ? "Claude is writing…" : "Draft with Claude"}</button></div>`}</div>
       ${achtergrondHTML(it.context, it.van)}
-      <div><div class="label">${ik("task")}Tasks from this email</div>
+      <details class="taken-uit"${takenOpen.has(it.id) ? " open" : ""} data-takenvan="${it.id}"><summary>${ik("task")}<span class="tk-samen">${takenSamen(it)}</span><span class="link">Edit</span></summary>
         <div class="takenlijst" style="gap:6px">${bewerkTaken(it).map((t, i) => `
           <div class="tk-rij${t.antwoord ? " tk-antwoord" : ""}">${t.antwoord ? `<span class="tk-ik" title="Drops off if you reply now with Reply in Mail or Send">${ik("reply")}</span>` : ""}<textarea class="groei" rows="1" data-tk="${i}" data-veld="omschrijving" placeholder="What needs to happen?">${esc(t.omschrijving)}</textarea>
             <input type="number" class="tk-min" min="15" max="480" step="15" data-tk="${i}" data-veld="minuten" value="${esc(String(t.minuten || ""))}" placeholder="min" aria-label="Minutes" title="Estimated minutes">
@@ -2778,7 +2850,7 @@ function tekenPaneel(it){
             <button class="ikoon rood" data-tkweg="${i}" title="Remove task">${ik("x")}</button></div>`).join("")}
           <div class="tk-erbij"><button class="knop klein" data-tkerbij="1">+ Add task</button>
             <button class="knop klein" data-klaarzetten="${it.id}" title="Move all tasks to Planning without replying now. The email and draft stay with the tasks.">${ik("calendar")}Move tasks to Planning</button></div>
-          <div class="tk-uitleg">If you reply now, the reply task drops off and the other tasks go to Planning.</div></div></div>
+          <div class="tk-uitleg">If you reply now, the reply task drops off and the other tasks go to Planning. Move tasks to Planning keeps the reply task, so the reply stays on your list.</div></div></details>
       ${beantwoord ? `</details>` : ""}
       ${!(it.actie === "agenda" || afspr[it.id]) && it.agenda ? `<div class="melding info">${ik("calendar")}<div><b>Calendar suggestion</b><br>${esc(it.agenda)}</div></div>` : ""}
       <details class="origineel" data-orig="${it.id}"><summary>${ik("mail")}Original email</summary>${p.querySelector(`details[data-orig="${it.id}"]`)?.open ? mailWeergave(it.id, it.tekst) : ""}</details>
@@ -3081,6 +3153,19 @@ async function bevestigTaak(){
   if (ok && start) verversDagen();
 }
 
+// één regel onder het concept: wat er naar Planning gaat als je antwoordt; open om te bewerken
+const takenOpen = new Set();
+function takenSamen(it){
+  const t = bewerkTaken(it).filter(x => !x.antwoord && String(x.omschrijving || "").trim());
+  if (!t.length) return `<b>Tasks</b> <span class="meta">nothing goes to Planning when you reply</span>`;
+  return `<b>Tasks</b> <span class="meta">when you reply, ${t.length === 1 ? "this goes" : "these go"} to Planning</span> ${t.map(x => `<span class="tk-chip">${esc(x.omschrijving)}${x.minuten ? ` <span class="meta">${duurTekst(Number(x.minuten))}</span>` : ""}</span>`).join("")}`;
+}
+document.addEventListener("toggle", ev => {
+  const d = ev.target;
+  if (!(d instanceof HTMLDetailsElement) || !d.dataset.takenvan) return;
+  const id = Number(d.dataset.takenvan); d.open ? takenOpen.add(id) : takenOpen.delete(id);
+  if (d.open) requestAnimationFrame(() => rekVelden(d));
+}, true);
 // taken uit een mail: bewerkbare kopie per mail, blijft bewaard als de lijst ververst
 const bewerkt = {};
 function bewerkTaken(it){
@@ -4145,12 +4230,17 @@ function bewaarBreedtes(){
   try { localStorage.setItem("mailagent-breedte", JSON.stringify(breedte)); localStorage.setItem("mailagent-ingeklapt", ingeklapt ? "1" : "0"); } catch(e){}
 }
 // ] opent of sluit de kolom Vandaag als die niet vast in beeld staat (schermen smaller dan 1440 pixels)
-function wisselDag(){ if (staat.tab !== "te_doen" || breedDag() || !drieKolommen()) return; staat.dagOpen = !staat.dagOpen; teken(); }
+function wisselDag(){
+  if (staat.tab !== "te_doen") return;
+  if (!drieKolommen()){ staat.tab = "planning"; bewaar(); return teken(); }      // telefoon: de dag staat in Planning
+  if (breedDag() && vandaagKolom()) return;                                       // de kolom staat er al
+  staat.dagOpen = !staat.dagOpen; teken();
+}
 document.addEventListener("keydown", ev => {
   if (ev.key === "]" && !(ev.target.closest && ev.target.closest("input, textarea, select")) && !ev.metaKey && !ev.ctrlKey){ ev.preventDefault(); wisselDag(); }
 });
 document.addEventListener("click", ev => {
-  if (ev.target.closest("[data-dagwissel]")){ ev.stopPropagation(); return wisselDag(); }
+  if (ev.target.closest("[data-dagwissel], [data-dagopen]")){ ev.stopPropagation(); return wisselDag(); }
   const pf = ev.target.closest("#pf-knop");
   const open = document.querySelector(".pf-menu");
   if (pf){ ev.stopPropagation(); if (open) return open.remove(); return document.getElementById("pf").insertAdjacentHTML("beforeend", projectMenu()); }
@@ -4213,8 +4303,11 @@ function tekenMenu(focusOp){
   doos.querySelector(".thema-menu")?.remove();
   const k = themaKeuze(), ins = (D && D.instellingen) || {anonimiseren: true, lokaal: false};
   const vink = (sleutel, aan, naam, uitleg) => `<button role="menuitemcheckbox" aria-checked="${aan}" class="${aan ? "aan" : ""}" data-instelling="${sleutel}" data-waarde="${aan ? 0 : 1}">${ik("check")}${naam}<span class="meta">${uitleg}</span></button>`;
+  const kol = vandaagKolom();
   doos.insertAdjacentHTML("beforeend", `<div class="thema-menu" role="menu" aria-label="Settings"><div class="menu-kop">Theme</div>${THEMAS.map(([w, naam, uitleg]) =>
     `<button role="menuitemradio" aria-checked="${w === k}" class="${w === k ? "aan" : ""}" data-thema="${w}">${ik("check")}${naam}${uitleg ? `<span class="meta">${uitleg}</span>` : ""}</button>`).join("")}
+    <div class="menu-streep"></div><div class="menu-kop">Layout</div>
+    <button role="menuitemcheckbox" aria-checked="${kol}" class="${kol ? "aan" : ""}" data-ui="vandaagkolom">${ik("check")}Today column<span class="meta">instead of Next up</span></button>
     <div class="menu-streep"></div><div class="menu-kop">Privacy and models</div>
     ${vink("anonimiseren", ins.anonimiseren, "Anonymise numbers", "student numbers, IBANs")}
     ${vink("lokaal", ins.lokaal, "Local model", "simple tasks on this Mac")}
@@ -4258,7 +4351,12 @@ document.addEventListener("change", async ev => {
   toast(j.melding, !j.ok); laad();
 });
 document.addEventListener("click", async ev => {
-  if (ev.target.closest(".thema-menu") && !ev.target.closest("[data-thema], [data-instelling]")) return;   // in het menu zelf
+  if (ev.target.closest(".thema-menu") && !ev.target.closest("[data-thema], [data-instelling], [data-ui]")) return;   // in het menu zelf
+  if (ev.target.closest("[data-ui='vandaagkolom']")){
+    try { localStorage.setItem("attache-vandaag", vandaagKolom() ? "regel" : "kolom"); } catch(e){}
+    staat.dagOpen = false; teken(); tekenMenu('[data-ui="vandaagkolom"]');
+    return toast(vandaagKolom() ? "Today is a column beside To do again." : "Today is one line above the list: Next up.", "info");
+  }
   const inst = ev.target.closest("[data-instelling]");
   if (inst){                                                   // het menu blijft open: je ziet meteen wat er veranderde
     const sleutel = inst.dataset.instelling;
