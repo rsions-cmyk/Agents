@@ -47,9 +47,17 @@ class Taak(BaseModel):
     minuten: Optional[int] = None   # geschat eigen werk; oudere items hebben dit niet
 
 
+class KeuzeTaak(BaseModel):
+    """Het werk dat volgt als de eigenaar deze optie kiest, zoals de review zelf na 'Accept'."""
+    omschrijving: str
+    minuten: Optional[int] = None
+    deadline: Optional[str] = None
+
+
 class Optie(BaseModel):
     label: str                     # op de knop, Brits Engels
     tekst: Optional[str] = None    # wat op de plek in het concept komt, in de taal van de mail
+    taak: Optional[KeuzeTaak] = None   # alleen bij een beslissing over de hele mail
 
 
 class OpenPunt(BaseModel):
@@ -152,8 +160,21 @@ SCHEMA_UITWERKING = {
                                 "label": {"type": "string", "description": "Op de knop, hoogstens vijf woorden, Brits Engels"},
                                 "tekst": {"type": ["string", "null"],
                                           "description": "Wat op de plek komt, in de taal van de mail; null bij hele_mail"},
+                                "taak": {
+                                    "anyOf": [{"type": "null"}, {
+                                        "type": "object",
+                                        "description": "Alleen bij hele_mail: het werk dat volgt als de eigenaar deze optie kiest",
+                                        "properties": {
+                                            "omschrijving": {"type": "string", "description": "Wat er moet gebeuren, Brits Engels"},
+                                            "minuten": {"type": ["integer", "null"], "description": "Geschat eigen werk in minuten"},
+                                            "deadline": {"type": ["string", "null"], "description": "YYYY-MM-DD of null"},
+                                        },
+                                        "required": ["omschrijving", "minuten", "deadline"],
+                                        "additionalProperties": False,
+                                    }],
+                                },
                             },
-                            "required": ["label", "tekst"],
+                            "required": ["label", "tekst", "taak"],
                             "additionalProperties": False,
                         },
                     },

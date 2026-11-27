@@ -174,6 +174,18 @@ main .rij[data-open]{box-shadow:inset 3px 0 0 var(--pk,transparent)}
 .chip.hoog .prio{margin:0 2px 0 0}
 /* leesbreedte: concept en mail niet breder dan ongeveer 85 tekens */
 .p-inhoud.lees > *{max-width:740px}
+.concept-vak{position:relative;border-radius:11px;background:#fdfdfc}
+:root[data-theme] .concept-vak{background:var(--input)}
+.concept-vak textarea#concept,:root[data-theme] .concept-vak textarea#concept{position:relative;z-index:1;background:transparent;resize:none;overflow:hidden;display:block}
+.concept-spiegel{position:absolute;inset:0;z-index:0;pointer-events:none;color:transparent;white-space:pre-wrap;overflow-wrap:break-word;overflow:hidden;border-style:solid;border-color:transparent;box-sizing:border-box;margin:0}
+.concept-spiegel mark{color:transparent;border-radius:3px;padding:0}
+.concept-spiegel mark.gat{background:color-mix(in srgb,var(--brass,#9C7030) 24%,transparent);box-shadow:0 2px 0 var(--brass,#9C7030)}
+.concept-spiegel mark.gevuld{background:transparent;box-shadow:0 1.5px 0 color-mix(in srgb,var(--t1,#151b21) 40%,transparent)}
+/* Send wacht op lege plekken: gestippeld en rustig, maar goed leesbaar */
+#verzenden.wacht,:root[data-theme] #verzenden.wacht:not(.bevestig){border-style:dashed;color:var(--t2,var(--zacht))}
+#verzenden{position:relative}
+#verzenden .tel{position:absolute;top:-9px;right:-7px;min-width:20px;height:20px;line-height:20px;padding:0 6px;font-size:12px;font-weight:700;text-align:center;border-radius:999px;background:var(--brass-t,#7A5520);color:var(--s1,#fff);box-shadow:0 0 0 2px var(--s1,#fff)}
+.op-chip .op-taak svg{width:12px;height:12px;vertical-align:-1px;opacity:.7}
 .mail-begin{border-left:2px solid var(--line2);padding:2px 0 2px 14px}
 .mail-begin .label{margin-bottom:4px}
 .mail-begin p{margin:0;white-space:pre-line;font-size:14px;line-height:1.55;color:var(--t1);overflow-wrap:anywhere}
@@ -1449,7 +1461,7 @@ function openPuntenHTML(it, tekst){
   const rijen = punten.map((p, i) => {
     const k = kz[i], stand = puntStand(p, k, tekst);
     const chips = (p.opties || []).map((o, j) => `<button class="op-chip${k && k.optie === j && stand === "gekozen" ? " aan" : ""}${p.suggestie === j ? " sug" : ""}"
-      data-opkies="${i}" data-optie="${j}"${p.suggestie === j ? ` title="Claude's suggestion"` : ""}>${esc(o.label)}</button>`).join("");
+      data-opkies="${i}" data-optie="${j}" title="${[p.suggestie === j ? "Claude's suggestion" : "", o.taak ? `Adds the task: ${o.taak.omschrijving}` : ""].filter(Boolean).map(esc).join(". ")}">${esc(o.label)}${o.taak ? ` <span class="op-taak" aria-hidden="true">${ik("task")}</span>` : ""}</button>`).join("");
     const eigen = k && k.optie === "eigen";
     const eigenKnop = p.soort === "keuze" ? `<button class="op-chip op-zelf${eigen && stand === "gekozen" ? " aan" : ""}" data-opkies="${i}" data-optie="eigen">Type my own…</button>` : "";
     const veld = p.soort === "invullen" || eigen
@@ -1468,7 +1480,39 @@ function openPuntenHTML(it, tekst){
     ${(nodig || bezig) && it.status !== "handmatig" ? `<div class="op-voet"><button class="knop klein" id="op-herschrijf"${bezig ? " disabled" : ""}>${ik("sparkle")}${bezig ? "Claude is rewriting…" : "Rewrite with these choices"}</button>
       <span class="meta">The draft still follows the other answer; Claude writes it again with all your choices.</span></div>` : ""}</div>`;
 }
+// Een tekstvak kan zelf niet kleuren: een spiegel eronder toont dezelfde tekst, met de lege [FILL IN]-plekken gemarkeerd en
+// wat je via een keuze invulde onderstreept. Het vak groeit mee, zodat tekst en spiegel nooit verschuiven. Send zegt hoeveel er open is.
+function werkSpiegelBij(){
+  const veld = document.getElementById("concept"), sp = document.getElementById("concept-spiegel");
+  if (!veld || !sp) return;
+  const c = getComputedStyle(veld);
+  for (const e of ["fontFamily", "fontSize", "fontWeight", "lineHeight", "letterSpacing", "paddingTop", "paddingRight", "paddingBottom", "paddingLeft",
+                   "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth", "textIndent", "wordSpacing"]) sp.style[e] = c[e];
+  const tekst = veld.value, id = Number(document.getElementById("paneel").dataset.id), kz = keuzes[id] || {}, reeksen = [];
+  const re = /\[\s*(FILL IN|AANVULLEN)[^\]]*\]/gi;
+  for (let m; (m = re.exec(tekst));) reeksen.push([m.index, m.index + m[0].length, "gat"]);
+  Object.values(kz).forEach(k => {
+    if (!k || !k.tekst) return;
+    const i = dichtstbij(tekst, k.tekst, k.pos ?? 0);
+    if (i >= 0 && !reeksen.some(r => i < r[1] && i + k.tekst.length > r[0])) reeksen.push([i, i + k.tekst.length, "gevuld"]);
+  });
+  reeksen.sort((a, b) => a[0] - b[0]);
+  let html = "", pos = 0;
+  for (const [van, tot, soort] of reeksen){ if (van < pos) continue; html += esc(tekst.slice(pos, van)) + `<mark class="${soort}">${esc(tekst.slice(van, tot))}</mark>`; pos = tot; }
+  sp.innerHTML = html + esc(tekst.slice(pos)) + "\n";
+  veld.style.height = "auto"; veld.style.height = Math.max(parseFloat(c.minHeight) || 0, veld.scrollHeight + parseFloat(c.borderTopWidth) + parseFloat(c.borderBottomWidth)) + "px";
+  const n = reeksen.filter(r => r[2] === "gat").length, s = document.getElementById("verzenden");
+  if (s && !s.classList.contains("bevestig")){
+    s.classList.toggle("wacht", n > 0);
+    let t = s.querySelector(".tel");
+    if (n){ if (!t){ t = document.createElement("span"); t.className = "tel"; s.append(t); } t.textContent = n; t.setAttribute("aria-label", `${n} to fill in`);
+      s.title = `${n === 1 ? "1 open point is" : n + " open points are"} still empty. Fill ${n === 1 ? "it" : "them"} in, then you can send`; }
+    else if (t){ t.remove(); s.title = "Send straight away; a second click confirms (⇧⌘↵)"; }
+  }
+}
+window.addEventListener("resize", () => werkSpiegelBij());
 function tekenOpenPunten(){
+  werkSpiegelBij();
   const blok = document.getElementById("op"), veld = document.getElementById("concept");
   if (!blok || !veld) return;
   const it = vindItem(Number(blok.dataset.id));
@@ -1507,7 +1551,14 @@ document.addEventListener("click", ev => {
   const optie = c.dataset.optie === "eigen" ? "eigen" : Number(c.dataset.optie);
   const veld = document.getElementById("concept"), stand = puntStand(p, oud, veld ? veld.value : "");
   if (p.soort === "hele_mail"){           // verandert het hele antwoord: onthouden, Claude herschrijft op verzoek
+    const voor = JSON.stringify(keuzeTaken(it).map(t => t.omschrijving));
     if (oud && oud.optie === optie) delete kz[i]; else kz[i] = {optie};
+    werkKeuzeTakenBij(it);
+    if (JSON.stringify(keuzeTaken(it).map(t => t.omschrijving)) !== voor){   // de taken onder het concept veranderen mee
+      const s = document.querySelector("#paneel .tk-samen"); if (s) s.innerHTML = takenSamen(it);
+      document.getElementById("paneel").dataset.sig = "";
+      if (takenOpen.has(id)) return tekenPaneel(it);                         // de open lijst opnieuw, met de nieuwe taak
+    }
     return tekenOpenPunten();
   }
   if (optie === "eigen"){
@@ -1554,7 +1605,7 @@ async function herschrijfMetKeuzes(id){
   schrijft.delete(id);
   if (!j.ok){ toast(j.melding, true); return teken(); }
   it.concept = j.concept; it.open_punten = j.open_punten || []; it.vragen = j.vragen || null;
-  delete keuzes[id]; concepten[id] = j.concept;
+  delete keuzes[id]; concepten[id] = j.concept; werkKeuzeTakenBij(it);
   const v = document.getElementById("concept");
   if (v && Number(document.getElementById("paneel").dataset.id) === id) v.value = j.concept;
   teken();
@@ -2839,7 +2890,7 @@ function tekenPaneel(it){
         ${it.vragen ? `<div class="melding" style="margin-bottom:12px">${ik("potlood")}<div><b>Your decision</b><br>${esc(it.vragen)}</div></div>` : ""}` : ""}
       ${openPuntenHTML(it, concept)}
       <div><div class="label">${ik("reply")}Draft reply</div>
-        <textarea id="concept" placeholder="${it.status === "handmatig" ? "This sender is not sent to Claude. Type your reply here." : "No draft yet. Have Claude write one, or type your own."}">${esc(concept)}</textarea>
+        <div class="concept-vak"><div class="concept-spiegel" id="concept-spiegel" aria-hidden="true"></div><textarea id="concept" placeholder="${it.status === "handmatig" ? "This sender is not sent to Claude. Type your reply here." : "No draft yet. Have Claude write one, or type your own."}">${esc(concept)}</textarea></div>
         ${it.status === "handmatig" ? "" : `<div class="c-schrijf"${concept.trim() && !schrijft.has(it.id) ? " hidden" : ""}><button class="knop" id="c-claude"${schrijft.has(it.id) ? " disabled" : ""}>${ik("sparkle")}${schrijft.has(it.id) ? "Claude is writing…" : "Draft with Claude"}</button></div>`}</div>
       ${achtergrondHTML(it.context, it.van)}
       <details class="taken-uit"${takenOpen.has(it.id) ? " open" : ""} data-takenvan="${it.id}"><summary>${ik("task")}<span class="tk-samen">${takenSamen(it)}</span><span class="link">Edit</span></summary>
@@ -2874,6 +2925,7 @@ function tekenPaneel(it){
   if (!drieKolommen()) document.getElementById("dek").classList.add("open");
   const inh = p.querySelector(".p-inhoud"); if (inh) inh.scrollTop = scroll;
   if (origOpen) p.querySelector("details.origineel").open = true;
+  werkSpiegelBij();
   if (focusId){ const f = document.getElementById(focusId); if (f) f.focus(); }
 }
 
@@ -3158,7 +3210,7 @@ const takenOpen = new Set();
 function takenSamen(it){
   const t = bewerkTaken(it).filter(x => !x.antwoord && String(x.omschrijving || "").trim());
   if (!t.length) return `<b>Tasks</b> <span class="meta">nothing goes to Planning when you reply</span>`;
-  return `<b>Tasks</b> <span class="meta">when you reply, ${t.length === 1 ? "this goes" : "these go"} to Planning</span> ${t.map(x => `<span class="tk-chip">${esc(x.omschrijving)}${x.minuten ? ` <span class="meta">${duurTekst(Number(x.minuten))}</span>` : ""}</span>`).join("")}`;
+  return `<b>Tasks</b> <span class="meta">when you reply, ${t.length === 1 ? "this goes" : "these go"} to Planning</span> ${t.map(x => `<span class="tk-chip"${x.keuzeLabel ? ` title="Because you chose ${esc(x.keuzeLabel)}"` : ""}>${x.keuzeLabel ? `<span class="meta">${esc(x.keuzeLabel)}:</span> ` : ""}${esc(x.omschrijving)}${x.minuten ? ` <span class="meta">${duurTekst(Number(x.minuten))}</span>` : ""}</span>`).join("")}`;
 }
 document.addEventListener("toggle", ev => {
   const d = ev.target;
@@ -3172,8 +3224,22 @@ function bewerkTaken(it){
   if (!bewerkt[it.id]) bewerkt[it.id] = [
     {omschrijving: `${it.actie === "delegeren" ? "Forward" : "Reply"}: ${it.onderwerp}`,
      deadline: it.deadline || "", minuten: 15, antwoord: true},
-    ...it.taken.map(t => ({omschrijving: t.omschrijving, deadline: t.deadline || "", minuten: t.minuten || ""}))];
+    ...it.taken.map(t => ({omschrijving: t.omschrijving, deadline: t.deadline || "", minuten: t.minuten || ""})),
+    ...keuzeTaken(it)];
   return bewerkt[it.id];
+}
+// de taak die hoort bij wat je bij een beslissing koos (of, zolang je niets koos, bij wat het concept zegt)
+function keuzeTaken(it){
+  const kz = keuzes[it.id] || {};
+  return (it.open_punten || []).flatMap((p, i) => {
+    if (p.soort !== "hele_mail") return [];
+    const j = kz[i] && typeof kz[i].optie === "number" ? kz[i].optie : p.suggestie, o = j != null ? (p.opties || [])[j] : null;
+    return o && o.taak ? [{omschrijving: o.taak.omschrijving, deadline: o.taak.deadline || "", minuten: o.taak.minuten || "", keuze: i, keuzeLabel: o.label}] : [];
+  });
+}
+function werkKeuzeTakenBij(it){
+  if (!bewerkt[it.id]) return;
+  bewerkt[it.id] = [...bewerkt[it.id].filter(t => t.keuze == null), ...keuzeTaken(it)];
 }
 // tekstvakken die meegroeien met hun inhoud (taken, taaktitel)
 function rekVelden(root = document){
@@ -3197,7 +3263,7 @@ document.addEventListener("change", ev => {
 });
 document.addEventListener("input", ev => {
   if (ev.target.matches && ev.target.matches("textarea.groei")) rekVelden(ev.target.parentElement);
-  if (ev.target.id === "concept"){ const k = document.querySelector(".c-schrijf"); if (k && !document.getElementById("c-claude")?.disabled) k.hidden = !!ev.target.value.trim();
+  if (ev.target.id === "concept"){ werkSpiegelBij(); const k = document.querySelector(".c-schrijf"); if (k && !document.getElementById("c-claude")?.disabled) k.hidden = !!ev.target.value.trim();
     concepten[Number(document.getElementById("paneel").dataset.id)] = ev.target.value;   // blijft staan als je even een andere mail opent
     clearTimeout(opTimer); opTimer = setTimeout(tekenOpenPunten, 200); }
   const d = ev.target.dataset;

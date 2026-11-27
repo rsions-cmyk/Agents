@@ -43,12 +43,24 @@ def schone_open_punten(concept: str | None, punten: list) -> list[OpenPunt]:
                 continue
             for o in p.opties:
                 o.tekst = None
+                if o.taak is not None:                     # werk dat volgt uit deze keuze
+                    o.taak.omschrijving = (o.taak.omschrijving or "").strip()[:200]
+                    if not o.taak.omschrijving:
+                        o.taak = None
+                        continue
+                    try:
+                        o.taak.minuten = max(15, min(480, int(o.taak.minuten))) if o.taak.minuten else None
+                    except (TypeError, ValueError):
+                        o.taak.minuten = None
+                    if o.taak.deadline and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", o.taak.deadline.strip()):
+                        o.taak.deadline = None
         else:
             if p.soort == "keuze" and not p.opties:
                 p.soort = "invullen"
             if p.soort == "invullen":
                 p.opties = []
             for o in p.opties:
+                o.taak = None                              # alleen een beslissing over de hele mail brengt werk mee
                 if o.tekst is None:
                     o.tekst = o.label
             if not p.plek or p.plek not in concept:

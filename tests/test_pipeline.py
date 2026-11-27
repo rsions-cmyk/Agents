@@ -1034,7 +1034,8 @@ def test_ochtendoverzicht_en_deadlines(omgeving, monkeypatch):
     cfg, store, bronnen = omgeving
     run(cfg, store, bronnen, NepLLM())
     vandaag = date.today()
-    morgen = (vandaag + timedelta(days=1)).isoformat()
+    # vier dagen vooruit: er zit altijd een werkdag tussen, ook als de test op vrijdagavond draait
+    morgen = (vandaag + timedelta(days=4)).isoformat()
     it = store.items(status="wacht")[0]
     zet_taken_klaar(store, bronnen, it["id"], "c", [{"omschrijving": "Rapport lezen", "deadline": morgen, "minuten": 60},
                                                      {"omschrijving": "Ooit", "deadline": "2030-01-01"}])
@@ -2127,3 +2128,25 @@ def test_begin_van_de_mail_boven_het_concept():
     lang, meer = mail_begin("woord " * 200)
     assert len(lang) <= 421 and lang.endswith("…") and meer
     assert mail_begin("") == ("", False)
+
+
+def test_beslissing_met_taak_bij_een_keuze():
+    """Een beslissing over de hele mail (Accept, Decline) kan per optie een taak meebrengen; bij andere punten niet."""
+    from mailagent.models import SCHEMA_UITWERKING
+    from mailagent.pipeline import schone_open_punten
+    concept = "Dear Editor,\n\nI am happy to review TM-1 and will report by [FILL IN: datum].\n"
+    punten = schone_open_punten(concept, [
+        {"vraag": "Accept the review?", "soort": "hele_mail", "plek": None, "suggestie": 0, "opties": [
+            {"label": "Accept", "tekst": None, "taak": {"omschrijving": "  Review manuscript TM-1 ", "minuten": 2000, "deadline": "2026-12-18"}},
+            {"label": "Decline", "tekst": None, "taak": None},
+            {"label": "Later", "tekst": None, "taak": {"omschrijving": "Review TM-1", "minuten": 0, "deadline": "next week"}}]},
+        {"vraag": "When?", "soort": "keuze", "plek": "[FILL IN: datum]", "suggestie": None, "opties": [
+            {"label": "18 Dec", "tekst": "18 December", "taak": {"omschrijving": "Mag niet", "minuten": 30, "deadline": None}}]},
+    ])
+    beslis, wanneer = punten[0], punten[1]
+    assert beslis.opties[0].taak.omschrijving == "Review manuscript TM-1" and beslis.opties[0].taak.minuten == 480
+    assert beslis.opties[0].taak.deadline == "2026-12-18" and beslis.opties[1].taak is None
+    assert beslis.opties[2].taak.minuten is None and beslis.opties[2].taak.deadline is None    # onzin wordt leeg, niet fout
+    assert wanneer.opties[0].taak is None                                                     # alleen een beslissing brengt werk mee
+    optie = SCHEMA_UITWERKING["properties"]["open_punten"]["items"]["properties"]["opties"]["items"]
+    assert "taak" in optie["required"] and optie["properties"]["taak"]["anyOf"][0] == {"type": "null"}
