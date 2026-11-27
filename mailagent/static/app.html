@@ -115,6 +115,7 @@ main{min-width:0;padding:24px 28px 120px}
 /* detailpaneel */
 .dek{position:fixed;inset:0;background:rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .2s}
 .dek.open{opacity:1;pointer-events:auto}
+.paneel:not(.open){box-shadow:none!important}
 .paneel{position:fixed;top:0;right:0;height:100vh;width:min(620px,100vw);background:var(--vlak);border-left:1px solid var(--lijn);box-shadow:-8px 0 32px rgba(0,0,0,.12);transform:translateX(100%);transition:transform .22s ease;display:flex;flex-direction:column;z-index:10}
 .paneel.open{transform:none}
 .p-kop{padding:18px 20px 14px;border-bottom:1px solid var(--lijn);display:flex;gap:12px;align-items:flex-start}
@@ -692,7 +693,7 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
   .voet-acties:has([data-maaktaak].hoofd) #gedaan .lbl,.voet-acties:has([data-maaktaak].hoofd) #goedkeuren .lbl{display:none}
 }
 @container paneel (max-width: 600px){
-  .p-voet .knop:not(.hoofd) .lbl, .p-voet .knop kbd{display:none}   /* smal: alleen iconen, uitleg via de tooltip */
+  .p-voet .knop:not(.hoofd):not(#verzenden) .lbl, .p-voet .knop kbd{display:none}   /* smal: alleen iconen, uitleg via de tooltip; Send blijft benoemd */
 }
 .meer-knop{display:none}
 @container paneel (max-width: 560px){
@@ -997,6 +998,8 @@ main{grid-row:2;grid-column:2 / -1;min-width:0}
   .balk{bottom:72px}
   /* een open paneel vult het scherm: de onderbalk wijkt, zodat de knoppen onderaan bereikbaar zijn (terug met ×) */
   .app:has(#paneel.open) .zij{display:none}
+  .afs-vrij span{display:none}
+  .afs .rek{display:none}
   .paneel{height:100dvh}
   .p-voet{padding-bottom:max(12px, env(safe-area-inset-bottom))}
 }
@@ -1539,8 +1542,9 @@ function toast(tekst, fout, knop){
   if(!tekst) return;
   const knoppen = !knop ? [] : Array.isArray(knop) ? knop : [knop];
   const t = document.createElement("div");
-  t.className = "toast" + (fout ? " fout" : "") + (knoppen.length > 1 ? " veel" : "");
-  t.innerHTML = ik(fout ? "alert" : "check") + `<div>${esc(tekst)}</div>` +
+  const info = fout === "info";                // mededeling of vraag: geen vinkje, geen alarm
+  t.className = "toast" + (fout && !info ? " fout" : "") + (knoppen.length > 1 ? " veel" : "");
+  t.innerHTML = (info ? ik("eye") : ik(fout ? "alert" : "check")) + `<div>${esc(tekst)}</div>` +
     (knoppen.length ? `<div class="knoppen">${knoppen.map((k, i) => `<button class="knop" data-i="${i}"${k.label === "Undo" ? ' title="Undo (Z)"' : ""}>${esc(k.label)}</button>`).join("")}</div>` : "");
   t.querySelectorAll("button").forEach(b => b.addEventListener("click", () => { t.remove(); knoppen[Number(b.dataset.i)].doe(); }));
   const bak = document.getElementById("toasts");
@@ -2056,6 +2060,7 @@ function tekenLeegPaneel(){
   const p = document.getElementById("paneel");
   p.dataset.id = ""; p.dataset.sleutel = ""; p.dataset.lees = ""; p.dataset.sig = "";
   const klaar = staat.tab === "te_doen" && !teDoen().length;
+  if (staat.tab === "te_doen" && staat.td === "afgehandeld" && !filter(D.afgehandeld || []).length){ p.innerHTML = `<div class="leegpaneel"></div>`; return; }
   p.innerHTML = `<div class="leegpaneel">
       ${klaar ? `<img class="leeg-teken" src="/merk.svg" alt="" width="96" height="96"><b style="color:var(--tekst)">All caught up</b>Nothing is waiting for you.` :
         staat.tab === "opruimen" ? `${ik("sparkle")}<b style="color:var(--tekst)">Tidy up</b><p>Click an email to read it. Tick emails to handle several at once.</p>` :
@@ -3326,14 +3331,14 @@ document.addEventListener("click", async ev => {
     const id = Number(document.getElementById("paneel").dataset.id);
     const goed = t.id === "goedkeuren";
     if (!document.getElementById("concept").value.trim()){
-      toast("The draft is empty. Type your reply first, or press D if this email needs no reply.", true);
+      toast("The draft is empty. Type your reply first, or press D if this email needs no reply.", "info");
       return document.getElementById("concept").focus();
     }
     const plekken = (document.getElementById("concept").value.match(/\[\s*(FILL IN|AANVULLEN)[^\]]*\]/gi) || []).length;
     if (plekken && !(nogLeeg.id === id && Date.now() - nogLeeg.tijd < 8000)){
       nogLeeg = {id, tijd: Date.now()};
       document.getElementById("op")?.scrollIntoView({block: "nearest", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
-      return toast(`${plekken === 1 ? "1 open point is" : plekken + " open points are"} still empty. Press ⌘↵ again to open the draft in Mail as it is.`, false,
+      return toast(`${plekken === 1 ? "1 open point is" : plekken + " open points are"} still empty. Press ⌘↵ again to open the draft in Mail as it is.`, "info",
                    {label: "Open in Mail anyway", doe: () => document.getElementById("goedkeuren")?.click()});
     }
     nogLeeg = {id: null, tijd: 0};
@@ -3484,7 +3489,7 @@ document.addEventListener("keydown", ev => {
     if (ev.key === "e") return verplaats(doel, "archief");
     if (ev.key === "#"){ ev.preventDefault(); return verplaats(doel, "prullenbak"); }
     if (ev.key === "v"){ ev.preventDefault(); return openKiezer(doel[0], document.querySelector('#paneel [data-opbergen]'), doel); }
-    if (ev.key === "t" && id !== null) return staat.gekozen.size ? toast("A task is made from one email. Clear the selection first (Esc).") : openTaak(id);
+    if (ev.key === "t" && id !== null) return staat.gekozen.size ? toast("A task is made from one email. Clear the selection first (Esc).", "info") : openTaak(id);
     if (ev.key === " " && id !== null){ ev.preventDefault(); staat.gekozen.has(id) ? staat.gekozen.delete(id) : staat.gekozen.add(id); staat.anker = id; return teken(); }
     return;
   }
@@ -3582,7 +3587,7 @@ function tekenPlanning(){
         <b>${esc(dagLabel)}</b>
         <button class="ikoon" data-pldag="1" title="Next day">${ik("chevron")}</button>
         <button class="knop klein" data-pldag="0">Today</button>
-        <span class="meta" style="margin-left:auto">${plaatsing ? "Move the block, then Schedule" : gekozenKaart ? "Tap a time to place the task" : "Drag a task to a time, or select it and press Enter"}</span></div>
+        <span class="meta" style="margin-left:auto">${plaatsing ? "Move the block, then Schedule" : gekozenKaart ? "Tap a time to place the task" : matchMedia("(pointer: coarse)").matches ? "Tap a task, then tap a time" : "Drag a task to a time, or select it and press Enter"}</span></div>
       ${t ? `<div class="plaatsbalk">${ik("calendar")}<span class="pb-tekst"><b>${esc(t.omschrijving)}</b>${plaatsing.verzet ? " · reschedule" : ""} · ${blokTijdVan(plaatsing.start, plaatsing.minuten)}${plBotsingen().length ? ` · <span style="color:var(--hoog)">overlaps with ${esc(botsTekst(plBotsingen()))}</span>` : ""}</span>
           <span class="pb-velden"><input type="date" id="pl-datum-in" value="${isoDag(new Date(plaatsing.start))}" aria-label="Date">
             <input type="time" id="pl-tijd-in" step="900" value="${tijdVan(plaatsing.start)}" aria-label="Start time">
@@ -3770,7 +3775,7 @@ function startPlaatsing(id, opties = {}){
   plaatsing = {id, minuten: duur, start, verzet: !!opties.verzet};
   gekozenKaart = null; sluitPop(); teken(); focusBlok();
   spreek(`${t.omschrijving}: ${blokTijdVan(start, duur)}.${!opties.start && vrijMoment.vol ? " No free time left this day that fits." : ""} Arrow keys to move, Enter to schedule.`);
-  if (!opties.start && vrijMoment.vol) toast("No free time left this day that fits. Move the block, or press → for the next day.");
+  if (!opties.start && vrijMoment.vol) toast("No free time left this day that fits. Move the block, or press → for the next day.", "info");
 }
 function zetPlaatsing(start, minuten){
   const t = D.taken.find(x => x.id === plaatsing.id);
