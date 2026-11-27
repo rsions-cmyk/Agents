@@ -530,7 +530,7 @@ def maak_handler(cfg: Config, store: Store, bronnen: dict, llm_factory):
                                    + " and ".join(delen))
                 elif actie == "afwijzen":
                     wijs_af(store, int(v["id"]))
-                    melding = "Dismissed"
+                    melding = "Marked as a wrong suggestion"
                 elif actie == "niet-afgewezen":
                     melding = zet_afwijzen_terug(store, int(v["id"]))
                 elif actie in ("taak-klaar", "taak-heropen"):

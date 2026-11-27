@@ -62,7 +62,7 @@ main{min-width:0;padding:24px 28px 120px}
 .lijst{background:var(--vlak);border:1px solid var(--lijn);border-radius:14px;overflow:hidden;box-shadow:var(--schaduw)}
 .groep{margin-bottom:22px}
 .groep-kop{display:flex;align-items:center;gap:10px;margin:0 4px 8px}
-.groep-kop h2{font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--zacht);margin:0;font-weight:650}
+.groep-kop h2{font-size:14px;color:var(--t2,var(--zacht));margin:0;font-weight:600}
 .groep-kop .acties{margin-left:auto;display:flex;gap:6px}
 
 .rij{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--lijn);cursor:pointer;position:relative}
@@ -127,7 +127,7 @@ main{min-width:0;padding:24px 28px 120px}
 .melding svg{color:var(--let);margin-top:1px}
 .melding.info{background:var(--accent-zacht)}.melding.info svg{color:var(--accent)}
 .melding.fout{background:color-mix(in srgb,var(--hoog) 12%,transparent)}.melding.fout svg{color:var(--hoog)}
-.label{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.05em;color:var(--zacht);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.label{font-size:13px;font-weight:600;color:var(--t2,var(--zacht));margin-bottom:6px;display:flex;align-items:center;gap:6px}
 textarea{width:100%;min-height:220px;resize:vertical;font:14px/1.55 inherit;font-family:inherit;padding:12px 14px;border:1px solid var(--lijn);border-radius:11px;background:var(--vlak2);color:var(--tekst)}
 textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:transparent}
 .takenlijst{display:flex;flex-direction:column;gap:6px}
@@ -140,6 +140,13 @@ details.origineel{scroll-margin-top:12px}
 .lees-sel .link{margin-left:auto;white-space:nowrap;font-size:12.5px;color:var(--t2);text-decoration:underline;text-underline-offset:2px}
 .lees-sel .link:hover{color:var(--t1)}
 .chips .projectkies{min-height:28px}
+main .rij[data-open]{box-shadow:inset 3px 0 0 var(--pk,transparent)}
+:root[data-theme] main .rij[data-open],:root[data-theme] main .rij[data-open].gekozen{box-shadow:inset 3px 0 0 var(--pk,transparent)}
+.melding.prive{border-left-color:var(--t2,var(--zacht))}
+.melding.prive svg{color:var(--t2,var(--zacht))}
+.chip.hoog .prio{margin:0 2px 0 0}
+/* leesbreedte: concept en mail niet breder dan ongeveer 85 tekens */
+.p-inhoud.lees > *{max-width:740px}
 .mail-begin{border-left:2px solid var(--line2);padding:2px 0 2px 14px}
 .mail-begin .label{margin-bottom:4px}
 .mail-begin p{margin:0;white-space:pre-line;font-size:14px;line-height:1.55;color:var(--t1);overflow-wrap:anywhere}
@@ -247,7 +254,7 @@ details.origineel pre{white-space:pre-wrap;font:13px/1.5 -apple-system,sans-seri
 .af-wie{font-weight:600;margin-bottom:8px}
 .af-vw{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;font-size:13px;color:var(--zacht);margin-bottom:6px}
 .af-vw input,.af-vw select{font:inherit;padding:5px 8px;border:1px solid var(--lijn);border-radius:8px;background:var(--vlak2);color:var(--tekst)}
-.af-kop{font-size:11px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--zacht);margin:10px 0 4px}
+.af-kop{font-size:12.5px;font-weight:600;color:var(--zacht);margin:10px 0 4px}
 .af-r{display:flex;align-items:center;gap:10px;padding:5px 2px;font-size:13.5px;cursor:pointer}
 .af-r>span:nth-of-type(1){flex:1}
 .af-niet{cursor:default;color:var(--zacht)}
@@ -333,7 +340,7 @@ div.pop-les{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 details.achtergrond{font-size:13px;color:var(--zacht)}
 details.achtergrond summary{cursor:pointer;display:flex;align-items:center;gap:6px}
 details.achtergrond summary svg{width:14px;height:14px;flex:none}
-.ag-kop{font-size:11px;font-weight:650;letter-spacing:.05em;text-transform:uppercase;margin:8px 0 2px}
+.ag-kop{font-size:12.5px;font-weight:600;margin:8px 0 2px}
 .ag-r{display:flex;gap:10px;padding:2px 0}
 .ag-r .meta{width:52px;flex:none}
 .vandaag{border:1px solid var(--lijn);border-radius:var(--r2, 12px);background:var(--vlak);box-shadow:var(--schaduw);padding:10px 14px;margin:0 0 14px}
@@ -387,7 +394,7 @@ details.regels summary svg{width:14px;height:14px;vertical-align:-2px;margin-rig
 .kiezer{position:fixed;z-index:40;width:min(380px,calc(100vw - 32px));max-height:min(460px,70vh);display:flex;flex-direction:column;background:var(--vlak);border:1px solid var(--lijn);border-radius:14px;box-shadow:0 16px 48px rgba(0,0,0,.22);overflow:hidden}
 .kiezer input{font:inherit;border:0;border-bottom:1px solid var(--lijn);padding:12px 14px;background:var(--vlak);color:var(--tekst);outline:none}
 .kiezer .opties{overflow-y:auto;padding:6px}
-.kiezer .kop2{font-size:11px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--zacht);padding:8px 8px 4px}
+.kiezer .kop2{font-size:12.5px;font-weight:600;color:var(--zacht);padding:8px 8px 4px}
 .kiezer .optie{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:8px 10px;border-radius:8px;color:var(--tekst)}
 .kiezer .optie svg{color:var(--zacht);width:16px;height:16px}
 .kiezer .optie .pad{color:var(--zacht);font-size:12px}
@@ -397,7 +404,7 @@ details.regels summary svg{width:14px;height:14px;vertical-align:-2px;margin-rig
 .kiezer .voet{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--lijn);font-size:12px;color:var(--zacht)}
 
 /* zijbalk-koppen */
-.nav-kop{font-size:11px;font-weight:650;text-transform:uppercase;letter-spacing:.06em;color:var(--zacht);padding:14px 10px 4px}
+.nav-kop{font-size:12.5px;font-weight:600;color:var(--zacht);padding:14px 10px 4px}
 .kop-tel{color:var(--zacht);font-weight:550}
 .leegpaneel{margin:auto;text-align:center;color:var(--zacht);padding:40px 24px;display:flex;flex-direction:column;align-items:center;gap:10px;max-width:420px}
 .leegpaneel p{margin:0;text-wrap:balance}
@@ -575,7 +582,7 @@ button:active{transform:scale(.98)}
 .p-inhoud{padding:18px 22px;gap:16px;animation:inkomen var(--gewoon) ease}
 @keyframes inkomen{from{opacity:.4;transform:translateY(4px)}}
 .melding{border-radius:var(--r1);font-size:13.5px}
-.label{font-size:11px;letter-spacing:.07em}
+.label{font-size:13px;letter-spacing:0}
 /* schrijfvak altijd licht en groter: proeflezen gaat beter met donkere tekst op een licht vlak */
 textarea#concept,#a-tekst{background:#fdfdfc;color:#151b21;border-color:#dde1dc;font-size:15px;line-height:1.6;padding:14px 16px;min-height:240px;color-scheme:light}
 textarea#concept::placeholder,#a-tekst::placeholder{color:#8a929b}
@@ -688,19 +695,29 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
 @container paneel (max-width: 820px){
   .voet-acties .knop kbd{display:none}                                /* eerst de toetsen weg, de woorden blijven */
 }
-@container paneel (max-width: 900px){
-  /* is Create task de hoofdknop, dan staan Done en Reply in Mail als icoon: alles op één regel */
-  .voet-acties:has([data-maaktaak].hoofd) #gedaan .lbl,.voet-acties:has([data-maaktaak].hoofd) #goedkeuren .lbl{display:none}
-}
 @container paneel (max-width: 600px){
-  .p-voet .knop:not(.hoofd):not(#verzenden) .lbl, .p-voet .knop kbd{display:none}   /* smal: alleen iconen, uitleg via de tooltip; Send blijft benoemd */
+  .lees-voet .knop .lbl, .lees-voet .knop kbd{display:none}   /* Tidy up smal: alleen iconen, uitleg via de tooltip */
 }
-.meer-knop{display:none}
-@container paneel (max-width: 560px){
+.altijd-meer{display:none!important}
+.lees-voet .meer-knop{display:none}
+/* links een stille rij, rechts altijd Done, Reply in Mail en Send op dezelfde plek; alleen de vulling wisselt */
+.voet-acties .groepje.stil{gap:2px}
+:root[data-theme] .voet-acties .stil .knop:not(.hoofd){border-color:transparent;background:transparent;color:var(--t2)}
+:root[data-theme] .voet-acties .stil .knop:not(.hoofd):hover{background:var(--s2);color:var(--t1)}
+.voet-acties .groepje.vast{margin-left:auto}
+@container paneel (max-width: 640px){
+  /* smal: Create task, File en Archive gaan in More; Done, Reply in Mail en Send houden hun woord en hun plek */
   .p-voet .in-meer{display:none}
   .p-voet .meer-knop{display:inline-flex}
-  .voet-acties{flex-wrap:nowrap}
-  .voet-acties .groepje{flex-wrap:nowrap}
+  .p-voet.voet-acties{flex-wrap:nowrap}
+  .p-voet.voet-acties .groepje{flex-wrap:nowrap}
+}
+@container paneel (max-width: 420px){
+  .p-voet.voet-acties{padding-left:14px;padding-right:14px;gap:6px}
+  .p-voet.voet-acties .groepje{flex-wrap:nowrap;gap:4px}
+  .p-voet.voet-acties .knop{padding:8px 9px}
+  .voet-acties .stil .knop.hoofd .lbl{display:none}
+  .voet-acties .lbl-rest{display:none}        /* telefoon: Reply, de tooltip zegt dat het in Mail opent */
 }
 .meer-menu{position:fixed;z-index:80;min-width:220px;background:var(--s1,var(--vlak));border:1px solid var(--line2,var(--lijn));border-radius:10px;box-shadow:var(--pop,0 8px 30px rgba(0,0,0,.18));padding:4px;display:flex;flex-direction:column}
 .meer-menu button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 10px;border-radius:7px;font-size:14px;color:var(--t1,var(--tekst))}
@@ -708,9 +725,7 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
 .meer-menu button svg{width:16px;height:16px;flex:none}
 @media (pointer:coarse){ .meer-menu kbd{display:none} }
 .meer-menu kbd{margin-left:auto;font-size:11px;padding:1px 6px;border-radius:5px;background:color-mix(in srgb,currentColor 10%,transparent)}
-@container paneel (max-width: 380px){
-  .p-voet .knop.hoofd .lbl{display:none}
-}
+
 .voet-acties .groepje{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .voet-acties .groepje:last-child{margin-left:auto}
 .knop.ikoonknop{padding:8px 10px}
@@ -750,7 +765,7 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
 .zoek kbd{flex:none}
 .zoek:focus-within kbd{display:none}
 .zoek-res{position:absolute;top:calc(100% + 6px);left:-1px;right:-1px;max-height:min(70vh,560px);overflow:auto;background:var(--vlak2);border:1px solid var(--lijn);border-radius:12px;box-shadow:var(--schaduw);padding:6px;z-index:60}
-.zr-kop{font-size:11.5px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--zacht);padding:8px 10px 4px}
+.zr-kop{font-size:12.5px;font-weight:600;color:var(--zacht);padding:8px 10px 4px}
 .zr-rij{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:8px 10px;border-radius:8px;color:var(--tekst)}
 .zr-rij.aan,.zr-rij:hover{background:var(--vlak3)}
 .zr-rij .avatar svg{width:14px;height:14px;color:#fff}
@@ -893,7 +908,7 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
 .thema-knop{display:flex;align-items:center;gap:8px;width:100%;padding:6px 10px;border-radius:var(--r1);color:var(--t2);font-size:12.5px}
 .thema-knop:hover{background:var(--hover);color:var(--t1)}
 .thema-menu{position:absolute;bottom:calc(100% + 6px);left:0;width:300px;background:var(--s1);border:1px solid var(--line2);border-radius:10px;box-shadow:var(--pop);padding:4px;z-index:70}
-.thema-menu .menu-kop{font-size:11px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);padding:6px 10px 2px}
+.thema-menu .menu-kop{font-size:12.5px;font-weight:600;color:var(--t3);padding:6px 10px 2px}
 .thema-menu .menu-streep{height:1px;background:var(--line);margin:4px 6px}
 .thema-menu .menu-noot{font-size:12px;line-height:1.45;color:var(--t2);padding:4px 10px 8px}
 .thema-menu .menu-noot code{font-size:11.5px}
@@ -913,14 +928,18 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
 .zij .logo .blok.merk,.zij .logo .blok.merk svg.merkteken{width:36px;height:36px}
 .kop-merk{font-size:21px;white-space:nowrap}
 .kop-streep{flex:none;width:1px;height:20px;background:var(--line2)}
-.zij .nav{width:46px;flex-direction:column;justify-content:center;gap:3px;padding:8px 0 6px;border-radius:10px;position:relative}
-.zij .nav .navtekst{display:none}
-.zij .nav .tel{margin:0;font-size:11px;line-height:1;padding:0;min-width:0}
+.zij .nav{width:58px;display:grid;grid-template-columns:auto auto;justify-content:center;align-items:center;column-gap:3px;row-gap:4px;padding:8px 0 7px;border-radius:10px;position:relative}
+.zij .nav svg{grid-column:1;grid-row:1}
+.zij .nav .navtekst{display:block;grid-column:1 / -1;grid-row:2;font-size:11px;line-height:1.1;font-weight:500;text-align:center;color:var(--t2);white-space:nowrap}
+.zij .nav.actief .navtekst{color:var(--t1);font-weight:600}
+.zij .nav .tel{grid-column:2;grid-row:1;margin:0;font-size:11px;line-height:1;padding:0;min-width:0}
 .zij .nav .nav-dot{position:absolute;top:6px;right:9px;margin:0}
 .zij .nav-kop{display:none}
 .zij .onder{margin-top:auto;align-items:center;width:100%}
-.zij .thema-knop{justify-content:center;width:44px;padding:8px 0;margin:0 auto}
+.zij .thema-knop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:58px;padding:8px 0 7px;margin:0 auto;border-radius:10px}
 .zij .thema-knop .navtekst{display:none}
+.rail-woord{display:none}
+.zij .thema-knop .rail-woord{display:block;font-size:11px;line-height:1.1;font-weight:500;color:var(--t2)}
 .zij .thema-menu{left:calc(100% + 6px);bottom:0}
 /* bovenbalk */
 .topbalk{grid-row:1;grid-column:2 / -1;position:sticky;top:0;z-index:20;height:52px;display:flex;align-items:center;gap:12px;padding:0 20px;background:var(--canvas);border-bottom:1px solid var(--line);min-width:0}
@@ -1019,7 +1038,7 @@ main{grid-row:2;grid-column:2 / -1;min-width:0}
 </div>
     <div id="nav" style="display:contents"></div>
     <div class="onder">
-      <div class="thema" id="thema"><button class="thema-knop" id="thema-knop" title="Settings: theme, anonymising, local model" aria-haspopup="menu"><span data-ikoon="thema"></span><span class="navtekst" id="thema-naam">Automatic</span></button></div>
+      <div class="thema" id="thema"><button class="thema-knop" id="thema-knop" title="Settings: theme, anonymising, local model" aria-haspopup="menu"><span data-ikoon="tandwiel"></span><span class="navtekst" id="thema-naam">Automatic</span><span class="rail-woord">Settings</span></button></div>
     </div>
   </aside>
   <header class="topbalk" id="topbalk">
@@ -1103,6 +1122,10 @@ function opstartWeg(meteen){
 const post = (naam, data) => api("/api/"+naam, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data||{})});
 const IKONEN = {
   thema:'<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor" stroke="none"/>',
+  tandwiel:'<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+  bezem:'<path d="M14.5 9.5 21 3"/><path d="M9 9l6 6"/><path d="M9 9l-5.2 5.2a2 2 0 0 0 0 2.8l3.2 3.2a2 2 0 0 0 2.8 0L15 15"/><path d="M6.5 16.5l1.5 1.5"/>',
+  slot:'<rect x="5" y="11" width="14" height="9.5" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  potlood:'<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
   inbox:'<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/>',
   refresh:'<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>',
   meer:'<circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/>',
@@ -1402,7 +1425,7 @@ function openPuntenHTML(it, tekst){
   }).join("");
   // herschrijven is alleen nodig als je bij een beslissing over de hele mail iets anders koos dan het concept zegt
   const nodig = punten.some((p, i) => p.soort === "hele_mail" && kz[i] && kz[i].optie !== p.suggestie), bezig = schrijft.has(it.id);
-  return `<div class="op" id="op" data-id="${it.id}"><div class="label">${ik("alert")}Open points<span class="op-tel">${nOpen ? `${nOpen} to fill in` : "nothing left to fill in"}</span></div>${rijen}
+  return `<div class="op" id="op" data-id="${it.id}"><div class="label">${ik("potlood")}Open points<span class="op-tel">${nOpen ? `${nOpen} to fill in` : "nothing left to fill in"}</span></div>${rijen}
     ${(nodig || bezig) && it.status !== "handmatig" ? `<div class="op-voet"><button class="knop klein" id="op-herschrijf"${bezig ? " disabled" : ""}>${ik("sparkle")}${bezig ? "Claude is rewriting…" : "Rewrite with these choices"}</button>
       <span class="meta">The draft still follows the other answer; Claude writes it again with all your choices.</span></div>` : ""}</div>`;
 }
@@ -1622,7 +1645,7 @@ function teken(){
   const tel = n => n === "alles" ? alleWacht.length : alleWacht.filter(i => i.project === n).length;
   const inPlan = filter(D.taken, true).filter(t => !t.gepland).length;
   const opruimN = filter(D.info).length + filter(D.overgeslagen).length;
-  const weergaven = [["te_doen","inbox","To do",teDoen().length],["planning","calendar","Planning",inPlan],["opruimen","sparkle","Tidy up",opruimN]];
+  const weergaven = [["te_doen","inbox","To do",teDoen().length],["planning","calendar","Planning",inPlan],["opruimen","bezem","Tidy up",opruimN]];
   document.getElementById("nav").innerHTML =
     weergaven.map(([k,i,l,n]) => `<button class="nav${staat.tab===k?" actief":""}" data-tab="${k}"${staat.tab===k ? ' aria-current="page"' : ""} aria-label="${l}${n ? ", " + n : ""}" title="${l}${n ? " · " + n : ""}">${ik(i)}<span class="navtekst">${l}</span>${n ? `<span class="tel">${n}</span>` : ""}${k === "te_doen" && heeftUrgent() ? `<span class="nav-dot" title="Something needs attention"></span>` : ""}</button>`).join("");
   projectMenu = () => `<div class="pf-menu" role="menu">`
@@ -1807,7 +1830,7 @@ function sluitMeer(terug){
 }
 function openMeer(knop){
   sluitMeer();
-  const voet = knop.closest(".p-voet"), doelen = [...voet.querySelectorAll(".in-meer")].filter(b => !b.disabled);
+  const voet = knop.closest(".p-voet"), doelen = [...voet.querySelectorAll(".in-meer, .altijd-meer")].filter(b => !b.disabled && b.offsetParent === null);
   if (!doelen.length) return;
   const m = document.createElement("div");
   m.className = "meer-menu"; m.setAttribute("role", "menu"); m.knop = knop;
@@ -1868,7 +1891,7 @@ function leesVoetHTML(id){
 // ---------------- Afgehandeld: terugvinden wat je uit Te doen haalde ----------------
 const detailCache = {};     // id -> volledige mail met je antwoord en taken
 const AFG = {gedaan:["check","Done"], goedgekeurd:["mail","Reply in Mail"], verzonden:["forward","Sent"],
-             afgewezen:["x","Dismissed"], taak:["task","Task created"], gearchiveerd:["archive","Archived"],
+             afgewezen:["x","Wrong suggestion"], taak:["task","Task created"], gearchiveerd:["archive","Archived"],
              opgeborgen:["folder","Filed"], verwijderd:["trash","In Bin"], verplaatst:["folder","Moved in Mail"], ter_info:["eye","FYI"],
              genegeerd:["ban","Skipped"], wacht:["inbox","In To do"], fout:["alert","In To do"], handmatig:["inbox","In To do"]};
 const afgLabel = it => { const [i, l] = AFG[it.status] || ["mail", it.status];
@@ -2078,7 +2101,7 @@ function tekenLeegPaneel(){
         staat.tab === "te_doen" && staat.td === "afgehandeld" ? `${ik("check")}<b style="color:var(--tekst)">Handled</b><p>Email you cleared from To do in the past three weeks. Click one to see what you did with it, or move it back.</p>` :
         `${ik("mail")}<b style="color:var(--tekst)">Choose an email</b>`}
       <div class="sneltoetsen"><span><kbd>J</kbd> <kbd>K</kbd> next, previous</span><span><kbd>⌘</kbd><kbd>↵</kbd> reply in Mail</span><span><kbd>⇧⌘↵</kbd> send</span><span><kbd>D</kbd> done</span>
-        <span><kbd>V</kbd> file</span><span><kbd>E</kbd> archive</span><span><kbd>#</kbd> Bin</span><span><kbd>T</kbd> task</span><span><kbd>X</kbd> dismiss</span>
+        <span><kbd>V</kbd> file</span><span><kbd>E</kbd> archive</span><span><kbd>#</kbd> Bin</span><span><kbd>T</kbd> task</span><span><kbd>X</kbd> wrong suggestion</span>
         <span><kbd>1</kbd>–<kbd>${D.projecten.length}</kbd> project</span><span><kbd>?</kbd> all shortcuts</span></div>
       ${klaar ? `<div class="leeg-merk"><span class="woordmerk">attach<span class="woordmerk-e">é</span></span><span class="tagline">Minding the details.</span></div>` : ""}</div>`;
   p.classList.add("open"); p.setAttribute("aria-hidden","false");
@@ -2515,13 +2538,14 @@ function tekenBeoordelen(items){
     const dl = it.deadline ? ` · ${new Date(it.deadline + "T12:00").toLocaleDateString("en-GB",{day:"numeric",month:"short"})}` : "";
     const chips = [];
     if (it.lijkt_beantwoord) chips.push(`<span class="chip ok">${ik("check")}Looks answered</span>`);
-    if (it.status === "fout" || it.status === "handmatig") chips.push(`<span class="chip let">${ik("alert")}Check it yourself</span>`);
+    if (it.status === "handmatig") chips.push(`<span class="chip">${ik("slot")}Private sender</span>`);
+    else if (it.status === "fout") chips.push(`<span class="chip let">${ik("alert")}Check it yourself</span>`);
     else if (it.vragen) chips.push(`<span class="chip let">Decision${dl}</span>`);
     else chips.push(`<span class="chip">${ik(ai)}${al}${dl}</span>`);
-    return `<div class="rij${staat.open===it.id?" gekozen":""}${isUrgent(it) ? " urg" : ""}" data-open="${it.id}" tabindex="0">
+    return `<div class="rij${staat.open===it.id?" gekozen":""}" data-open="${it.id}" tabindex="0" style="--pk:${kleur(it.project)}">
       ${avatar(it)}
       <div class="midden">
-        <div class="regel1"><span class="van">${it.belangrijk ? `<span class="vip" title="Important sender">${ik("ster")}</span>` : ""}${esc(a.naam)}${it.prioriteit === "hoog" ? `<span class="prio" title="High priority"></span>` : ""}</span><span class="datum">${datum(it.datum)}</span></div>
+        <div class="regel1"><span class="van">${it.belangrijk ? `<span class="vip" title="Important sender">${ik("ster")}</span>` : ""}${esc(a.naam)}${it.prioriteit === "hoog" || isUrgent(it) ? `<span class="prio" title="${it.prioriteit === "hoog" ? "High priority" : "Needs you soon"}" role="img" aria-label="${it.prioriteit === "hoog" ? "High priority" : "Needs you soon"}"></span>` : ""}</span><span class="datum">${datum(it.datum)}</span></div>
         <div class="onderwerp">${esc(it.onderwerp)}</div>
         <div class="samenvatting">${esc(it.samenvatting && it.samenvatting !== it.onderwerp ? it.samenvatting : (it.opmerking || ""))}</div>
         <div class="chips">${chips.join("")}</div>
@@ -2581,7 +2605,7 @@ function tekenAntwoord(){
       <div class="chips"><span class="chip">${ik("task")}${esc(t.omschrijving)}</span></div></div>
       <button class="ikoon" id="sluit" title="Close (Esc)">${ik("x")}</button></div>
     <div class="p-inhoud">
-      ${antwoord.vragen ? `<div class="melding">${ik("alert")}<div><b>Your decision</b><br>${esc(antwoord.vragen)}</div></div>` : ""}
+      ${antwoord.vragen ? `<div class="melding">${ik("potlood")}<div><b>Your decision</b><br>${esc(antwoord.vragen)}</div></div>` : ""}
       <div><div class="label">${ik("reply")}Reply</div>
         <textarea id="a-tekst" placeholder="Type your reply, or have Claude write a draft.">${esc(tekst)}</textarea></div>
       <div><button class="knop" id="a-claude" ${antwoord.laden ? "disabled" : ""}>${ik("sparkle")}${antwoord.laden ? "Claude is writing…" : "Draft with Claude"}</button></div>
@@ -2722,10 +2746,10 @@ function tekenPaneel(it){
             title="${it.belangrijk ? "Important sender: click to remove" : "Mark as important sender: always in To do, with a notification on your Mac"}">${ik("ster")}</button></div>
         <div class="chips"><select class="projectkies" data-projectkies="${it.id}" style="background-color:${kleur(it.project)}" aria-label="Project">
             ${D.projecten.map((pr, i) => `<option value="${esc(pr.naam)}"${pr.naam===it.project?" selected":""}>${esc(naamProject(pr.naam))} (${i+1})</option>`).join("")}</select>
-          <span class="chip">${ik(ai)}${al}</span>${it.prioriteit==="hoog"?`<span class="chip hoog">${ik("alert")}High</span>`:""}
+          <span class="chip">${ik(ai)}${al}</span>${it.prioriteit==="hoog"?`<span class="chip hoog"><span class="prio" aria-hidden="true"></span>High priority</span>`:""}
           ${it.deadline?`<span class="chip">${ik("clock")}${esc(dagKort(it.deadline))}</span>${it.deadline_in_agenda ? `<span class="chip">${ik("calendar")}in calendar</span>` : D.agenda_aan ? `<button class="knop klein" data-deadlineagenda="${it.id}" data-soort="mail" title="All-day event, marked private, with a reminder at 09:00 the day before">Add to calendar</button>` : ""}`:""}</div></div>
       <button class="ikoon sluit-mail" id="sluit" title="Close (Esc)">${ik("x")}</button></div>
-    <div class="p-inhoud">
+    <div class="p-inhoud lees">
       ${beantwoord ? `<div class="lijktgedaan">${ik("check")}<div><b>Looks answered.</b> ${esc(it.lijkt_beantwoord)}
           ${it.jouw_antwoord && it.jouw_antwoord.tekst ? `<div class="jouw-antwoord">${esc(it.jouw_antwoord.tekst)}</div>` : ""}</div>
         <button class="knop klein goed" data-gedaanmelding="1">Done</button>
@@ -2733,13 +2757,14 @@ function tekenPaneel(it){
       ${it.terug_in_inbox && !beantwoord ? `<div class="melding info">${ik("inbox")}<div><b>Back in your inbox.</b> You moved this email back to your inbox ${wanneerTerug(it.terug_in_inbox)}.
           ${it.eigen_antwoord ? `<details class="al-beantwoord"><summary>Your earlier reply</summary><div class="jouw-antwoord">${esc(it.eigen_antwoord)}</div></details>` : ""}</div></div>` : ""}
       ${it.samenvatting && it.samenvatting !== it.onderwerp ? `<div class="melding info">${ik("sparkle")}<div>${esc(it.samenvatting)}</div></div>` : ""}
-      ${zelf ? `<div class="melding fout">${ik("alert")}<div>${esc(it.opmerking || it.reden || "Check this email yourself.")}</div></div>` : ""}
+      ${it.status === "handmatig" ? `<div class="melding prive">${ik("slot")}<div><b>Private sender.</b> Claude never sees this email; write the reply yourself.</div></div>`
+        : zelf ? `<div class="melding fout">${ik("alert")}<div>${esc(it.opmerking || it.reden || "Check this email yourself.")}</div></div>` : ""}
       ${it.begin && !beantwoord ? `<div class="mail-begin"><div class="label">${ik("mail")}${esc(a.naam || a.adres)} wrote</div>
         <p>${esc(it.begin)}</p>${it.begin_meer ? `<button class="link" data-heelmail="${it.id}">Read the whole email</button>` : ""}</div>` : ""}
-      ${it.vragen && !beantwoord ? `<div class="melding">${ik("alert")}<div><b>Your decision</b><br>${esc(it.vragen)}</div></div>` : ""}
+      ${it.vragen && !beantwoord ? `<div class="melding">${ik("potlood")}<div><b>Your decision</b><br>${esc(it.vragen)}</div></div>` : ""}
       ${!beantwoord && (it.actie === "agenda" || afspr[it.id]) ? afspraakHTML(it) : ""}
       ${beantwoord ? `<details class="al-beantwoord"${zelfdeMail && p.querySelector("details.al-beantwoord")?.open ? " open" : ""}><summary>Show draft, background and tasks anyway</summary>
-        ${it.vragen ? `<div class="melding" style="margin-bottom:12px">${ik("alert")}<div><b>Your decision</b><br>${esc(it.vragen)}</div></div>` : ""}` : ""}
+        ${it.vragen ? `<div class="melding" style="margin-bottom:12px">${ik("potlood")}<div><b>Your decision</b><br>${esc(it.vragen)}</div></div>` : ""}` : ""}
       ${openPuntenHTML(it, concept)}
       <div><div class="label">${ik("reply")}Draft reply</div>
         <textarea id="concept" placeholder="${it.status === "handmatig" ? "This sender is not sent to Claude. Type your reply here." : "No draft yet. Have Claude write one, or type your own."}">${esc(concept)}</textarea>
@@ -2759,17 +2784,17 @@ function tekenPaneel(it){
       <details class="origineel" data-orig="${it.id}"><summary>${ik("mail")}Original email</summary>${p.querySelector(`details[data-orig="${it.id}"]`)?.open ? mailWeergave(it.id, it.tekst) : ""}</details>
     </div>
     <div class="p-voet voet-acties">
-      <div class="groepje">
+      <div class="groepje stil">
         <button class="knop meer-knop ikoonknop" aria-haspopup="menu" aria-expanded="false" title="More actions">${ik("meer")}</button>
         <button class="knop${hoofd === "taak" ? " hoofd" : " ikoonknop in-meer"}" data-maaktaak="${it.id}" title="Create and schedule task (T)" data-naam="Create task">${ik("calendar")}${hoofd === "taak" ? `<span class="lbl">Create task</span>` : ""}<kbd>T</kbd></button>
-        ${it.actie === "agenda" ? "" : `<button class="knop ikoonknop in-meer" data-afsprladen="${it.id}" title="Schedule a meeting with the sender" data-naam="Schedule a meeting">${ik("mensen")}</button>`}
         <button class="knop ikoonknop in-meer" data-opbergen="${it.id}" title="File in a folder (V)" data-naam="File in a folder">${ik("folder")}<kbd>V</kbd></button>
         <button class="knop ikoonknop in-meer" data-een="archief" data-id="${it.id}" title="Archive without replying (E)" data-naam="Archive">${ik("archive")}<kbd>E</kbd></button>
-        <button class="knop ikoonknop in-meer" id="afwijzen" title="Dismiss: the suggestion is wrong (X)" data-naam="Dismiss">${ik("x")}<kbd>X</kbd></button>
-        <button class="knop${hoofd === "gedaan" ? " hoofd" : ""}" id="gedaan" title="Done: no reply needed. You can then archive or file the email (D; Shift+D picks a folder straight away)">${ik("check")}<span class="lbl">Done</span><kbd>D</kbd></button>
+        ${it.actie === "agenda" ? "" : `<button class="knop ikoonknop altijd-meer" data-afsprladen="${it.id}" title="Schedule a meeting with the sender" data-naam="Schedule a meeting">${ik("mensen")}</button>`}
+        <button class="knop ikoonknop altijd-meer" id="afwijzen" title="Wrong suggestion: Claude misread this email; it stays in your inbox (X)" data-naam="Wrong suggestion">${ik("x")}<kbd>X</kbd></button>
       </div>
-      <div class="groepje">
-        <button class="knop${hoofd === "antwoord" ? " hoofd" : ""}" id="goedkeuren" title="Prepare a reply with this text in Apple Mail; you send it from there (⌘↵)">${ik("reply")}<span class="lbl">Reply in Mail</span><kbd>⌘↵</kbd></button>
+      <div class="groepje vast">
+        <button class="knop${hoofd === "gedaan" ? " hoofd" : ""}" id="gedaan" title="Done: no reply needed. You can then archive or file the email (D; Shift+D picks a folder straight away)">${ik("check")}<span class="lbl">Done</span><kbd>D</kbd></button>
+        <button class="knop${hoofd === "antwoord" ? " hoofd" : ""}" id="goedkeuren" title="Prepare a reply with this text in Apple Mail; you send it from there (⌘↵)">${ik("reply")}<span class="lbl">Reply<span class="lbl-rest"> in Mail</span></span><kbd>⌘↵</kbd></button>
         <button class="knop" id="verzenden" title="Send straight away; a second click confirms (⇧⌘↵)">${ik("forward")}<span class="lbl">Send</span><kbd>⇧⌘↵</kbd></button>
       </div>
     </div>`;
@@ -3336,7 +3361,7 @@ document.addEventListener("click", async ev => {
     const j = await stil("afwijzen", {id});
     verborgen.delete(id);
     if (!j.ok){ toast(j.melding, true); staat.open = id; teken(); return; }
-    toast("Dismissed: Claude's suggestion was wrong. The email stays in your inbox.", false, {label: "Undo", doe: async () => {
+    toast("Marked as a wrong suggestion. The email stays in your inbox.", false, {label: "Undo", doe: async () => {
       const r = await stil("niet-afgewezen", {id}); toast(r.melding, !r.ok); staat.open = id; laad(); }});
     laad();
     return;
@@ -3447,7 +3472,7 @@ function toonSneltoetsen(){
     <dt><kbd>#</kbd></dt><dd>Move to Bin</dd>
     <dt><kbd>T</kbd></dt><dd>Create and schedule task</dd>
     <dt><kbd>↵</kbd> in Planning</dt><dd>Pick a time for a task; arrows move it, ↵ schedules</dd>
-    <dt><kbd>X</kbd></dt><dd>Dismiss</dd>
+    <dt><kbd>X</kbd></dt><dd>Wrong suggestion: Claude misread the email, it stays in your inbox (also under More ⋯)</dd>
     <dt><kbd>1</kbd>–<kbd>${D ? D.projecten.length : 4}</kbd></dt><dd>Change project</dd>
     <dt><kbd>[</kbd></dt><dd>Collapse or expand sidebar</dd>
     <dt>Shift-click</dt><dd>Select a range (Tidy up)</dd>
@@ -4172,7 +4197,7 @@ werkPaneelInertBij();
 })();
 
 // ---------------- thema: Automatic (Paper overdag, Dark 's avonds via macOS), Paper, Light, Dark ----------------
-const THEMAS = [["auto", "Automatic", "follows macOS"], ["paper", "Paper", ""], ["light", "Light", ""], ["dark", "Dark", ""]];
+const THEMAS = [["auto", "Automatic", "follows macOS"], ["paper", "Paper", ""], ["light", "Sand", "warmer, a little darker"], ["dark", "Dark", ""]];
 const donkerSysteem = window.matchMedia ? matchMedia("(prefers-color-scheme: dark)") : null;
 function themaKeuze(){ try { return localStorage.getItem("attache-thema") || "auto"; } catch(e){ return "auto"; } }
 function pasThemaToe(){
