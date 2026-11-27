@@ -138,6 +138,7 @@ details.origineel{scroll-margin-top:12px}
 .lees-sel svg{width:14px;height:14px;flex:none;margin-top:2px}
 .lees-sel .link{margin-left:auto;white-space:nowrap;font-size:12.5px;color:var(--t2);text-decoration:underline;text-underline-offset:2px}
 .lees-sel .link:hover{color:var(--t1)}
+.chips .projectkies{min-height:28px}
 .mail-begin{border-left:2px solid var(--line2);padding:2px 0 2px 14px}
 .mail-begin .label{margin-bottom:4px}
 .mail-begin p{margin:0;white-space:pre-line;font-size:14px;line-height:1.55;color:var(--t1);overflow-wrap:anywhere}
@@ -719,6 +720,7 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
 .overlay{position:fixed;inset:0;background:rgba(10,14,18,.35);display:grid;place-items:center;z-index:50;animation:inkomen var(--snel) ease}
 .overlay .vel{background:var(--vlak);border-radius:16px;box-shadow:var(--schaduw-hoog);padding:22px 24px;width:min(520px,calc(100vw - 32px))}
 .overlay h3{margin:0 0 12px;font-size:16px}
+.overlay .vel-kop{font-size:17px;margin:0 0 12px}
 .overlay dl{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;margin:0}
 .overlay dt{text-align:right}
 .overlay dd{margin:0;color:var(--zacht)}
@@ -767,19 +769,19 @@ textarea.groei{resize:none;overflow:hidden;min-height:0;line-height:1.45;font:in
    Messing alleen voor wat nu gebeurt, wat aandacht vraagt en de ene hoofdknop. Selectie is neutraal. */
 :root[data-theme]{--font:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--r1:8px;--r2:10px}
 :root[data-theme=paper]{--canvas:#F6F2E9;--s1:#FDFBF6;--s2:#F1EBDD;--hover:#F7F3EA;--input:#FFFFFF;--line:#E6DECD;--line2:#D3C8B2;
-  --t1:#0E131C;--t2:#525967;--t3:#7D7768;--brass:#9C7030;--brass-t:#7A5520;--fill:#C9A052;--fill-b:#9C7030;--on:#0E131C;
+  --t1:#0E131C;--t2:#525967;--t3:#6F695B;--brass:#9C7030;--brass-t:#7A5520;--fill:#C9A052;--fill-b:#9C7030;--on:#0E131C;
   --hatch:rgba(14,19,28,.045);--papier:#FFFFFF;--pop:0 8px 24px rgba(0,0,0,.06);color-scheme:light;
   --onderwijs:#4F6488;--onderzoek:#6B5880;--istte:#4E7466;--overig:#7D7768}
 :root[data-theme=light]{--canvas:#F2EAD9;--s1:#E8DEC8;--s2:#D9CCB0;--hover:#E1D6BE;--input:#F8F3E8;--line:#D6C9AE;--line2:#C4B494;
-  --t1:#0E131C;--t2:#4D5461;--t3:#7D7768;--brass:#9C7030;--brass-t:#7A5520;--fill:#C9A052;--fill-b:#9C7030;--on:#0E131C;
+  --t1:#0E131C;--t2:#4D5461;--t3:#605A4D;--brass:#9C7030;--brass-t:#7A5520;--fill:#C9A052;--fill-b:#9C7030;--on:#0E131C;
   --hatch:rgba(14,19,28,.05);--papier:#FBF8F1;--pop:0 8px 24px rgba(0,0,0,.08);color-scheme:light;
   --onderwijs:#4F6488;--onderzoek:#6B5880;--istte:#4E7466;--overig:#7D7768}
 :root[data-theme=dark]{--canvas:#0E131C;--s1:#1C2534;--s2:#243044;--hover:#202A3C;--input:#151C28;--line:#283142;--line2:#374154;
-  --t1:#F2EAD9;--t2:#9BA3B0;--t3:#6B7482;--brass:#D4A853;--brass-t:#E2BE76;--fill:linear-gradient(#E6C27A,#B98A3E);--fill-b:#B98A3E;--on:#0E131C;
+  --t1:#F2EAD9;--t2:#A8AFBA;--t3:#8A93A1;--brass:#D4A853;--brass-t:#E2BE76;--fill:linear-gradient(#E6C27A,#B98A3E);--fill-b:#B98A3E;--on:#0E131C;
   --hatch:rgba(242,234,217,.06);--papier:#F7F2E7;--pop:0 8px 24px rgba(0,0,0,.12);color-scheme:dark;
   --onderwijs:#8094B5;--onderzoek:#9C8AAE;--istte:#7FA394;--overig:#6B7482}
 :root[data-theme]{--bg:var(--s1);--vlak:var(--s1);--vlak2:var(--hover);--vlak3:var(--canvas);--tekst:var(--t1);--zacht:var(--t2);--lijn:var(--line);
-  --accent:var(--t1);--accent-zacht:var(--s2);--accent-sterk:var(--t1);--ok:var(--t2);--ok-zacht:var(--s2);--hoog:var(--brass);
+  --accent:var(--t1);--accent-zacht:var(--s2);--accent-sterk:var(--t1);--ok:var(--t2);--ok-zacht:var(--s2);--hoog:var(--brass-t);
   --let:var(--t2);--let-zacht:transparent;--overleg:var(--t2);--afdeling:var(--t2);--schaduw:none;--schaduw-hoog:var(--pop)}
 :root[data-theme] body{background:var(--s1);color:var(--t1)}
 :root[data-theme] :focus-visible{outline:2px solid var(--t1);outline-offset:2px}
@@ -1005,7 +1007,7 @@ main{grid-row:2;grid-column:2 / -1;min-width:0}
 <div class="opstart" id="opstart" aria-hidden="true"><img src="/merk.svg" alt="" width="112" height="112"><span class="woordmerk">attach<span class="woordmerk-e">é</span></span><span class="opstart-regel">Minding the details.</span></div>
 <script>requestAnimationFrame(function(){requestAnimationFrame(function(){window.opstartVanaf=performance.now()})})</script>
 <div class="app" id="app">
-  <aside class="zij">
+  <aside class="zij" aria-label="Navigation">
     <div class="logo"><span class="blok merk"><svg class="merkteken" aria-hidden="true" viewBox="0 0 512 512"><defs>
 <linearGradient id="ambg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#243047"/><stop offset="1" stop-color="#10151f"/></linearGradient>
 <linearGradient id="amms" gradientUnits="userSpaceOnUse" x1="180" y1="0" x2="330" y2="0"><stop offset="0" stop-color="#b98a35"/><stop offset=".5" stop-color="#f3dd9a"/><stop offset="1" stop-color="#b48434"/></linearGradient>
@@ -1036,9 +1038,9 @@ main{grid-row:2;grid-column:2 / -1;min-width:0}
   <main>
     <div id="inhoud"></div>
   </main>
-  <aside class="paneel" id="paneel" aria-hidden="true"></aside>
+  <aside class="paneel" id="paneel" aria-hidden="true" aria-label="Email"></aside>
   <aside class="dagkol" id="dagkol" aria-label="Today"></aside>
-  <div class="greep" id="greep-lijst" title="Drag to resize; double-click to reset" role="separator" aria-orientation="vertical"></div>
+  <div class="greep" id="greep-lijst" title="Drag to resize; double-click to reset" role="separator" aria-orientation="vertical" aria-valuemin="280" aria-valuemax="900" aria-valuenow="360"></div>
 </div>
 
 <div class="dek" id="dek"></div>
@@ -1962,7 +1964,7 @@ function tekenZoek(){
   const kop = {mail:"Email", wacht:"Awaiting reply", taak:"Tasks"};
   let vorige = "", html = "";
   alle.forEach((r, n) => {
-    if (r.soort !== vorige){ html += `<div class="zr-kop">${kop[r.soort]}</div>`; vorige = r.soort; }
+    if (r.soort !== vorige){ html += `${vorige ? "</div>" : ""}<div role="group" aria-label="${kop[r.soort]}"><div class="zr-kop" aria-hidden="true">${kop[r.soort]}</div>`; vorige = r.soort; }
     const x = r.x, aan = n === zoekKeuze ? " aan" : "";
     if (r.soort === "mail"){
       const a = afzender(x.van), [i, l] = afgLabel(x);
@@ -1976,7 +1978,10 @@ function tekenZoek(){
         <span class="zr-r2">${x.klaar ? "Ticked off" : x.gepland ? "Scheduled " + kortDatum(x.gepland.slice(0, 10)) : "To schedule"}</span></span></button>`;
     }
   });
-  box.innerHTML = html;
+  box.innerHTML = html + (vorige ? "</div>" : "");
+  box.setAttribute("role", "listbox"); box.setAttribute("aria-label", "Search results");
+  box.querySelectorAll(".zr-rij").forEach(r => { r.id = "zr-" + r.dataset.zr; r.setAttribute("aria-selected", r.classList.contains("aan")); });
+  zoekVeld().setAttribute("aria-activedescendant", "zr-" + zoekKeuze); zoekVeld().setAttribute("aria-controls", "zoekres");
   box.querySelector(".zr-rij.aan")?.scrollIntoView({block:"nearest"});
 }
 async function zoek(q){
@@ -2895,7 +2900,7 @@ function tijdlijnHTML(){
           <b>${esc(document.getElementById("t-titel")?.value || taak.voorstel.titel)}</b><span id="tb-tijd">${blokTijd()}</span><div class="rek"></div></div>`;
   const heledag = lijst.filter(a => a.heledag);
   return (heledag.length ? `<div class="heledag">${heledag.map(a => `<span>${esc(a.titel)}</span>`).join("")}</div>` : "") +
-    `<div class="tijdlijn" id="tijdlijn"><div class="tl-binnen" id="tl-binnen" data-van="${van}" style="height:${(tot-van)*PX}px">${h}</div></div>` +
+    `<div class="tijdlijn" id="tijdlijn" tabindex="0" aria-label="Day view"><div class="tl-binnen" id="tl-binnen" data-van="${van}" style="height:${(tot-van)*PX}px">${h}</div></div>` +
     (bots.length ? `<div class="melding fout">${ik("alert")}<div>Overlaps with ${esc(bots.map(a => a.titel).join(", "))}</div></div>` : "");
 }
 
@@ -2944,14 +2949,14 @@ function tekenTaak(){
     const dagLabel = taak.dag ? new Date(taak.dag + "T12:00").toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"}) : "";
     p.innerHTML = kop + `<div class="p-inhoud">
       <div class="melding info">${ik("sparkle")}<div>${esc(v.toelichting)}</div></div>
-      <div class="veld"><div class="label">Task</div><textarea class="groei" rows="1" id="t-titel">${esc(document.getElementById("t-titel")?.value ?? v.titel)}</textarea></div>
+      <div class="veld"><label class="label" for="t-titel">Task</label><textarea class="groei" rows="1" id="t-titel">${esc(document.getElementById("t-titel")?.value ?? v.titel)}</textarea></div>
       <div class="taak-grid">
       <div class="taak-velden">
       <div class="veld"><div class="label">${ik("clock")}Estimated time</div>
         <div class="keuzes">${duren.map(d => `<button class="keuze${d===taak.minuten?" aan":""}" data-duur="${d}">${duurTekst(d)}</button>`).join("")}</div></div>
-      <div class="veld"><div class="label">${ik("task")}What to do (one step per line)</div>
+      <div class="veld"><label class="label" for="t-stappen">${ik("task")}What to do (one step per line)</label>
         <textarea id="t-stappen">${esc(document.getElementById("t-stappen")?.value ?? v.stappen.join("\n"))}</textarea></div>
-      <div class="veld"><div class="label">Deadline</div><input type="date" id="t-deadline" value="${esc(document.getElementById("t-deadline")?.value ?? (v.deadline || ""))}"></div>
+      <div class="veld"><label class="label" for="t-deadline">Deadline</label><input type="date" id="t-deadline" value="${esc(document.getElementById("t-deadline")?.value ?? (v.deadline || ""))}"></div>
       ${it.status === "ter_info" || it.status === "genegeerd" ? `<label class="vinkregel"><input type="checkbox" class="vink" id="t-archief" ${taak.archiveren?"checked":""}> Archive email (stays linked to the task)</label>` : ""}
       </div>
       <div class="veld taak-plan"><div class="label">${ik("calendar")}Schedule in your calendar</div>
@@ -3395,7 +3400,7 @@ function toonSneltoetsen(){
   const o = document.createElement("div");
   o.className = "overlay";
   o.setAttribute("role", "dialog"); o.setAttribute("aria-modal", "true"); o.setAttribute("aria-label", "Keyboard shortcuts");
-  o.innerHTML = `<div class="vel"><h3>Keyboard shortcuts</h3><dl>
+  o.innerHTML = `<div class="vel"><h2 class="vel-kop">Keyboard shortcuts</h2><dl>
     <dt><kbd>J</kbd> <kbd>K</kbd></dt><dd>Next and previous email</dd>
     <dt><kbd>⌘</kbd> <kbd>↵</kbd></dt><dd>Prepare reply in Apple Mail</dd>
     <dt><kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>↵</kbd></dt><dd>Send straight away (press twice: the second press confirms)</dd>
@@ -3521,7 +3526,7 @@ function tekenPlanning(){
         ingepland = taken.filter(t => t.gepland).sort((a, b) => a.gepland.localeCompare(b.gepland));
   const totaal = open.reduce((a, t) => a + (t.minuten || 30), 0);
   const kaart = (t, plan) => `
-    <div class="kaart${plan ? " ingepland" : ""}${gekozenKaart === t.id || (plaatsing && plaatsing.id === t.id) ? " gekozen" : ""}" ${plan ? `data-gepland="${t.id}"` : `data-kaart="${t.id}" tabindex="0" role="button" aria-label="${esc(t.omschrijving)}, ${duurTekst(t.minuten || 30)}. Press Enter to pick a time" title="Drag to a time, or press Enter to pick one"`}>
+    <div class="kaart${plan ? " ingepland" : ""}${gekozenKaart === t.id || (plaatsing && plaatsing.id === t.id) ? " gekozen" : ""}" ${plan ? `data-gepland="${t.id}"` : `data-kaart="${t.id}" tabindex="0" role="group" aria-roledescription="task" aria-label="${esc(t.omschrijving)}, ${duurTekst(t.minuten || 30)}. Press Enter to pick a time" title="Drag to a time, or press Enter to pick one"`}>
       <div class="r"><button class="rondje" data-klaar="${t.id}" title="Tick off">${ik("check")}</button>
         <span class="stip" style="background:${kleur(t.project)}"></span><span class="titel">${esc(t.omschrijving)}</span></div>
       ${t.stappen && t.stappen.length ? `<ul class="stappen-klein">${t.stappen.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
@@ -4070,6 +4075,7 @@ function zetBreedtes(){
   const app = document.getElementById("app");
   app.style.setProperty("--zij-b", "64px");
   app.style.setProperty("--lijst-b", breedte.lijst + "px");
+  document.getElementById("greep-lijst")?.setAttribute("aria-valuenow", breedte.lijst);
 }
 function bewaarBreedtes(){
   try { localStorage.setItem("mailagent-breedte", JSON.stringify(breedte)); localStorage.setItem("mailagent-ingeklapt", ingeklapt ? "1" : "0"); } catch(e){}
