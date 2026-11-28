@@ -464,6 +464,40 @@ details.regels summary svg{width:14px;height:14px;vertical-align:-2px;margin-rig
 .opstart .opstart-regel{font-size:14px;color:var(--t2);opacity:0;transition:opacity .45s ease .6s}
 .opstart.letter .woordmerk,.opstart.letter .opstart-regel{opacity:1}
 .opstart.weg{opacity:0;pointer-events:none}
+.opstart-intro{display:flex;gap:8px;margin-top:18px;opacity:0;transition:opacity .45s ease .9s}
+.opstart.letter .opstart-intro{opacity:1}
+.opstart-intro .stil-link{font:inherit;font-size:13.5px;color:var(--t2);text-decoration:underline;text-underline-offset:2px;background:none;border:0;cursor:pointer;padding:4px}
+.opstart:not(.eerste) .opstart-intro .knop{display:none}
+.opstart.eerste .opstart-intro .stil-link{display:none}
+/* introductie */
+#intro{position:fixed;inset:0;z-index:500}
+#intro .intro-vang{position:absolute;inset:0;background:transparent}
+#intro.midden .intro-vang{background:rgba(14,19,28,.55)}
+#intro .intro-licht{position:fixed;border-radius:12px;box-shadow:0 0 0 9999px rgba(14,19,28,.55),inset 0 0 0 2px var(--brass,#9C7030);transition:left .35s ease,top .35s ease,width .35s ease,height .35s ease;pointer-events:none}
+#intro .intro-kaart{position:fixed;width:min(380px,calc(100vw - 32px));background:var(--s1,#fff);color:var(--t1,#0E131C);border-radius:14px;box-shadow:0 14px 44px rgba(0,0,0,.28);padding:14px 16px 12px;transition:left .35s ease,top .35s ease;outline:none}
+#intro.midden .intro-kaart{left:50%!important;top:50%!important;transform:translate(-50%,-50%);width:min(460px,calc(100vw - 32px))}
+.intro-balk{display:flex;gap:3px;margin-bottom:10px}
+.intro-balk span{flex:1;height:3px;border-radius:2px;background:color-mix(in srgb,var(--t1,#0E131C) 14%,transparent);overflow:hidden}
+.intro-balk span.klaar{background:var(--brass,#9C7030)}
+.intro-balk span i{display:block;height:100%;width:0;background:var(--brass,#9C7030)}
+@keyframes intro-vul{from{width:0}to{width:100%}}
+.intro-deel{font-size:12.5px;color:var(--t3,#6F695B);font-weight:600}
+.intro-titel{font-size:18px;line-height:1.25;margin:4px 0 6px;letter-spacing:-.01em}
+.intro-tekst{font-size:14.5px;line-height:1.5;color:var(--t2,#525967);margin:0}
+.intro-toetsen{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 8px;margin-top:12px}
+.intro-toetsen:empty{display:none}
+.intro-toetsen span{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--t2,#525967)}
+.intro-toetsen kbd{align-self:flex-start;font-weight:600;font-size:13px;line-height:1;padding:5px 8px;border-radius:6px;border:1px solid var(--line2,#D3C8B2);background:var(--s2,#F1EBDD);color:var(--t1,#0E131C)}
+.intro-knoppen{display:flex;gap:6px;align-items:center;margin-top:12px}
+.intro-knoppen .knop svg{width:16px;height:16px}
+.intro-ruimte{flex:1}
+.intro-cursor{position:fixed;width:22px;height:22px;margin:-3px 0 0 -4px;transition:left .7s cubic-bezier(.3,.7,.2,1),top .7s cubic-bezier(.3,.7,.2,1);pointer-events:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))}
+.intro-cursor svg{width:22px;height:22px;fill:#fff;stroke:#0E131C;stroke-width:1.6}
+.intro-cursor.tik::after{content:"";position:absolute;left:-9px;top:-9px;width:24px;height:24px;border-radius:50%;border:2px solid var(--brass,#9C7030);animation:intro-tik .32s ease-out}
+@keyframes intro-tik{from{transform:scale(.4);opacity:1}to{transform:scale(1.6);opacity:0}}
+@media (max-width:760px){ #intro .intro-kaart,#intro.midden .intro-kaart{left:16px!important;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));top:auto!important;width:auto;transform:none}
+  #intro.boven .intro-kaart{top:calc(12px + env(safe-area-inset-top,0px))!important;bottom:auto} }
+@media (prefers-reduced-motion:reduce){ #intro .intro-licht,#intro .intro-kaart,.intro-cursor{transition:none} }
 @keyframes opstart-in{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}
 .leeg-merk .tagline{font-size:12.5px;letter-spacing:.01em;color:var(--zacht)}
 .sneltoetsen{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--zacht);justify-content:center;max-width:360px}
@@ -1065,7 +1099,8 @@ main{grid-row:2;grid-column:2 / -1;min-width:0}
 </style>
 </head>
 <body>
-<div class="opstart" id="opstart" aria-hidden="true"><img src="/merk.svg" alt="" width="112" height="112"><span class="woordmerk">attach<span class="woordmerk-e">é</span></span><span class="opstart-regel">Minding the details.</span></div>
+<div class="opstart" id="opstart" aria-hidden="true"><img src="/merk.svg" alt="" width="112" height="112"><span class="woordmerk">attach<span class="woordmerk-e">é</span></span><span class="opstart-regel">Minding the details.</span>
+  <div class="opstart-intro"><button class="knop goed" id="intro-start">Watch the introduction · 2 min</button><button class="knop" id="intro-sla">Skip</button><button class="stil-link" id="intro-link">Watch the introduction</button></div></div>
 <script>requestAnimationFrame(function(){requestAnimationFrame(function(){window.opstartVanaf=performance.now()})})</script>
 <div class="app" id="app">
   <aside class="zij" aria-label="Navigation">
@@ -1143,20 +1178,28 @@ if (opstart && !document.documentElement.classList.contains("al-gestart")){
   const letter = document.fonts && document.fonts.load ? document.fonts.load('34px "Young Serif"').catch(() => {}) : Promise.resolve();
   Promise.race([letter, new Promise(r => setTimeout(r, 400))]).then(() => opstart.classList.add("letter"));
   setTimeout(() => opstartWeg(), 5000);   // hoe dan ook weg, ook als de app niet bereikbaar is
-  const overslaan = () => opstartWeg(true);
+  const overslaan = ev => { if (ev && ev.target && ev.target.closest && ev.target.closest(".opstart-intro")) return; opstartWeg(true); };
   opstart.addEventListener("pointerdown", overslaan);
   document.addEventListener("keydown", overslaan, {once: true});
+  let eersteKeer = false; try { eersteKeer = !localStorage.getItem("attache-intro-gezien"); } catch(e){}
+  if (eersteKeer){ opstart.classList.add("eerste"); opstart.removeAttribute("aria-hidden"); setTimeout(() => document.getElementById("intro-start")?.focus(), 900); }
+  const begin = () => { const ga = () => (typeof D !== "undefined" && D) ? (opstartWeg(true), startIntro()) : setTimeout(ga, 200); ga(); };
+  document.getElementById("intro-start").addEventListener("click", begin);
+  document.getElementById("intro-link").addEventListener("click", begin);
+  document.getElementById("intro-sla").addEventListener("click", () => { try { localStorage.setItem("attache-intro-gezien", "1"); } catch(e){} opstartWeg(true); });
 }
 function opstartWeg(meteen){
   if (!opstart || !opstart.isConnected) return;
+  if (!meteen && opstart.classList.contains("eerste")) return;     // de eerste keer: wachten tot je kiest
   if (opstartKlaar && !meteen) return;
   opstartKlaar = true;
   try { sessionStorage.setItem("attache-opgestart", "1"); } catch(e){}
   if (document.documentElement.classList.contains("al-gestart")) return opstart.remove();
   const gezien = window.opstartVanaf != null ? performance.now() - window.opstartVanaf : 0;
   clearTimeout(opstart._t);
-  opstart._t = setTimeout(() => { opstart.classList.add("weg"); setTimeout(() => opstart.remove(), 550); },
-                          meteen ? 0 : Math.max(0, OPSTART_MIN - gezien));
+  const weg = () => { if (!meteen && opstart.querySelector(".opstart-intro:hover, .opstart-intro :focus")){ opstart._t = setTimeout(weg, 400); return; }   // je wijst de link aan: even blijven
+    opstart.classList.add("weg"); setTimeout(() => opstart.remove(), 550); };
+  opstart._t = setTimeout(weg, meteen ? 0 : Math.max(0, OPSTART_MIN - gezien));
 }
 const post = (naam, data) => api("/api/"+naam, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data||{})});
 const IKONEN = {
@@ -1261,6 +1304,7 @@ const filter = (lijst, taken) => lijst.filter(i => !(taken ? takenVerborgen : ve
 let peilTimer = null;   // één timer, hoe vaak laad() ook wordt aangeroepen
 let afsSleep = null, negeerKlik = false;   // een blok in Planning wordt versleept
 async function laad(){
+  if (intro) return;                      // de clip draait op voorbeeldmail; daarna verversen we weer
   clearTimeout(peilTimer);
   try {
     const r = await api("/api/data");
@@ -1882,6 +1926,7 @@ async function openLees(id){
 
 const gelezenGestuurd = new Set();
 function zetGelezen(id){
+  if (id < 0) return;                     // voorbeeldmail uit de introductie
   const it = vindItem(id);
   if (!it || it.gelezen || gelezenGestuurd.has(id)) return;
   gelezenGestuurd.add(id);
@@ -3639,6 +3684,7 @@ function toonSneltoetsen(){
     <dt><kbd>⇧</kbd> <kbd>J</kbd> <kbd>K</kbd></dt><dd>Extend selection</dd>
     <dt><kbd>⌘</kbd> <kbd>A</kbd></dt><dd>Select everything in Tidy up</dd>
     <dt><kbd>Esc</kbd></dt><dd>Close</dd>
+    <dt>Introduction</dt><dd>Settings (the gear), Introduction</dd>
     <dt><kbd>Z</kbd></dt><dd>Undo the last action (as long as its message shows)</dd>
     <dt><kbd>?</kbd></dt><dd>This overview</dd></dl>
     <div style="text-align:right;margin-top:12px"><button class="knop klein" id="sneltoetsen-dicht">Close</button></div></div>`;
@@ -4382,6 +4428,7 @@ function tekenMenu(focusOp){
     `<button role="menuitemradio" aria-checked="${w === k}" class="${w === k ? "aan" : ""}" data-thema="${w}">${ik("check")}${naam}${uitleg ? `<span class="meta">${uitleg}</span>` : ""}</button>`).join("")}
     <div class="menu-streep"></div><div class="menu-kop">Layout</div>
     <button role="menuitemcheckbox" aria-checked="${kol}" class="${kol ? "aan" : ""}" data-ui="vandaagkolom">${ik("check")}Today column<span class="meta">instead of Next up</span></button>
+    <button role="menuitem" class="intro-item" data-ui="intro">${ik("eye")}Introduction<span class="meta">2 min</span></button>
     <div class="menu-streep"></div><div class="menu-kop">Privacy and models</div>
     ${vink("anonimiseren", ins.anonimiseren, "Anonymise numbers", "student numbers, IBANs")}
     ${vink("lokaal", ins.lokaal, "Local model", "simple tasks on this Mac")}
@@ -4426,6 +4473,7 @@ document.addEventListener("change", async ev => {
 });
 document.addEventListener("click", async ev => {
   if (ev.target.closest(".thema-menu") && !ev.target.closest("[data-thema], [data-instelling], [data-ui]")) return;   // in het menu zelf
+  if (ev.target.closest("[data-ui='intro']")){ sluitMenu(); return startIntro(); }
   if (ev.target.closest("[data-ui='vandaagkolom']")){
     try { localStorage.setItem("attache-vandaag", vandaagKolom() ? "regel" : "kolom"); } catch(e){}
     staat.dagOpen = false; teken(); tekenMenu('[data-ui="vandaagkolom"]');
@@ -4446,6 +4494,240 @@ document.addEventListener("click", async ev => {
   try { localStorage.setItem("attache-thema", b.dataset.thema); } catch(e){}
   pasThemaToe();
 });
+// ---------------- Introductie: een clip die zelf doorloopt, over voorbeeldmail in de echte schermen ----------------
+// De voorbeeldmail heeft negatieve nummers en gaat nooit naar de server: niets wordt gelezen, verplaatst of verstuurd.
+// Tijdens de clip staat het verversen stil; daarna komt alles terug zoals het was.
+let intro = null;
+const introGezien = () => { try { return !!localStorage.getItem("attache-intro-gezien"); } catch(e){ return true; } };
+function introData(echt){
+  const d = JSON.parse(JSON.stringify(echt)), dag = n => isoDag(new Date(Date.now() + n * 864e5)), toen = n => new Date(Date.now() - n * 864e5).toISOString();
+  const pr = n => (d.projecten || []).some(p => p.naam === n) ? n : ((d.projecten || [])[0] || {naam: "overig"}).naam;
+  const mail = (id, o) => ({id, project: "overig", actie: "antwoorden", prioriteit: "normaal", deadline: null, samenvatting: "", status: "wacht",
+    van: "", onderwerp: "", datum: toen(1), lijkt_beantwoord: null, deadline_in_agenda: false, opgeruimd: false, opgeborgen_in: null, gelezen: true,
+    reden: "", concept: "", agenda: null, vragen: null, opmerking: null, context: [], taken: [], tekst: "", open_punten: [], terug_in_inbox: null,
+    eigen_antwoord: null, begin: "", begin_meer: false, belangrijk: false, ...o});
+  d.wacht = [
+    mail(-101, {project: pr("istte"), prioriteit: "hoog", van: "Board Chair <chair@association.example>", onderwerp: "Agenda for the December board meeting",
+      datum: toen(3), samenvatting: "Agenda items by 1 December; attendance and budget copies", deadline: dag(3),
+      tekst: "Dear colleagues,\n\nPlease send me your agenda items for the board meeting on 12 December. Will you join in person? For item 4, please bring printed copies of the budget.\n\nBest,\nThe Chair",
+      begin: "Please send me your agenda items for the board meeting on 12 December. Will you join in person? For item 4, please bring printed copies of the budget.",
+      concept: "Dear Chair,\n\nThank you for the draft agenda. I will [FILL IN: attendance] the meeting on 12 December. For item 4 I will bring [FILL IN: number of copies] printed copies of the conference budget.\n\nWarm regards,",
+      open_punten: [{vraag: "Will you be there on 12 December?", soort: "keuze", plek: "[FILL IN: attendance]", suggestie: 0,
+                     opties: [{label: "In person", tekst: "attend"}, {label: "Online", tekst: "join online for"}, {label: "Can't make it", tekst: "unfortunately miss"}]},
+                    {vraag: "How many copies of the budget?", soort: "invullen", plek: "[FILL IN: number of copies]", opties: [], suggestie: null}],
+      taken: [{omschrijving: "Send agenda items to the Chair", deadline: dag(3), minuten: 30}]}),
+    mail(-102, {project: pr("onderwijs"), van: "Sam Student <s.student@students.example>", onderwerp: "Extension for my placement portfolio", datum: toen(2),
+      samenvatting: "Asks for one more week for the portfolio",
+      begin: "Could I have one more week for my placement portfolio? My company has not filled in the evaluation yet.",
+      concept: "Dear Sam,\n\nThank you for letting me know. You can hand in your portfolio by [FILL IN: new deadline].\n\nKind regards,",
+      open_punten: [{vraag: "Give Sam the extension?", soort: "hele_mail", plek: null, suggestie: 0, opties: [{label: "Yes", tekst: null}, {label: "No", tekst: null}]},
+                    {vraag: "New deadline?", soort: "keuze", plek: "[FILL IN: new deadline]", suggestie: 1,
+                     opties: [{label: dagKort(dag(5)), tekst: dagKort(dag(5))}, {label: dagKort(dag(8)), tekst: dagKort(dag(8))}]}]}),
+    mail(-103, {project: pr("onderzoek"), actie: "taak", van: "Editorial Office <editor@journal.example>", onderwerp: "Invitation to review manuscript TM-2026-0412",
+      datum: toen(1), samenvatting: "Review invitation; answer by Friday", deadline: dag(4),
+      begin: "We would like to invite you to review “Overtourism and resident wellbeing”. Please let us know whether you can accept.",
+      concept: "Dear Editor,\n\nThank you for the invitation. I am happy to review TM-2026-0412 and will send my report within three weeks.\n\nKind regards,",
+      open_punten: [{vraag: "Accept the review?", soort: "hele_mail", plek: null, suggestie: 0, opties: [
+        {label: "Accept", tekst: null, taak: {omschrijving: "Review manuscript TM-2026-0412", minuten: 180, deadline: dag(21)}},
+        {label: "Decline", tekst: null, taak: null},
+        {label: "Ask for three more weeks", tekst: null, taak: {omschrijving: "Review manuscript TM-2026-0412", minuten: 180, deadline: dag(42)}}]}]}),
+    mail(-104, {project: pr("onderwijs"), actie: "taak", prioriteit: "laag", van: "Quality Office <quality@university.example>", onderwerp: "Module evaluation: please complete the form",
+      datum: toen(1), samenvatting: "Complete the module evaluation form by Friday", deadline: dag(4),
+      begin: "Please complete the evaluation form for your module by Friday.", taken: [{omschrijving: "Complete the module evaluation form", deadline: dag(4), minuten: 30}]})];
+  d.zelf = [mail(-105, {status: "handmatig", actie: "ter_info", van: "My Bank <service@bank.example>", onderwerp: "Your account statement", datum: toen(1),
+    begin: "Your monthly statement is ready.", reden: "on the list of senders never sent to Claude"})];
+  const fyi = (id, van, onderwerp, status = "ter_info") => mail(id, {actie: status === "genegeerd" ? "negeren" : "ter_info", status, prioriteit: "laag", van, onderwerp, datum: toen(2)});
+  d.info = [fyi(-201, "University Library <library@university.example>", "New databases and opening hours"),
+            fyi(-202, "Research Office <research@university.example>", "Webinar: writing a strong rebuttal"),
+            fyi(-203, "Faculty News <news@university.example>", "Newsletter week 48")];
+  d.overgeslagen = [fyi(-301, "Deals <deals@shop.example>", "Black Friday: 50% off", "genegeerd")];
+  d.oud = []; d.oud_aantal = 0; d.afgehandeld = []; d.wacht_op = []; d.voorstellen = []; d.regels = []; d.gedrag = {};
+  const taak = (id, o) => ({id, item_id: null, project: pr("onderwijs"), omschrijving: "", deadline: null, klaar: 0, aangemaakt: toen(1), minuten: 60, stappen: [],
+    gepland: null, afgerond: null, oordeel: null, later: 0, mail: null, lijkt_klaar: false, deadline_in_agenda: false, ...o});
+  d.taken = [taak(-401, {omschrijving: "Prepare the lecture on destination branding", minuten: 90, deadline: dag(4), stappen: ["Collect three recent cases", "Draft ten slides"]}),
+             taak(-402, {omschrijving: "Read the draft thesis chapter", project: pr("onderzoek"), minuten: 60, deadline: dag(6)})];
+  d.ochtend = {deadlines: [{id: -401, soort: "taak", titel: "Prepare the lecture on destination branding", deadline: dag(4), te_laat: false, ingepland: false, in_agenda: false}],
+               blijft_liggen_n: 1, blijft_liggen: [{id: -101, van: "Board Chair <chair@association.example>", dagen: 3}], ingepland: [], zonder_moment: [], belangrijk: 0, wacht_op: 0, lijkt_gedaan: 0};
+  [...d.info, ...d.overgeslagen].forEach(it => { leesCache[it.id] = {tekst: "An example email for the introduction.", reden: ""}; });
+  return d;
+}
+const $i = s => document.querySelector(s);
+const openVoorbeeld = id => { staat.tab = "te_doen"; staat.td = "open"; document.getElementById("paneel").dataset.sig = ""; openPaneel(id); };
+const INTRO = [
+  {deel: "Welcome", titel: "Welcome to attaché", tekst: "attaché reads your inbox, sorts it and drafts replies with Claude. You decide, and you always press send yourself. This introduction uses example email.",
+   voor: () => { staat.tab = "te_doen"; staat.open = null; staat.geenAuto = true; sluitPaneel(); teken(); }},
+  {deel: "The daily flow", titel: "Three places", tekst: "To do, Planning and Tidy up. The number shows what is waiting in each.", doel: () => [...document.querySelectorAll("#nav .nav")]},
+  {deel: "The daily flow", titel: "Your day at a glance", tekst: "What is on now or next, this week's deadlines and email that has waited two days or more. Day opens the whole day.",
+   doel: () => $i(".nextup") || $i("#dagkol")},
+  {deel: "The daily flow", titel: "One question per email", tekst: "To do is grouped by what each email asks of you: Reply, Decide, Do, and Check yourself. J and K move through the list.",
+   doel: () => [...document.querySelectorAll("main .tdgroep, main .rij[data-open]")]},
+  {deel: "The daily flow", titel: "Open an email", tekst: "The question is at the top. Above the draft you see the first lines of what the sender wrote.",
+   klik: () => $i('main .rij[data-open="-101"]'), doe: () => openVoorbeeld(-101), doel: () => [$i("#paneel .chip.vraag"), $i("#paneel .mail-begin")]},
+  {deel: "The daily flow", titel: "You choose, Claude writes", tekst: "Where Claude doesn't know something, you pick an answer and it goes straight into the draft. A number or a name you type.",
+   doel: () => $i("#op"), klik: () => [...document.querySelectorAll("#op .op-chip")].find(c => c.textContent.trim() === "In person"), doe: el => el && el.click()},
+  {deel: "The daily flow", titel: "Nothing slips through", tekst: "Spots still to fill in are highlighted in the draft, and Send shows how many are left. You can always edit the text yourself.",
+   doel: () => $i(".concept-vak")},
+  {deel: "The daily flow", titel: "Tasks come along", tekst: "When you reply, the tasks from this email go to Planning. Edit opens them.", doel: () => $i(".taken-uit")},
+  {deel: "The daily flow", titel: "You press send", tekst: "Reply in Mail puts your reply ready in Apple Mail, where you send it. Done files the email in the folder where it belongs, with Undo.",
+   doel: () => $i(".voet-acties .groepje.vast")},
+  {deel: "The daily flow", titel: "Decisions get buttons", tekst: "Accept a review and the review itself goes to Planning. Decline, and it goes again.",
+   klik: () => $i('main .rij[data-open="-103"]'), doe: () => openVoorbeeld(-103), doel: () => $i("#op")},
+  {deel: "Safe by design", titel: "Private stays private", tekst: "Email from senders on your private list never goes to Claude. You write those replies yourself.",
+   klik: () => $i('main .rij[data-open="-105"]'), doe: () => openVoorbeeld(-105), doel: () => $i("#paneel .melding.prive")},
+  {deel: "Safe by design", titel: "Nothing leaves without you", tekst: "attaché never sends by itself: Send asks for a second click, and the automatic rounds can't send at all. Student numbers and IBANs become codes before anything goes to Claude, and Claude has no tools."},
+  {deel: "Shortcuts", titel: "Hands on the keyboard", toetsen: [["J K", "next, previous"], ["⌘↵", "reply in Mail"], ["D", "done"], ["E", "archive"], ["V", "file"], ["T", "task"], ["X", "wrong suggestion"], ["Z", "undo"], ["?", "all shortcuts"]],
+   tekst: "Everything works without a mouse."},
+  {deel: "The daily flow", titel: "Planning", tekst: "Drag a task into your day, or select it, press Enter, move it with the arrow keys and press Enter again.",
+   voor: () => { sluitPaneel(); staat.tab = "planning"; teken(); }, doel: () => $i(".kaarten [data-kaart]")},
+  {deel: "The daily flow", titel: "Tidy up", tekst: "FYI email and newsletters. Read them, then archive or file them, one by one or all at once.",
+   voor: () => { staat.tab = "opruimen"; staat.lees = null; staat.geenAuto = true; teken(); sluitPaneel(); }, doel: () => $i("main .groep")},
+  {deel: "Settings", titel: "Your way", tekst: "Behind the gear: the theme, Next up or the Today column, anonymising and an optional local model.",
+   voor: () => { staat.tab = "te_doen"; teken(); tekenMenu(); }, doel: () => $i(".thema-menu"), na: () => sluitMenu()},
+  {deel: "Done", titel: "That's attaché", tekst: "Watch this again under Settings, Introduction. Press ? for every shortcut.", einde: true}
+];
+const introDuur = s => s.einde ? null : Math.max(4500, 2600 + (s.tekst.split(/\s+/).length + (s.toetsen ? 18 : 0)) * 260);
+function startIntro(){
+  if (intro || !D) return;
+  sluitMeer(); sluitMenu(); document.querySelector(".overlay")?.remove(); sluitPop();
+  intro = {D, staat: {tab: staat.tab, td: staat.td, open: staat.open, project: staat.project, lees: staat.lees, dagOpen: staat.dagOpen, geenAuto: staat.geenAuto, gekozen: [...staat.gekozen]},
+           stap: -1, pauze: false, rest: 0, focus: document.activeElement};
+  D = introData(D); staat.project = "alles"; staat.gekozen.clear(); staat.dagOpen = false; plaatsing = null; taak = null; antwoord = null;
+  const o = document.createElement("div");
+  o.id = "intro"; o.setAttribute("role", "dialog"); o.setAttribute("aria-label", "Introduction to attaché"); o.setAttribute("aria-modal", "true");
+  o.innerHTML = `<div class="intro-vang"></div><div class="intro-licht" hidden></div><div class="intro-cursor" hidden>${'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l14 8-6 1.6L10 19z"/></svg>'}</div>
+    <div class="intro-kaart" tabindex="-1"><div class="intro-balk">${INTRO.map(() => `<span><i></i></span>`).join("")}</div>
+      <div class="intro-deel"></div><h2 class="intro-titel"></h2><p class="intro-tekst"></p><div class="intro-toetsen"></div>
+      <div class="intro-knoppen"><button class="knop klein" data-intro="vorige" title="Previous (←)">${ik("chevron").replace("<path", '<path transform="rotate(180 12 12)"')}</button>
+        <button class="knop klein" data-intro="pauze" title="Pause (Space)">Pause</button><button class="knop klein" data-intro="volgende" title="Next (→)">${ik("chevron")}</button>
+        <span class="intro-ruimte"></span><button class="knop klein" data-intro="sluit" title="Close (Esc)">Close</button></div></div>
+    <div class="sr" aria-live="polite" id="intro-stem"></div>`;
+  document.body.append(o);
+  naarStap(0);
+}
+function stopIntro(){
+  if (!intro) return;
+  clearTimeout(intro.timer); clearTimeout(intro.klikTimer);
+  const s = INTRO[intro.stap]; if (s && s.na) s.na();
+  document.getElementById("intro")?.remove();
+  const terug = intro;
+  intro = null;
+  D = terug.D;
+  Object.assign(staat, {tab: terug.staat.tab, td: terug.staat.td, open: terug.staat.open, project: terug.staat.project, lees: terug.staat.lees, dagOpen: terug.staat.dagOpen, geenAuto: terug.staat.geenAuto});
+  staat.gekozen = new Set(terug.staat.gekozen);
+  for (const lijst of [keuzes, concepten, bewerkt, leesCache]) Object.keys(lijst).forEach(k => { if (Number(k) < 0) delete lijst[k]; });
+  [...takenOpen].forEach(k => { if (k < 0) takenOpen.delete(k); });
+  try { localStorage.setItem("attache-intro-gezien", "1"); } catch(e){}
+  document.getElementById("paneel").dataset.sig = "";
+  sluitMenu(); teken(); laad();
+  terug.focus?.focus?.();
+}
+const wachtMs = ms => new Promise(r => setTimeout(r, ms));
+function omvang(doel){
+  const lijst = (Array.isArray(doel) ? doel : [doel]).filter(e => e && e.getClientRects().length);
+  if (!lijst.length) return null;
+  const rs = lijst.map(e => e.getBoundingClientRect());
+  return {l: Math.min(...rs.map(r => r.left)), t: Math.min(...rs.map(r => r.top)), r: Math.max(...rs.map(r => r.right)), b: Math.max(...rs.map(r => r.bottom))};
+}
+function zetLicht(doel){
+  const o = document.getElementById("intro"); if (!o) return null;
+  const licht = o.querySelector(".intro-licht"), kaart = o.querySelector(".intro-kaart");
+  const eerste = (Array.isArray(doel) ? doel : [doel]).find(Boolean);
+  if (eerste && eerste.scrollIntoView) eerste.scrollIntoView({block: "nearest"});
+  const v = doel ? omvang(doel) : null, m = 8;
+  o.classList.toggle("midden", !v); if (!v) o.classList.remove("boven");
+  if (!v){ licht.hidden = true; kaart.style.left = kaart.style.top = ""; return null; }
+  const b = {l: Math.max(4, v.l - m), t: Math.max(4, v.t - m), r: Math.min(innerWidth - 4, v.r + m), b: Math.min(innerHeight - 4, v.b + m)};
+  Object.assign(licht.style, {left: b.l + "px", top: b.t + "px", width: (b.r - b.l) + "px", height: (b.b - b.t) + "px"}); licht.hidden = false;
+  if (innerWidth <= 760){ kaart.style.left = kaart.style.top = ""; o.classList.toggle("boven", (b.t + b.b) / 2 > innerHeight * 0.5); return b; }   // telefoon: de kaart onder of boven, nooit over het doel
+  const kw = kaart.offsetWidth, kh = kaart.offsetHeight;
+  const plekken = [[b.r + 16, b.t], [b.l - kw - 16, b.t], [b.l, b.b + 16], [b.l, b.t - kh - 16]];
+  const past = ([x, y]) => x >= 12 && y >= 12 && x + kw <= innerWidth - 12 && y + kh <= innerHeight - 12;
+  let [x, y] = plekken.find(past) || [innerWidth - kw - 16, innerHeight - kh - 16];
+  y = Math.max(12, Math.min(innerHeight - kh - 12, y));
+  kaart.style.left = x + "px"; kaart.style.top = y + "px";
+  return b;
+}
+function zetCursor(el, zichtbaar = true){
+  const c = document.querySelector("#intro .intro-cursor"); if (!c) return;
+  if (!el || !zichtbaar || matchMedia("(prefers-reduced-motion: reduce)").matches){ c.hidden = true; return; }
+  const r = el.getBoundingClientRect(); c.hidden = false;
+  c.style.left = (r.left + Math.min(r.width / 2, 60)) + "px"; c.style.top = (r.top + r.height / 2) + "px";
+}
+async function naarStap(i){
+  if (!intro) return;
+  i = Math.max(0, Math.min(INTRO.length - 1, i));
+  clearTimeout(intro.timer); clearTimeout(intro.klikTimer);
+  const vorige = INTRO[intro.stap]; if (vorige && vorige.na && intro.stap !== i) vorige.na();
+  intro.stap = i; const s = INTRO[i], nr = i;
+  const o = document.getElementById("intro");
+  o.querySelectorAll(".intro-balk span").forEach((b, j) => { b.className = j < i ? "klaar" : j === i ? "nu" : ""; b.firstElementChild.style.animation = "none"; });
+  o.querySelector(".intro-deel").textContent = `${s.deel} · ${i + 1} of ${INTRO.length}`;
+  o.querySelector(".intro-titel").textContent = s.titel;
+  o.querySelector(".intro-tekst").textContent = s.tekst;
+  o.querySelector(".intro-toetsen").innerHTML = s.toetsen ? s.toetsen.map(([k, w]) => `<span><kbd>${esc(k)}</kbd>${esc(w)}</span>`).join("") : "";
+  o.querySelector('[data-intro="volgende"]').hidden = !!s.einde;
+  o.querySelector('[data-intro="pauze"]').hidden = !!s.einde;
+  o.querySelector('[data-intro="sluit"]').textContent = s.einde ? "Start" : "Close";
+  o.querySelector('[data-intro="sluit"]').classList.toggle("goed", !!s.einde);
+  document.getElementById("intro-stem").textContent = `${s.titel}. ${s.tekst}`;
+  if (s.voor) s.voor();
+  await wachtMs(260); if (!intro || intro.stap !== nr) return;
+  if (s.klik){
+    const el = s.klik(), vooraf = s.doel && s.doel();
+    zetLicht((Array.isArray(vooraf) ? vooraf.some(Boolean) : vooraf) ? vooraf : el); zetCursor(el);   // de kaart staat meteen bij het blok, de cursor gaat naar de knop
+    await wachtMs(matchMedia("(prefers-reduced-motion: reduce)").matches ? 150 : 750); if (!intro || intro.stap !== nr) return;
+    const c = document.querySelector("#intro .intro-cursor"); c?.classList.add("tik"); setTimeout(() => c?.classList.remove("tik"), 320);
+    s.doe && s.doe(el);
+    await wachtMs(380); if (!intro || intro.stap !== nr) return;
+  } else zetCursor(null);
+  zetLicht(s.doel ? s.doel() : null);
+  if (s.einde){ o.querySelector('[data-intro="sluit"]').focus(); return; }
+  speel(introDuur(s));
+}
+function speel(ms){
+  if (!intro) return;
+  const i = intro.stap, balk = document.querySelectorAll("#intro .intro-balk span i")[i];
+  intro.rest = ms; intro.begin = Date.now();
+  if (balk){ balk.style.animation = "none"; void balk.offsetWidth; balk.style.animation = `intro-vul ${introDuur(INTRO[i])}ms linear forwards`;
+    balk.style.animationDelay = `-${introDuur(INTRO[i]) - ms}ms`; balk.style.animationPlayState = intro.pauze ? "paused" : "running"; }
+  if (!intro.pauze) intro.timer = setTimeout(() => naarStap(intro.stap + 1), ms);
+}
+function wisselPauze(){
+  if (!intro || INTRO[intro.stap].einde) return;
+  intro.pauze = !intro.pauze;
+  const k = document.querySelector('#intro [data-intro="pauze"]'); if (k) k.textContent = intro.pauze ? "Play" : "Pause";
+  if (intro.pauze){ clearTimeout(intro.timer); intro.rest = Math.max(0, intro.rest - (Date.now() - intro.begin)); }
+  const balk = document.querySelectorAll("#intro .intro-balk span i")[intro.stap];
+  if (balk) balk.style.animationPlayState = intro.pauze ? "paused" : "running";
+  if (!intro.pauze) speel(intro.rest);
+}
+window.addEventListener("click", ev => {          // op het venster: vóór alle andere afhandeling
+  if (!intro) return;
+  const k = ev.target.closest && ev.target.closest("[data-intro]");
+  if (!ev.target.closest("#intro")) return;
+  ev.stopImmediatePropagation(); ev.preventDefault();
+  if (!k) return;
+  const w = k.dataset.intro;
+  if (w === "sluit") return stopIntro();
+  if (w === "pauze") return wisselPauze();
+  naarStap(intro.stap + (w === "volgende" ? 1 : -1));
+}, true);
+window.addEventListener("keydown", ev => {        // op het venster: vóór menu's en panelen, zodat Esc altijd de clip sluit
+  if (!intro) return;
+  ev.stopImmediatePropagation();
+  if (ev.key === "Escape"){ ev.preventDefault(); return stopIntro(); }
+  if (ev.key === " " && !ev.target.closest?.("button")){ ev.preventDefault(); return wisselPauze(); }
+  if (ev.key === "ArrowRight"){ ev.preventDefault(); return naarStap(intro.stap + 1); }
+  if (ev.key === "ArrowLeft"){ ev.preventDefault(); return naarStap(intro.stap - 1); }
+  if (ev.key === "Tab"){                                                     // de focus blijft in de kaart
+    const knoppen = [...document.querySelectorAll("#intro .intro-knoppen button")].filter(b => !b.hidden);
+    const j = knoppen.indexOf(document.activeElement); ev.preventDefault();
+    return knoppen[(j + (ev.shiftKey ? -1 : 1) + knoppen.length) % knoppen.length]?.focus();
+  }
+  if (ev.key !== "Enter") ev.preventDefault();                            // geen sneltoetsen van de app achter de clip
+}, true);
+window.addEventListener("resize", () => { if (intro){ const s = INTRO[intro.stap]; zetLicht(s.doel ? s.doel() : null); } });
+
 pasThemaToe();
 laad();
 setInterval(() => { if (!document.hidden && staat.open === null) laad(); }, 60000);
