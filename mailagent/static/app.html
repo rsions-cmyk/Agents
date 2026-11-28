@@ -491,6 +491,7 @@ details.regels summary svg{width:14px;height:14px;vertical-align:-2px;margin-rig
 .intro-knoppen{display:flex;gap:6px;align-items:center;margin-top:12px}
 .intro-knoppen .knop svg{width:16px;height:16px}
 .intro-ruimte{flex:1}
+#intro [hidden]{display:none!important}
 .intro-cursor{position:fixed;width:22px;height:22px;margin:-3px 0 0 -4px;transition:left .7s cubic-bezier(.3,.7,.2,1),top .7s cubic-bezier(.3,.7,.2,1);pointer-events:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))}
 .intro-cursor svg{width:22px;height:22px;fill:#fff;stroke:#0E131C;stroke-width:1.6}
 .intro-cursor.tik::after{content:"";position:absolute;left:-9px;top:-9px;width:24px;height:24px;border-radius:50%;border:2px solid var(--brass,#9C7030);animation:intro-tik .32s ease-out}
@@ -1100,7 +1101,7 @@ main{grid-row:2;grid-column:2 / -1;min-width:0}
 </head>
 <body>
 <div class="opstart" id="opstart" aria-hidden="true"><img src="/merk.svg" alt="" width="112" height="112"><span class="woordmerk">attach<span class="woordmerk-e">é</span></span><span class="opstart-regel">Minding the details.</span>
-  <div class="opstart-intro"><button class="knop goed" id="intro-start">Watch the introduction · 2 min</button><button class="knop" id="intro-sla">Skip</button><button class="stil-link" id="intro-link">Watch the introduction</button></div></div>
+  <div class="opstart-intro"><button class="knop goed" id="intro-start">Watch the introduction (3 min)</button><button class="knop" id="intro-sla">Skip</button><button class="stil-link" id="intro-link">Watch the introduction</button></div></div>
 <script>requestAnimationFrame(function(){requestAnimationFrame(function(){window.opstartVanaf=performance.now()})})</script>
 <div class="app" id="app">
   <aside class="zij" aria-label="Navigation">
@@ -4428,7 +4429,7 @@ function tekenMenu(focusOp){
     `<button role="menuitemradio" aria-checked="${w === k}" class="${w === k ? "aan" : ""}" data-thema="${w}">${ik("check")}${naam}${uitleg ? `<span class="meta">${uitleg}</span>` : ""}</button>`).join("")}
     <div class="menu-streep"></div><div class="menu-kop">Layout</div>
     <button role="menuitemcheckbox" aria-checked="${kol}" class="${kol ? "aan" : ""}" data-ui="vandaagkolom">${ik("check")}Today column<span class="meta">instead of Next up</span></button>
-    <button role="menuitem" class="intro-item" data-ui="intro">${ik("eye")}Introduction<span class="meta">2 min</span></button>
+    <button role="menuitem" class="intro-item" data-ui="intro">${ik("eye")}Introduction<span class="meta">3 min</span></button>
     <div class="menu-streep"></div><div class="menu-kop">Privacy and models</div>
     ${vink("anonimiseren", ins.anonimiseren, "Anonymise numbers", "student numbers, IBANs")}
     ${vink("lokaal", ins.lokaal, "Local model", "simple tasks on this Mac")}
@@ -4498,6 +4499,41 @@ document.addEventListener("click", async ev => {
 // De voorbeeldmail heeft negatieve nummers en gaat nooit naar de server: niets wordt gelezen, verplaatst of verstuurd.
 // Tijdens de clip staat het verversen stil; daarna komt alles terug zoals het was.
 let intro = null;
+// De gesproken tekst gaat via de spraak van de browser, die op een Mac de stemmen van macOS gebruikt
+// (ook een Premium- of Enhanced-stem als je die hebt gedownload). Zonder stem loopt de clip stil door.
+let introStem = null;
+const introGeluid = () => { try { return localStorage.getItem("attache-intro-geluid") !== "uit"; } catch(e){ return true; } };
+function kiesStem(){
+  if (!("speechSynthesis" in window)) return null;
+  const alle = speechSynthesis.getVoices(); if (!alle.length) return null;
+  const gb = alle.filter(v => /^en[-_]GB/i.test(v.lang)), en = alle.filter(v => /^en/i.test(v.lang));
+  const voorkeur = ["Daniel", "Serena", "Jamie", "Kate", "Arthur", "Stephanie", "Oliver"];
+  const score = v => (/(premium|enhanced)/i.test(v.name) ? 0 : 20) + (v.localService ? 0 : 40) + ((voorkeur.findIndex(n => v.name.startsWith(n)) + 1) || 10);
+  return (gb.length ? gb : en).sort((a, b) => score(a) - score(b))[0] || null;
+}
+let introSpraak = null;
+function zwijg(){ clearInterval(introSpraak?.kijk); introSpraak = null; try { speechSynthesis.cancel(); } catch(e){} }
+function spreekStap(s, klaar){
+  zwijg();
+  if (intro?.pauze || !introGeluid() || !s.stem || !("speechSynthesis" in window)) return klaar();
+  introStem = introStem || kiesStem();
+  if (!introStem) return klaar();
+  const u = new SpeechSynthesisUtterance(s.stem);
+  u.voice = introStem; u.lang = introStem.lang; u.rate = 0.96;
+  let klaarGemeld = false;
+  const af = () => { if (klaarGemeld) return; klaarGemeld = true; if (introSpraak?.u === u){ clearInterval(introSpraak.kijk); introSpraak = null; } klaar(); };
+  u.onend = u.onerror = af;
+  // niet elke browser meldt het einde van een zin: daarom kijken we ook zelf of er nog gesproken wordt
+  introSpraak = {u, kijk: setInterval(() => { if (!speechSynthesis.speaking && !speechSynthesis.pending) af(); }, 400)};
+  speechSynthesis.speak(u);
+}
+if ("speechSynthesis" in window){ try { speechSynthesis.getVoices(); speechSynthesis.addEventListener("voiceschanged", () => { introStem = null; werkGeluidKnopBij(); }); } catch(e){} }
+function werkGeluidKnopBij(){
+  const k = document.querySelector('#intro [data-intro="geluid"]'); if (!k) return;
+  const kan = "speechSynthesis" in window && !!kiesStem();
+  k.hidden = !kan; k.textContent = introGeluid() ? "Sound on" : "Sound off"; k.setAttribute("aria-pressed", introGeluid());
+  if (kan) k.title = `Voice: ${kiesStem().name}. S switches the sound off and on.`;
+}
 const introGezien = () => { try { return !!localStorage.getItem("attache-intro-gezien"); } catch(e){ return true; } };
 function introData(echt){
   const d = JSON.parse(JSON.stringify(echt)), dag = n => isoDag(new Date(Date.now() + n * 864e5)), toen = n => new Date(Date.now() - n * 864e5).toISOString();
@@ -4555,37 +4591,51 @@ const $i = s => document.querySelector(s);
 const openVoorbeeld = id => { staat.tab = "te_doen"; staat.td = "open"; document.getElementById("paneel").dataset.sig = ""; openPaneel(id); };
 const INTRO = [
   {deel: "Welcome", titel: "Welcome to attaché", tekst: "attaché reads your inbox, sorts it and drafts replies with Claude. You decide, and you always press send yourself. This introduction uses example email.",
+   stem: "Hello. I'm attaché. I read your inbox, sort it and prepare your replies with Claude. You decide what happens, and you always press send yourself.",
    voor: () => { staat.tab = "te_doen"; staat.open = null; staat.geenAuto = true; sluitPaneel(); teken(); }},
-  {deel: "The daily flow", titel: "Three places", tekst: "To do, Planning and Tidy up. The number shows what is waiting in each.", doel: () => [...document.querySelectorAll("#nav .nav")]},
-  {deel: "The daily flow", titel: "Your day at a glance", tekst: "What is on now or next, this week's deadlines and email that has waited two days or more. Day opens the whole day.",
-   doel: () => $i(".nextup") || $i("#dagkol")},
-  {deel: "The daily flow", titel: "One question per email", tekst: "To do is grouped by what each email asks of you: Reply, Decide, Do, and Check yourself. J and K move through the list.",
-   doel: () => [...document.querySelectorAll("main .tdgroep, main .rij[data-open]")]},
-  {deel: "The daily flow", titel: "Open an email", tekst: "The question is at the top. Above the draft you see the first lines of what the sender wrote.",
+  {deel: "The daily flow", titel: "Three views", tekst: "The app has three views: To do, Planning and Tidy up. The number next to each one shows how much is waiting there.",
+   stem: "There are three views: To do, Planning and Tidy up. The numbers show how much is waiting in each.", doel: () => [...document.querySelectorAll("#nav .nav")]},
+  {deel: "The daily flow", titel: "Your day", tekst: "This line shows what is on now or next, this week's deadlines and email that has waited two days or more. Click Day to see the whole day.",
+   stem: "This line shows your day. You see what is on now or next, this week's deadlines, and email that has been waiting.", doel: () => $i(".nextup") || $i("#dagkol")},
+  {deel: "The daily flow", titel: "Four groups", tekst: "attaché puts each email in one of four groups: Reply, Decide, Do and Check yourself. Press J and K to move through the list.",
+   stem: "I put each email in one of four groups: Reply, Decide, Do and Check yourself.", doel: () => [...document.querySelectorAll("main .tdgroep, main .rij[data-open]")]},
+  {deel: "The daily flow", titel: "Open an email", tekst: "At the top you see what this email asks of you. Above the draft are the first lines of what the sender wrote.",
+   stem: "When you open an email, you see at the top what it asks of you, and the first lines of the message.",
    klik: () => $i('main .rij[data-open="-101"]'), doe: () => openVoorbeeld(-101), doel: () => [$i("#paneel .chip.vraag"), $i("#paneel .mail-begin")]},
-  {deel: "The daily flow", titel: "You choose, Claude writes", tekst: "Where Claude doesn't know something, you pick an answer and it goes straight into the draft. A number or a name you type.",
+  {deel: "The daily flow", titel: "Choose an answer", tekst: "Where Claude does not know something, you choose an answer and it goes straight into the draft. You type a number or a name yourself.",
+   stem: "Where I don't know something, I ask you. Choose an answer, and I write it into the draft.",
    doel: () => $i("#op"), klik: () => [...document.querySelectorAll("#op .op-chip")].find(c => c.textContent.trim() === "In person"), doe: el => el && el.click()},
-  {deel: "The daily flow", titel: "Nothing slips through", tekst: "Spots still to fill in are highlighted in the draft, and Send shows how many are left. You can always edit the text yourself.",
-   doel: () => $i(".concept-vak")},
-  {deel: "The daily flow", titel: "Tasks come along", tekst: "When you reply, the tasks from this email go to Planning. Edit opens them.", doel: () => $i(".taken-uit")},
-  {deel: "The daily flow", titel: "You press send", tekst: "Reply in Mail puts your reply ready in Apple Mail, where you send it. Done files the email in the folder where it belongs, with Undo.",
+  {deel: "The daily flow", titel: "Open spots stay visible", tekst: "attaché highlights every spot in the draft that still needs filling in, and Send shows how many are left. You can edit the text yourself at any time.",
+   stem: "Any spot that still needs filling in stays highlighted, and Send shows how many are left.", doel: () => $i(".concept-vak")},
+  {deel: "The daily flow", titel: "Tasks from the email", tekst: "When you reply, the tasks from this email go to Planning. Click Edit to change them.",
+   stem: "When you reply, the tasks from this email go to Planning.", doel: () => $i(".taken-uit")},
+  {deel: "The daily flow", titel: "You send the reply", tekst: "With Reply in Mail, attaché prepares your reply in Apple Mail, and you send it from there. When you click Done, attaché files the email in the folder where it belongs. Click Undo to put it back in your inbox.",
+   stem: "With Reply in Mail, I prepare your reply in Apple Mail, and you send it from there. When you click Done, I file the email in the right folder, and you can undo that.",
    doel: () => $i(".voet-acties .groepje.vast")},
-  {deel: "The daily flow", titel: "Decisions get buttons", tekst: "Accept a review and the review itself goes to Planning. Decline, and it goes again.",
+  {deel: "The daily flow", titel: "Accept or decline", tekst: "If you accept a review, the review itself goes to Planning as a task. If you decline, attaché removes that task.",
+   stem: "Some emails ask for a decision. If you accept a review, I add the review itself to Planning. If you decline, I leave it out.",
    klik: () => $i('main .rij[data-open="-103"]'), doe: () => openVoorbeeld(-103), doel: () => $i("#op")},
-  {deel: "Safe by design", titel: "Private stays private", tekst: "Email from senders on your private list never goes to Claude. You write those replies yourself.",
+  {deel: "Safety", titel: "Private senders", tekst: "Email from senders on your private list never goes to Claude. You write those replies yourself.",
+   stem: "Some senders never reach Claude. You answer those yourself.",
    klik: () => $i('main .rij[data-open="-105"]'), doe: () => openVoorbeeld(-105), doel: () => $i("#paneel .melding.prive")},
-  {deel: "Safe by design", titel: "Nothing leaves without you", tekst: "attaché never sends by itself: Send asks for a second click, and the automatic rounds can't send at all. Student numbers and IBANs become codes before anything goes to Claude, and Claude has no tools."},
-  {deel: "Shortcuts", titel: "Hands on the keyboard", toetsen: [["J K", "next, previous"], ["⌘↵", "reply in Mail"], ["D", "done"], ["E", "archive"], ["V", "file"], ["T", "task"], ["X", "wrong suggestion"], ["Z", "undo"], ["?", "all shortcuts"]],
-   tekst: "Everything works without a mouse."},
-  {deel: "The daily flow", titel: "Planning", tekst: "Drag a task into your day, or select it, press Enter, move it with the arrow keys and press Enter again.",
+  {deel: "Safety", titel: "Safety", tekst: "attaché never sends email by itself. Sending takes two clicks from you, and the automatic rounds cannot send at all. Before anything goes to Claude, attaché replaces student numbers and IBANs with codes, and Claude cannot use any tools.",
+   stem: "I never send email by myself. Before a message goes to Claude, I replace student numbers and IBANs with codes."},
+  {deel: "Shortcuts", titel: "Keyboard shortcuts", toetsen: [["J K", "next, previous"], ["⌘↵", "reply in Mail"], ["D", "done"], ["E", "archive"], ["V", "file"], ["T", "task"], ["X", "wrong suggestion"], ["Z", "undo"], ["?", "all shortcuts"]],
+   tekst: "You can do everything without a mouse.", stem: "You can do everything from the keyboard. Press the question mark to see every shortcut."},
+  {deel: "The daily flow", titel: "Planning", tekst: "Drag a task into your day. You can also select it, press Enter, move it with the arrow keys and press Enter again.",
+   stem: "In Planning, you drag a task into your day, or you select it and move it with the arrow keys.",
    voor: () => { sluitPaneel(); staat.tab = "planning"; teken(); }, doel: () => $i(".kaarten [data-kaart]")},
-  {deel: "The daily flow", titel: "Tidy up", tekst: "FYI email and newsletters. Read them, then archive or file them, one by one or all at once.",
+  {deel: "The daily flow", titel: "Tidy up", tekst: "Tidy up lists FYI email and newsletters. Read them, then archive them or file them in a folder, one at a time or all at once.",
+   stem: "Tidy up lists newsletters and email for your information. You can archive or file them all at once.",
    voor: () => { staat.tab = "opruimen"; staat.lees = null; staat.geenAuto = true; teken(); sluitPaneel(); }, doel: () => $i("main .groep")},
-  {deel: "Settings", titel: "Your way", tekst: "Behind the gear: the theme, Next up or the Today column, anonymising and an optional local model.",
+  {deel: "Settings", titel: "Settings", tekst: "The gear opens Settings, with the theme, Next up or the Today column, anonymising and an optional local model.",
+   stem: "The gear opens Settings, with the theme, the layout and the privacy options.",
    voor: () => { staat.tab = "te_doen"; teken(); tekenMenu(); }, doel: () => $i(".thema-menu"), na: () => sluitMenu()},
-  {deel: "Done", titel: "That's attaché", tekst: "Watch this again under Settings, Introduction. Press ? for every shortcut.", einde: true}
+  {deel: "End", titel: "End of the introduction", tekst: "You can watch it again under Settings, Introduction. Press ? to see every shortcut.",
+   stem: "That's the introduction. You can watch it again under Settings. attaché. Minding the details.", einde: true}
 ];
-const introDuur = s => s.einde ? null : Math.max(4500, 2600 + (s.tekst.split(/\s+/).length + (s.toetsen ? 18 : 0)) * 260);
+const woorden = t => (t || "").split(/\s+/).filter(Boolean).length;
+const introDuur = s => s.einde ? null : Math.max(4500, 2600 + (woorden(s.tekst) + (s.toetsen ? 18 : 0)) * 260, Math.round(woorden(s.stem) / 2.5 * 1000) + 1500);
 function startIntro(){
   if (intro || !D) return;
   sluitMeer(); sluitMenu(); document.querySelector(".overlay")?.remove(); sluitPop();
@@ -4599,14 +4649,16 @@ function startIntro(){
       <div class="intro-deel"></div><h2 class="intro-titel"></h2><p class="intro-tekst"></p><div class="intro-toetsen"></div>
       <div class="intro-knoppen"><button class="knop klein" data-intro="vorige" title="Previous (←)">${ik("chevron").replace("<path", '<path transform="rotate(180 12 12)"')}</button>
         <button class="knop klein" data-intro="pauze" title="Pause (Space)">Pause</button><button class="knop klein" data-intro="volgende" title="Next (→)">${ik("chevron")}</button>
-        <span class="intro-ruimte"></span><button class="knop klein" data-intro="sluit" title="Close (Esc)">Close</button></div></div>
+        <span class="intro-ruimte"></span><button class="knop klein" data-intro="geluid" title="The spoken text (S)" hidden>Sound on</button><button class="knop klein" data-intro="sluit" title="Close (Esc)">Close</button></div></div>
     <div class="sr" aria-live="polite" id="intro-stem"></div>`;
   document.body.append(o);
+  werkGeluidKnopBij();
   naarStap(0);
 }
 function stopIntro(){
   if (!intro) return;
   clearTimeout(intro.timer); clearTimeout(intro.klikTimer);
+  zwijg();
   const s = INTRO[intro.stap]; if (s && s.na) s.na();
   document.getElementById("intro")?.remove();
   const terug = intro;
@@ -4661,7 +4713,7 @@ async function naarStap(i){
   intro.stap = i; const s = INTRO[i], nr = i;
   const o = document.getElementById("intro");
   o.querySelectorAll(".intro-balk span").forEach((b, j) => { b.className = j < i ? "klaar" : j === i ? "nu" : ""; b.firstElementChild.style.animation = "none"; });
-  o.querySelector(".intro-deel").textContent = `${s.deel} · ${i + 1} of ${INTRO.length}`;
+  o.querySelector(".intro-deel").textContent = `${s.deel}, ${i + 1} of ${INTRO.length}`;
   o.querySelector(".intro-titel").textContent = s.titel;
   o.querySelector(".intro-tekst").textContent = s.tekst;
   o.querySelector(".intro-toetsen").innerHTML = s.toetsen ? s.toetsen.map(([k, w]) => `<span><kbd>${esc(k)}</kbd>${esc(w)}</span>`).join("") : "";
@@ -4670,6 +4722,9 @@ async function naarStap(i){
   o.querySelector('[data-intro="sluit"]').textContent = s.einde ? "Start" : "Close";
   o.querySelector('[data-intro="sluit"]').classList.toggle("goed", !!s.einde);
   document.getElementById("intro-stem").textContent = `${s.titel}. ${s.tekst}`;
+  intro.tijdOm = false; intro.spreekt = true;
+  const beurt = intro.beurt = (intro.beurt || 0) + 1;
+  spreekStap(s, () => { if (!intro || intro.beurt !== beurt) return; intro.spreekt = false; if (intro.tijdOm && !intro.pauze) naarStap(nr + 1); });
   if (s.voor) s.voor();
   await wachtMs(260); if (!intro || intro.stap !== nr) return;
   if (s.klik){
@@ -4690,13 +4745,14 @@ function speel(ms){
   intro.rest = ms; intro.begin = Date.now();
   if (balk){ balk.style.animation = "none"; void balk.offsetWidth; balk.style.animation = `intro-vul ${introDuur(INTRO[i])}ms linear forwards`;
     balk.style.animationDelay = `-${introDuur(INTRO[i]) - ms}ms`; balk.style.animationPlayState = intro.pauze ? "paused" : "running"; }
-  if (!intro.pauze) intro.timer = setTimeout(() => naarStap(intro.stap + 1), ms);
+  if (!intro.pauze) intro.timer = setTimeout(() => { intro.tijdOm = true; if (!intro.spreekt) naarStap(intro.stap + 1); }, ms);
 }
 function wisselPauze(){
   if (!intro || INTRO[intro.stap].einde) return;
   intro.pauze = !intro.pauze;
   const k = document.querySelector('#intro [data-intro="pauze"]'); if (k) k.textContent = intro.pauze ? "Play" : "Pause";
-  if (intro.pauze){ clearTimeout(intro.timer); intro.rest = Math.max(0, intro.rest - (Date.now() - intro.begin)); }
+  if (intro.pauze){ clearTimeout(intro.timer); intro.rest = Math.max(0, intro.rest - (Date.now() - intro.begin)); try { speechSynthesis.pause(); } catch(e){} }
+  else { try { speechSynthesis.resume(); } catch(e){} if (intro.tijdOm && !intro.spreekt) return naarStap(intro.stap + 1); }
   const balk = document.querySelectorAll("#intro .intro-balk span i")[intro.stap];
   if (balk) balk.style.animationPlayState = intro.pauze ? "paused" : "running";
   if (!intro.pauze) speel(intro.rest);
@@ -4710,6 +4766,8 @@ window.addEventListener("click", ev => {          // op het venster: vóór alle
   const w = k.dataset.intro;
   if (w === "sluit") return stopIntro();
   if (w === "pauze") return wisselPauze();
+  if (w === "geluid"){ try { localStorage.setItem("attache-intro-geluid", introGeluid() ? "uit" : "aan"); } catch(e){}
+    if (!introGeluid() && introSpraak){ const u = introSpraak.u; zwijg(); u.onend && u.onend(); } werkGeluidKnopBij(); return; }
   naarStap(intro.stap + (w === "volgende" ? 1 : -1));
 }, true);
 window.addEventListener("keydown", ev => {        // op het venster: vóór menu's en panelen, zodat Esc altijd de clip sluit
@@ -4719,6 +4777,7 @@ window.addEventListener("keydown", ev => {        // op het venster: vóór menu
   if (ev.key === " " && !ev.target.closest?.("button")){ ev.preventDefault(); return wisselPauze(); }
   if (ev.key === "ArrowRight"){ ev.preventDefault(); return naarStap(intro.stap + 1); }
   if (ev.key === "ArrowLeft"){ ev.preventDefault(); return naarStap(intro.stap - 1); }
+  if (ev.key === "s" || ev.key === "S"){ ev.preventDefault(); return document.querySelector('#intro [data-intro="geluid"]:not([hidden])')?.click(); }
   if (ev.key === "Tab"){                                                     // de focus blijft in de kaart
     const knoppen = [...document.querySelectorAll("#intro .intro-knoppen button")].filter(b => !b.hidden);
     const j = knoppen.indexOf(document.activeElement); ev.preventDefault();
